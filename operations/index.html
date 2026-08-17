@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Soro Operations</title>
+    <link rel="stylesheet" href="operations.css" />
+    <link rel="stylesheet" href="roles.css" />
+    <link rel="stylesheet" href="auth.css" />
+    <link rel="stylesheet" href="profile-dialog.css" />
+  </head>
+  <body>
+    <section class="auth-gate" id="auth-gate" aria-labelledby="sign-in-title">
+      <form class="auth-card" id="sign-in-form">
+        <img src="solo_horizontal.svg" alt="Soro Group" class="auth-logo" />
+        <p class="eyebrow">Soro Operations</p>
+        <h1 id="sign-in-title">Welcome back</h1>
+        <p>Sign in to your secure Soro portal.</p>
+        <label>Email<input name="email" type="email" autocomplete="email" required placeholder="you@thesorogroup.com" /></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" required placeholder="Your password" /></label>
+        <button class="button primary auth-submit" type="submit">Sign in</button>
+        <button class="text-button auth-reset" type="button" id="reset-password">Forgot password?</button>
+        <p id="auth-message" class="auth-message" aria-live="polite"></p>
+      </form>
+    </section>
+    <main class="app-shell" id="app" hidden>
+      <aside class="sidebar" aria-label="Primary navigation">
+        <a class="brand" href="#overview" aria-label="Soro Operations home"><img src="solo_horizontal.svg" alt="Soro Group" /><small>Operations</small></a>
+        <nav id="main-nav">
+          <button class="nav-link active" data-view="overview">Overview</button>
+          <button class="nav-link" data-view="tasks">My Tasks <b>5</b></button>
+          <button class="nav-link" data-view="clients">Clients</button>
+          <button class="nav-link" data-view="vas">Talent</button>
+          <button class="nav-link" data-view="placements">Placements</button>
+          <button class="nav-link" data-view="documents">Documents</button>
+          <button class="nav-link" data-view="reports">Reports</button>
+        </nav>
+        <button class="profile" id="role-switcher" aria-label="Change sample workspace"><span class="avatar">MJ</span><span><strong>Matt Johnson</strong><small id="role-label">Administrator</small></span><i>⌄</i></button>
+      </aside>
+      <section class="content">
+        <header class="topbar">
+          <button class="mobile-menu" id="mobile-menu" aria-label="Open menu">☰</button>
+          <label class="global-search"><span>⌕</span><input id="global-search" placeholder="Search clients, Virtual Assistants, tasks…" /></label>
+          <div class="top-actions"><button class="text-button" id="sign-out" type="button">Sign out</button><button class="icon-button" aria-label="Notifications">◌<em>3</em></button><button class="help" aria-label="Help">?</button></div>
+        </header>
+        <div id="view-root"></div>
+      </section>
+    </main>
+    <dialog id="task-dialog"><form method="dialog" class="modal"><div class="modal-title"><h2>Add task</h2><button value="cancel" aria-label="Close">×</button></div><label>Task name<input id="task-name" required placeholder="What needs attention?" /></label><label>Due date<input type="date" /></label><label>Assign to<select><option>Me — Matt Johnson</option><option>Talent Management</option><option>Billing</option></select></label><button value="default" class="primary">Add task</button></form></dialog>
+    <dialog id="role-dialog"><form method="dialog" class="modal"><div class="modal-title"><h2>Preview a workspace</h2><button value="cancel" aria-label="Close">×</button></div><div class="role-options"><button value="admin" class="role-option"><strong>Admin Panel</strong><small>Company-wide operations and oversight</small></button><button value="sales" class="role-option"><strong>Sales Panel</strong><small>Clients, follow-ups, and shortlists</small></button><button value="talent" class="role-option"><strong>Talent Panel</strong><small>Virtual Assistant readiness, support, and reviews</small></button><button value="client" class="role-option"><strong>Client Portal</strong><small>Active Virtual Assistants, documents, invoices, and hiring</small></button><button value="va" class="role-option"><strong>Virtual Assistant Portal</strong><small>Daily work, Dream Pathway, and support</small></button></div></form></dialog>
+    <dialog id="talent-dialog"><section class="modal talent-profile-modal"><div class="modal-title"><div><p class="eyebrow">Talent profile</p><h2 id="talent-profile-title">Talent profile</h2></div><button type="button" class="profile-close" aria-label="Close Talent profile" id="close-talent-profile">×</button></div><div id="talent-profile-content"></div></section></dialog>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="operations.js"></script>
+    <script src="auth.js"></script>
+  </body>
+</html>

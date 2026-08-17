@@ -1,0 +1,27 @@
+[build]
+  publish = "."
+
+[[redirects]]
+  from = "/about-us/"
+  to = "/about-us.html"
+  status = 200
+
+[[redirects]]
+  from = "/how-it-works/"
+  to = "/how-it-works.html"
+  status = 200
+
+[[redirects]]
+  from = "/virtual-assistants/"
+  to = "/virtual-assistants.html"
+  status = 200
+
+[[redirects]]
+  from = "/businesses/"
+  to = "/businesses.html"
+  status = 200
+
+[[redirects]]
+  from = "/contact/"
+  to = "/contact.html"
+  status = 200

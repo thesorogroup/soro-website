@@ -1,0 +1,18 @@
+#talent-dialog{width:min(760px,calc(100vw - 36px));max-height:min(780px,calc(100vh - 36px));padding:0;border:0;border-radius:18px;box-shadow:0 28px 80px rgba(8,27,59,.28);overflow:hidden}
+#talent-dialog::backdrop{background:rgba(8,25,50,.52);backdrop-filter:blur(2px)}
+.talent-profile-modal{width:100%;max-height:inherit;padding:28px 30px 30px;overflow:auto;background:#fff}
+.talent-profile-modal .modal-title{margin:0 -30px 22px;padding:0 30px 20px;border-bottom:1px solid #e7eaf0;align-items:flex-start}
+.talent-profile-modal .modal-title .eyebrow{margin:0 0 4px;font-size:12px;letter-spacing:.02em}
+.talent-profile-modal .modal-title h2{font-size:26px;letter-spacing:-.4px}
+.profile-close{width:36px;height:36px;border:1px solid #d6dee9;border-radius:10px;background:#fff;color:#24334b;font:500 28px/30px Arial,sans-serif;cursor:pointer;display:grid;place-items:center;transition:background .15s,border-color .15s,color .15s,transform .15s}
+.profile-close:hover{background:#fff1ed;border-color:#f45a1f;color:#c73f0d;transform:scale(1.04)}
+.profile-close:focus-visible{outline:3px solid #9ec8ff;outline-offset:2px}
+.talent-profile-modal>#talent-profile-content>p.eyebrow{display:none}
+.talent-profile-modal>#talent-profile-content>p:not(.eyebrow){margin:0 0 22px;color:#667085;font-size:14px}
+.profile-documents{border:1px solid #e2e8f0;border-radius:14px;padding:18px;background:#fbfcfe}
+.profile-documents .panel-head{margin-bottom:8px}.profile-documents h3{margin:0;font-size:17px}
+.profile-documents ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.profile-documents li{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:13px 14px;border:1px solid #e6ebf2;border-radius:10px;background:#fff}
+.profile-documents li>span{min-width:0}.profile-documents strong{display:block;overflow-wrap:anywhere;font-size:14px;line-height:1.35}.profile-documents small{display:block;margin-top:4px;color:#667085;font-size:12px}
+.profile-documents .text-button{flex:0 0 auto;padding:7px 9px;border:1px solid #cbd8e8;border-radius:8px;background:#f8fbff;color:#082d5c;font-size:12px}.profile-documents .text-button:hover{border-color:#3d82c5;background:#eef7ff}
+@media(max-width:600px){#talent-dialog{width:calc(100vw - 20px);max-height:calc(100vh - 20px)}.talent-profile-modal{padding:22px 18px}.talent-profile-modal .modal-title{margin:0 -18px 18px;padding:0 18px 16px}.talent-profile-modal .modal-title h2{font-size:22px}.profile-documents{padding:12px}.profile-documents li{align-items:flex-start;flex-direction:column;gap:10px}.profile-documents .text-button{width:100%;text-align:center}}

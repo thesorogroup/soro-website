@@ -1,0 +1,11 @@
+# Local Netlify folder
+.netlify
+.env
+.env.*
+!.env.example
+
+# Local deployment packages and legacy export copies
+*.zip
+/netlify-upload/
+/wordpress-imports/
+/svg-jpeg-previews/
