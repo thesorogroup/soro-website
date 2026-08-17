@@ -1,0 +1,94 @@
+/* Inline private introduction video on a Talent profile. */
+.profile-hero-media {
+  width: min(100%, 360px);
+  display: grid;
+  gap: 12px;
+  justify-items: end;
+  flex: 0 1 360px;
+}
+
+.profile-introduction-video-slot { width: 100%; }
+
+.profile-introduction-video {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #d9e3ef;
+  border-radius: 13px;
+  background: #fff;
+  box-shadow: 0 3px 14px rgba(8, 45, 92, .06);
+}
+
+.profile-introduction-video > div { margin-bottom: 9px; }
+
+.profile-introduction-video strong {
+  display: block;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-introduction-video video {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: 210px;
+  border-radius: 9px;
+  background: #0a294f;
+}
+
+.profile-introduction-video small {
+  display: block;
+  margin-top: 7px;
+  color: #667085;
+  font-size: 11px;
+}
+
+.profile-layout .profile-skills-experience-section { min-width: 0; }
+.profile-layout .profile-documents-section { grid-column: 1 / -1; }
+
+.skills-experience-content {
+  display: grid;
+  gap: 18px;
+}
+
+.detail-label {
+  margin: 0 0 8px;
+  color: #315d92;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.skill-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.skill-chips span {
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #eaf3fb;
+  color: #113f73;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.experience-summary {
+  margin: 0;
+  color: #26384d;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+@media (max-width: 900px) {
+  .profile-hero-media { max-width: 340px; }
+  .profile-layout .profile-documents-section { grid-column: auto; }
+}
+
+@media (max-width: 620px) {
+  .profile-hero-media { width: 100%; max-width: none; justify-items: stretch; }
+}
