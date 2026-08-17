@@ -1,6 +1,6 @@
 # Soro private-file import bridge
 
-This Netlify Function copies legacy Google Drive application files into the private Supabase Storage bucket and adds a document record to the matching Talent profile.
+This Netlify Function copies legacy Google Drive application files and publicly shared Loom introduction videos into the private Supabase Storage bucket, then adds a document record to the matching Talent profile.
 
 Set these **server-only** Netlify environment variables before deploying:
 
@@ -18,4 +18,4 @@ The importer can alternatively use the following three OAuth variables when a se
 
 Do not put any of these values in `operations/supabase-config.js`, browser JavaScript, or a public repository. The browser sends only the signed-in Admin session to `/.netlify/functions/import-google-drive`; the function checks the Soro role before it runs.
 
-Loom recordings need their own archive connection because Loom is separate from Google Drive.
+Loom recording archival needs no additional account connection: the importer uses each applicant's existing public Loom link. Files above Supabase Storage's 50 MB per-file limit are reported for manual handling instead of being exposed as public links.

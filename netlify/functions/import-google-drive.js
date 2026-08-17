@@ -1,10 +1,10 @@
 /*
- * Admin-only legacy document importer.
+ * Admin-only legacy file importer.
  *
- * This function deliberately runs on the server. Google credentials stay in
- * Netlify environment variables and never reach the browser or the public
- * Soro site. Database and storage actions run under the initiating Soro
- * Admin's short-lived session, which is protected by row-level security.
+ * This function deliberately runs on the server. Google credentials and Loom
+ * retrieval happen here, never in the browser or the public Soro site.
+ * Database and storage actions run under the initiating Soro Admin's
+ * short-lived session, which is protected by row-level security.
  */
 const crypto = require('node:crypto');
 // The project URL is public configuration. Keep a safe fallback so an
@@ -23,6 +23,7 @@ const GOOGLE_DRIVE_CLIENT_SECRET = process.env.GOOGLE_DRIVE_CLIENT_SECRET;
 const GOOGLE_DRIVE_REFRESH_TOKEN = process.env.GOOGLE_DRIVE_REFRESH_TOKEN;
 const GOOGLE_SERVICE_ACCOUNT_JSON_BASE64 = process.env.GOOGLE_SERVICE_ACCOUNT_JSON_BASE64;
 const BUCKET = 'soro-private-documents';
+const MAX_ARCHIVE_BYTES = 50 * 1024 * 1024;
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -30,18 +31,34 @@ const json = (statusCode, body) => ({
   body: JSON.stringify(body)
 });
 
-function requiredConfiguration() {
-  const missing = [];
+function hasGoogleConfiguration() {
   const hasServiceAccount = Boolean(GOOGLE_SERVICE_ACCOUNT_JSON_BASE64);
   const hasOAuthRefresh = [GOOGLE_DRIVE_CLIENT_ID, GOOGLE_DRIVE_CLIENT_SECRET, GOOGLE_DRIVE_REFRESH_TOKEN].every(Boolean);
-  if (!hasServiceAccount && !hasOAuthRefresh) missing.push('GOOGLE_SERVICE_ACCOUNT_JSON_BASE64');
-  return missing;
+  return hasServiceAccount || hasOAuthRefresh;
 }
 
 function extractDriveId(url) {
   if (typeof url !== 'string') return null;
   const match = url.match(/\/d\/([\w-]+)/) || url.match(/[?&]id=([\w-]+)/);
   return match ? match[1] : null;
+}
+
+function extractLoomId(url) {
+  if (typeof url !== 'string') return null;
+  try {
+    const parsed = new URL(url);
+    if (!/(^|\.)loom\.com$/i.test(parsed.hostname)) return null;
+    const parts = parsed.pathname.split('/').filter(Boolean);
+    const marker = parts.findIndex((part) => ['share', 'embed'].includes(part.toLowerCase()));
+    const candidate = marker >= 0 ? parts[marker + 1] : parts.at(-1);
+    return candidate && /^[a-zA-Z0-9-]{8,}$/.test(candidate) ? candidate : null;
+  } catch {
+    return null;
+  }
+}
+
+function urlsIn(value) {
+  return (value.match(/https?:\/\/[^\s,]+/g) || []).map((url) => url.replace(/[\])}>.,;]+$/, ''));
 }
 
 function documentType(key = '') {
@@ -56,7 +73,7 @@ function documentType(key = '') {
 
 function collectDriveSources(value, key = '', results = []) {
   if (typeof value === 'string') {
-    const urls = value.match(/https?:\/\/[^\s,]+/g) || [];
+    const urls = urlsIn(value);
     for (const url of urls) {
       const fileId = extractDriveId(url);
       if (fileId) results.push({ fileId, sourceUrl: url, documentType: documentType(key) });
@@ -65,6 +82,20 @@ function collectDriveSources(value, key = '', results = []) {
     value.forEach((item) => collectDriveSources(item, key, results));
   } else if (value && typeof value === 'object') {
     Object.entries(value).forEach(([childKey, childValue]) => collectDriveSources(childValue, childKey, results));
+  }
+  return results;
+}
+
+function collectLoomSources(value, key = '', results = []) {
+  if (typeof value === 'string') {
+    for (const url of urlsIn(value)) {
+      const loomId = extractLoomId(url);
+      if (loomId) results.push({ loomId, sourceUrl: url, documentType: 'introduction_video' });
+    }
+  } else if (Array.isArray(value)) {
+    value.forEach((item) => collectLoomSources(item, key, results));
+  } else if (value && typeof value === 'object') {
+    Object.entries(value).forEach(([childKey, childValue]) => collectLoomSources(childValue, childKey, results));
   }
   return results;
 }
@@ -154,12 +185,30 @@ async function getDriveFile(fileId, accessToken) {
   return { metadata, bytes: await fileResponse.arrayBuffer() };
 }
 
+async function getLoomFile(loomId) {
+  const sourceResponse = await fetch(`https://www.loom.com/api/campaigns/sessions/${encodeURIComponent(loomId)}/transcoded-url`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'User-Agent': 'Soro Ops legacy archive' }
+  });
+  if (!sourceResponse.ok) throw new Error('This Loom recording is no longer available for secure archival.');
+  const payload = await sourceResponse.json();
+  if (!payload?.url) throw new Error('Loom did not provide an archive file for this recording.');
+  const fileResponse = await fetch(payload.url);
+  if (!fileResponse.ok) throw new Error('The Loom recording could not be downloaded.');
+  const expectedSize = Number(fileResponse.headers.get('content-length') || 0);
+  if (expectedSize > MAX_ARCHIVE_BYTES) throw new Error('This Loom recording is over Soro storage’s 50 MB per-file limit.');
+  const bytes = await fileResponse.arrayBuffer();
+  if (bytes.byteLength > MAX_ARCHIVE_BYTES) throw new Error('This Loom recording is over Soro storage’s 50 MB per-file limit.');
+  return {
+    metadata: { id: loomId, name: `Loom introduction video - ${loomId}.mp4`, mimeType: fileResponse.headers.get('content-type') || 'video/mp4' },
+    bytes
+  };
+}
+
 function safePathPart(value) { return String(value || 'file').replace(/[^a-zA-Z0-9._-]/g, '_'); }
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed.' });
-  const missing = requiredConfiguration();
-  if (missing.length) return json(503, { error: 'Import bridge is not configured.', missing });
   try {
     const adminCheck = await requireAdmin(event);
     if (!adminCheck.allowed) return json(403, { error: adminCheck.reason });
@@ -168,30 +217,40 @@ exports.handler = async (event) => {
     const offset = Number.isInteger(requested.offset) && requested.offset >= 0 ? requested.offset : 0;
     const batchSize = 1;
     const query = new URLSearchParams({
-      select: 'id,organization_id,full_name,resume_url,legacy_application_data',
+      select: 'id,organization_id,full_name,resume_url,loom_video_url,legacy_application_data',
       order: 'application_received_at.asc'
     });
     if (selectedIds?.length) query.set('id', `in.(${selectedIds.join(',')})`);
     const authorization = adminCheck.authorization;
     const applicants = await (await supabase(`/rest/v1/applicants?${query}`, authorization)).json();
     const workItems = [];
-    let loomNeedsArchive = 0;
+    let loomFound = 0;
     for (const applicant of applicants) {
       const sources = collectDriveSources({ resume: applicant.resume_url, ...(applicant.legacy_application_data || {}) });
-      const uniqueSources = [...new Map(sources.map((source) => [source.fileId, source])).values()];
-      if ((applicant.legacy_application_data?.['Introduction video'] || applicant.legacy_application_data?.['Loom Video']) && applicant.legacy_application_data?.['Introduction video']?.includes('loom.com')) loomNeedsArchive += 1;
-      uniqueSources.forEach((source) => workItems.push({ applicant, source }));
+      const driveSources = [...new Map(sources.map((source) => [source.fileId, source])).values()];
+      const loomSources = [...new Map(collectLoomSources({ loom_video_url: applicant.loom_video_url, ...(applicant.legacy_application_data || {}) }).map((source) => [source.loomId, source])).values()];
+      loomFound += loomSources.length;
+      driveSources.forEach((source) => workItems.push({ applicant, source, provider: 'drive' }));
+      loomSources.forEach((source) => workItems.push({ applicant, source, provider: 'loom' }));
     }
     const batch = workItems.slice(offset, offset + batchSize);
-    const report = { imported: 0, skipped: 0, failed: [], loomNeedsArchive, total: workItems.length, nextOffset: offset + batch.length };
+    const report = { imported: 0, skipped: 0, failed: [], loomFound, loomArchived: 0, total: workItems.length, nextOffset: offset + batch.length };
     if (batch.length) {
-      const accessToken = await getGoogleAccessToken();
-      for (const { applicant, source } of batch) {
+      let accessToken;
+      for (const { applicant, source, provider } of batch) {
         try {
           const existing = await (await supabase(`/rest/v1/documents?applicant_id=eq.${applicant.id}&external_url=eq.${encodeURIComponent(source.sourceUrl)}&select=id`, authorization)).json();
           if (existing.length) { report.skipped += 1; continue; }
-          const { metadata, bytes } = await getDriveFile(source.fileId, accessToken);
-          const storagePath = `applicants/${applicant.id}/${source.fileId}-${safePathPart(metadata.name)}`;
+          if (provider === 'drive' && !hasGoogleConfiguration()) throw new Error('Google Drive import is not configured.');
+          if (provider === 'drive' && !accessToken) accessToken = await getGoogleAccessToken();
+          const { metadata, bytes } = provider === 'loom'
+            ? await getLoomFile(source.loomId)
+            : await getDriveFile(source.fileId, accessToken);
+          const fileId = provider === 'loom' ? source.loomId : source.fileId;
+          const fileName = provider === 'loom'
+            ? `${safePathPart(applicant.full_name)}-loom-introduction-video.mp4`
+            : metadata.name;
+          const storagePath = `applicants/${applicant.id}/${provider}-${fileId}-${safePathPart(fileName)}`;
           await supabase(`/storage/v1/object/${BUCKET}/${storagePath.split('/').map(encodeURIComponent).join('/')}`, authorization, {
             method: 'POST',
             headers: { 'Content-Type': metadata.mimeType || 'application/octet-stream', 'x-upsert': 'true' },
@@ -203,7 +262,7 @@ exports.handler = async (event) => {
             body: JSON.stringify({
               organization_id: applicant.organization_id,
               applicant_id: applicant.id,
-              file_name: metadata.name,
+              file_name: fileName,
               storage_path: storagePath,
               external_url: source.sourceUrl,
               document_type: source.documentType,
@@ -211,8 +270,9 @@ exports.handler = async (event) => {
             })
           });
           report.imported += 1;
+          if (provider === 'loom') report.loomArchived += 1;
         } catch (error) {
-          report.failed.push({ applicant: applicant.full_name, file: source.fileId, message: error.message });
+          report.failed.push({ applicant: applicant.full_name, file: source.loomId || source.fileId, provider, message: error.message });
         }
     }
     }
