@@ -7,7 +7,18 @@
   flex: 0 1 360px;
 }
 
-.profile-introduction-video-slot { width: 100%; }
+.profile-introduction-video-slot {
+  width: 100%;
+  display: grid;
+  gap: 12px;
+}
+
+.profile-video-empty {
+  margin: 0;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.45;
+}
 
 .profile-introduction-video {
   width: 100%;
@@ -83,6 +94,17 @@
   line-height: 1.55;
   white-space: pre-line;
 }
+
+.profile-edit-details { white-space: nowrap; }
+.profile-details-dialog { width:min(620px,calc(100vw - 32px)); padding:0; border:0; border-radius:16px; box-shadow:0 24px 70px rgba(8,31,60,.24); color:#112944; }
+.profile-details-dialog form { padding:26px; }
+.dialog-heading { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; }
+.dialog-heading h2 { margin:2px 0 0; font-family:Georgia,serif; font-size:26px; color:#0c386a; }
+.dialog-copy { margin:12px 0 20px; color:#53657b; line-height:1.5; }
+.profile-details-dialog label { display:grid; gap:7px; margin-top:16px; font-size:14px; font-weight:800; color:#183d68; }
+.profile-details-dialog label span { font-size:12px; font-weight:500; color:#667085; }
+.profile-details-dialog textarea { width:100%; box-sizing:border-box; resize:vertical; border:1px solid #ccd8e6; border-radius:10px; padding:11px 12px; font:inherit; font-weight:400; line-height:1.45; color:#172033; background:#fff; }
+.profile-details-dialog textarea:focus { outline:3px solid rgba(48,122,196,.2); border-color:#3a78b8; }
 
 @media (max-width: 900px) {
   .profile-hero-media { max-width: 340px; }

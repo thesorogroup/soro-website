@@ -202,11 +202,11 @@ async function getLoomFile(loomId) {
   const sourceResponse = await fetchWithTimeout(`https://www.loom.com/api/campaigns/sessions/${encodeURIComponent(loomId)}/transcoded-url`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'User-Agent': 'Soro Ops legacy archive' }
-  }, 8000, 'Loom did not provide an archive link quickly enough.');
+  }, 2500, 'Loom did not provide an archive link quickly enough.');
   if (!sourceResponse.ok) throw new Error('This Loom recording is no longer available for secure archival.');
   const payload = await sourceResponse.json();
   if (!payload?.url) throw new Error('Loom did not provide an archive file for this recording.');
-  const fileResponse = await fetchWithTimeout(payload.url, {}, 12000, 'The Loom video download took too long and needs review.');
+  const fileResponse = await fetchWithTimeout(payload.url, {}, 4500, 'The Loom video download took too long and needs review.');
   if (!fileResponse.ok) throw new Error('The Loom recording could not be downloaded.');
   const expectedSize = Number(fileResponse.headers.get('content-length') || 0);
   if (expectedSize > MAX_ARCHIVE_BYTES) throw new Error('This Loom recording is over Soro storage’s 50 MB per-file limit.');
@@ -227,6 +227,7 @@ exports.handler = async (event) => {
     if (!adminCheck.allowed) return json(403, { error: adminCheck.reason });
     const requested = event.body ? JSON.parse(event.body) : {};
     const selectedIds = Array.isArray(requested.applicantIds) ? requested.applicantIds : null;
+    const requestedProvider = ['drive', 'loom'].includes(requested.provider) ? requested.provider : null;
     const offset = Number.isInteger(requested.offset) && requested.offset >= 0 ? requested.offset : 0;
     const batchSize = 1;
     const query = new URLSearchParams({
@@ -252,8 +253,9 @@ exports.handler = async (event) => {
         .filter((source) => !importedSourceUrls.has(source.sourceUrl))
         .forEach((source) => workItems.push({ applicant, source, provider: 'loom' }));
     }
-    const batch = workItems.slice(offset, offset + batchSize);
-    const report = { imported: 0, skipped: 0, failed: [], loomFound, loomArchived: 0, total: workItems.length, nextOffset: offset + batch.length };
+    const providerWorkItems = requestedProvider ? workItems.filter((item) => item.provider === requestedProvider) : workItems;
+    const batch = providerWorkItems.slice(offset, offset + batchSize);
+    const report = { imported: 0, skipped: 0, failed: [], loomFound, loomArchived: 0, provider: requestedProvider, total: providerWorkItems.length, nextOffset: offset + batch.length };
     if (batch.length) {
       let accessToken;
       for (const { applicant, source, provider } of batch) {

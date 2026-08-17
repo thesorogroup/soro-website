@@ -1,0 +1,32 @@
+/* Address data is deliberately styled as private profile information. */
+.profile-private-address {
+  width: min(100%, 270px);
+  margin: 12px 0 0;
+  padding: 12px 13px;
+  border: 1px solid #cbdceb;
+  border-left: 3px solid #f35d2b;
+  border-radius: 11px;
+  background: linear-gradient(135deg, #f7fbff, #fffdfa);
+  box-shadow: 0 4px 15px rgba(9, 46, 90, .05);
+}
+
+.private-address-heading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #35577d;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.private-address-lock { color: #f35d2b; font-size: 14px; line-height: 1; }
+.profile-private-address strong { display: block; color: #123d70; font-size: 14px; }
+.profile-private-address p { margin: 5px 0 6px; color: #273c55; font-size: 13px; line-height: 1.42; }
+.profile-private-address small { color: #64748b; font-size: 12px; }
+
+@media (max-width: 720px) {
+  .profile-private-address { width: 100%; box-sizing: border-box; }
+}
