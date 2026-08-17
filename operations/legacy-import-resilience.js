@@ -49,6 +49,7 @@
       let offset = 0;
       let imported = 0;
       let skipped = 0;
+      let failed = [];
       let total = 1;
       while (offset < total) {
         button.textContent = offset ? `Importing legacy files (${offset}/${total})…` : 'Importing legacy files…';
@@ -57,9 +58,11 @@
         offset = Number(report.nextOffset ?? offset + 1);
         imported += Number(report.imported || 0);
         skipped += Number(report.skipped || 0);
+        failed = failed.concat(report.failed || []);
       }
 
-      toast(`Legacy import complete: ${imported} file${imported === 1 ? '' : 's'} attached${skipped ? `, ${skipped} already on file` : ''}.`);
+      toast(`Legacy import complete: ${imported} file${imported === 1 ? '' : 's'} attached${skipped ? `, ${skipped} already on file` : ''}${failed.length ? `. ${failed.length} file${failed.length === 1 ? '' : 's'} need review` : ''}.`);
+      if (failed.length) console.warn('Legacy import files needing review:', failed);
       if (typeof loadLiveApplicants === 'function') await loadLiveApplicants();
     } catch (error) {
       console.error('Soro Ops legacy import failed', error);

@@ -1,0 +1,142 @@
+/* Soro Ops task dialog: a light, deliberate companion to the Operations UI. */
+#task-dialog {
+  width: min(540px, calc(100vw - 32px));
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+#task-dialog::backdrop {
+  background: rgba(6, 27, 54, .54);
+  backdrop-filter: blur(4px);
+}
+
+#task-dialog .modal {
+  width: 100%;
+  margin: 0;
+  padding: 30px;
+  border: 1px solid #d7e2ef;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #ffffff 0%, #fbfdff 100%);
+  box-shadow: 0 26px 70px rgba(4, 25, 53, .3);
+}
+
+#task-dialog .modal-title {
+  align-items: flex-start;
+  margin: 0 0 23px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #e2eaf2;
+}
+
+#task-dialog .modal-title h2 {
+  margin: 0;
+  color: #0b3768;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -.45px;
+  line-height: 1.1;
+}
+
+#task-dialog .modal-title h2::before {
+  content: 'Soro Ops · My tasks';
+  display: block;
+  margin: 0 0 7px;
+  color: #6c7f95;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+#task-dialog .modal label {
+  gap: 7px;
+  margin: 15px 0;
+  color: #38516b;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .065em;
+  text-transform: uppercase;
+}
+
+#task-dialog .modal input,
+#task-dialog .modal select {
+  min-height: 45px;
+  padding: 10px 12px;
+  border: 1px solid #cbd8e7;
+  border-radius: 10px;
+  background: #fff;
+  color: #182b40;
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+
+#task-dialog .modal input::placeholder { color: #8a99aa; }
+
+#task-dialog .modal input:focus,
+#task-dialog .modal select:focus {
+  outline: 0;
+  border-color: #4f87bc;
+  box-shadow: 0 0 0 3px rgba(67, 129, 186, .14);
+}
+
+#task-dialog .modal-actions {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  margin-top: 24px;
+}
+
+#task-dialog .modal-cancel,
+#task-dialog .primary {
+  min-height: 44px;
+  margin: 0;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+#task-dialog .modal-cancel {
+  border-color: #d5dee9;
+  color: #294765;
+  background: #fff;
+}
+
+#task-dialog .modal-cancel:hover { background: #f3f7fb; }
+
+#task-dialog .primary {
+  width: auto;
+  border-color: #ed5b27;
+  background: linear-gradient(135deg, #f7652d, #ef531c);
+  box-shadow: 0 7px 16px rgba(222, 78, 27, .19);
+}
+
+#task-dialog .primary:hover { filter: brightness(.97); }
+
+#task-dialog .modal-close {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #d5e0ec;
+  border-radius: 50%;
+  color: #183d67;
+  font-size: 23px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+#task-dialog .modal-close:hover {
+  border-color: #f0aa8d;
+  background: #fff3ee;
+  color: #c84d1e;
+}
+
+@media (max-width: 520px) {
+  #task-dialog .modal { padding: 24px 20px 20px; }
+  #task-dialog .modal-title h2 { font-size: 25px; }
+}

@@ -185,15 +185,28 @@ async function getDriveFile(fileId, accessToken) {
   return { metadata, bytes: await fileResponse.arrayBuffer() };
 }
 
+async function fetchWithTimeout(url, options = {}, timeoutMs = 10000, timeoutMessage = 'The remote file took too long to respond.') {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error(timeoutMessage);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function getLoomFile(loomId) {
-  const sourceResponse = await fetch(`https://www.loom.com/api/campaigns/sessions/${encodeURIComponent(loomId)}/transcoded-url`, {
+  const sourceResponse = await fetchWithTimeout(`https://www.loom.com/api/campaigns/sessions/${encodeURIComponent(loomId)}/transcoded-url`, {
     method: 'POST',
     headers: { Accept: 'application/json', 'User-Agent': 'Soro Ops legacy archive' }
-  });
+  }, 8000, 'Loom did not provide an archive link quickly enough.');
   if (!sourceResponse.ok) throw new Error('This Loom recording is no longer available for secure archival.');
   const payload = await sourceResponse.json();
   if (!payload?.url) throw new Error('Loom did not provide an archive file for this recording.');
-  const fileResponse = await fetch(payload.url);
+  const fileResponse = await fetchWithTimeout(payload.url, {}, 12000, 'The Loom video download took too long and needs review.');
   if (!fileResponse.ok) throw new Error('The Loom recording could not be downloaded.');
   const expectedSize = Number(fileResponse.headers.get('content-length') || 0);
   if (expectedSize > MAX_ARCHIVE_BYTES) throw new Error('This Loom recording is over Soro storage’s 50 MB per-file limit.');
@@ -223,6 +236,8 @@ exports.handler = async (event) => {
     if (selectedIds?.length) query.set('id', `in.(${selectedIds.join(',')})`);
     const authorization = adminCheck.authorization;
     const applicants = await (await supabase(`/rest/v1/applicants?${query}`, authorization)).json();
+    const existingDocuments = await (await supabase('/rest/v1/documents?select=external_url&external_url=not.is.null', authorization)).json();
+    const importedSourceUrls = new Set(existingDocuments.map((document) => document.external_url).filter(Boolean));
     const workItems = [];
     let loomFound = 0;
     for (const applicant of applicants) {
@@ -230,8 +245,12 @@ exports.handler = async (event) => {
       const driveSources = [...new Map(sources.map((source) => [source.fileId, source])).values()];
       const loomSources = [...new Map(collectLoomSources({ loom_video_url: applicant.loom_video_url, ...(applicant.legacy_application_data || {}) }).map((source) => [source.loomId, source])).values()];
       loomFound += loomSources.length;
-      driveSources.forEach((source) => workItems.push({ applicant, source, provider: 'drive' }));
-      loomSources.forEach((source) => workItems.push({ applicant, source, provider: 'loom' }));
+      driveSources
+        .filter((source) => !importedSourceUrls.has(source.sourceUrl))
+        .forEach((source) => workItems.push({ applicant, source, provider: 'drive' }));
+      loomSources
+        .filter((source) => !importedSourceUrls.has(source.sourceUrl))
+        .forEach((source) => workItems.push({ applicant, source, provider: 'loom' }));
     }
     const batch = workItems.slice(offset, offset + batchSize);
     const report = { imported: 0, skipped: 0, failed: [], loomFound, loomArchived: 0, total: workItems.length, nextOffset: offset + batch.length };
