@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Soro Operations</title>
+    <title>Soro Ops</title>
     <link rel="stylesheet" href="operations.css" />
     <link rel="stylesheet" href="roles.css" />
     <link rel="stylesheet" href="auth.css" />
@@ -12,8 +12,8 @@
   <body>
     <section class="auth-gate" id="auth-gate" aria-labelledby="sign-in-title">
       <form class="auth-card" id="sign-in-form">
-        <img src="solo_horizontal.svg" alt="Soro Group" class="auth-logo" />
-        <p class="eyebrow">Soro Operations</p>
+        <img src="../assets/soro-logo-horizontal.svg" alt="Soro Group" class="auth-logo" />
+        <p class="eyebrow">Soro Ops</p>
         <h1 id="sign-in-title">Welcome back</h1>
         <p>Sign in to your secure Soro portal.</p>
         <label>Email<input name="email" type="email" autocomplete="email" required placeholder="you@thesorogroup.com" /></label>
@@ -25,7 +25,7 @@
     </section>
     <main class="app-shell" id="app" hidden>
       <aside class="sidebar" aria-label="Primary navigation">
-        <a class="brand" href="#overview" aria-label="Soro Operations home"><img src="solo_horizontal.svg" alt="Soro Group" /><small>Operations</small></a>
+        <a class="brand" href="#overview" aria-label="Soro Ops home"><img src="../assets/soro-logo-horizontal.svg" alt="Soro Group" /><span class="brand-ops">OPS</span></a>
         <nav id="main-nav">
           <button class="nav-link active" data-view="overview">Overview</button>
           <button class="nav-link" data-view="tasks">My Tasks <b>5</b></button>
@@ -40,7 +40,7 @@
       <section class="content">
         <header class="topbar">
           <button class="mobile-menu" id="mobile-menu" aria-label="Open menu">☰</button>
-          <label class="global-search"><span>⌕</span><input id="global-search" placeholder="Search clients, Virtual Assistants, tasks…" /></label>
+          <label class="global-search"><span>⌕</span><input id="global-search" placeholder="Search clients, Talent, tasks…" /></label>
           <div class="top-actions"><button class="text-button" id="sign-out" type="button">Sign out</button><button class="icon-button" aria-label="Notifications">◌<em>3</em></button><button class="help" aria-label="Help">?</button></div>
         </header>
         <div id="view-root"></div>

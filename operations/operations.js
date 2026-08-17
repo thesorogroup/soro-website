@@ -23,3 +23,37 @@ async function uploadHeadshot(file){const applicant=liveApplicants.find(a=>a.id=
 async function openPrivateDocument(storagePath){const viewer=window.open('','_blank');if(!viewer){toast('Allow pop-ups for Soro to view private documents.');return}viewer.document.title='Opening secure Soro document…';const {data,error}=await window.soroSupabase.storage.from('soro-private-documents').createSignedUrl(storagePath,60);if(error||!data?.signedUrl){viewer.close();toast('This private document could not be opened.');return}viewer.location.href=data.signedUrl}
 async function importDriveFiles(){const button=document.getElementById('import-drive');if(!button)return;button.disabled=true;button.textContent='Starting import…';toast('Checking your Admin access and preparing the secure import…');try{if(!window.soroSupabase)throw new Error('Soro sign-in is still loading. Refresh this page and try again.');const {data:{session},error:sessionError}=await window.soroSupabase.auth.getSession();if(sessionError||!session)throw new Error('Please sign in to Soro again, then retry the import.');let offset=0,imported=0,skipped=0,total=0;do{button.textContent=total?`Importing ${Math.min(offset+1,total)}/${total}…`:'Importing…';const response=await fetch('/.netlify/functions/import-google-drive',{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},body:JSON.stringify({offset})}),responseText=await response.text();let report;try{report=JSON.parse(responseText)}catch{throw new Error(`The import server returned an unexpected response (${response.status}).`)}if(!response.ok)throw new Error(report.error||'The import could not start.');imported+=report.imported||0;skipped+=report.skipped||0;total=report.total||0;offset=report.nextOffset;if(report.complete)break}while(offset<total);toast(`${imported} private files attached. ${skipped} already existed.`);await loadLiveApplicants()}catch(error){toast(error.message||'The import could not start.')}finally{button.disabled=false;button.textContent='Import Drive files'}}
 window.addEventListener('soro-auth-changed',event=>{if(event.detail.session)loadLiveApplicants();else liveApplicants=[]});const initialHash=location.hash.match(/^#talent\/([^/]+)$/);if(initialHash){current='talent-profile';selectedTalentId=initialHash[1]}else if(location.hash.slice(1) in data){current=location.hash.slice(1)}render();
+
+function displayTalentName(value){
+  const raw=String(value||'').trim().replace(/\s+/g,' ');
+  if(!raw)return 'Talent';
+  const word=value=>value.split(/([-'])/).map(part=>/^[-']$/.test(part)?part:part?part.charAt(0).toUpperCase()+part.slice(1).toLowerCase():'').join('');
+  const words=value=>value.trim().split(/\s+/).filter(Boolean).map(word).join(' ');
+  const parts=raw.split(',').map(value=>value.trim()).filter(Boolean);
+  if(parts.length>1)return `${words(parts[0])}, ${words(parts.slice(1).join(' '))}`;
+  const tokens=raw.split(/\s+/).filter(Boolean);
+  return tokens.length>1?`${words(tokens[0])}, ${words(tokens.slice(1).join(' '))}`:words(raw);
+}
+
+function applyTalentDisplayNames(){
+  root.querySelectorAll('.talent-cell strong,.profile-identity h1').forEach(element=>{
+    element.textContent=displayTalentName(element.textContent);
+  });
+  root.querySelectorAll('.page-heading .eyebrow').forEach(element=>{
+    if(element.textContent.trim()==='Soro Operations')element.textContent='Soro Ops';
+  });
+}
+
+new MutationObserver(applyTalentDisplayNames).observe(root,{childList:true,subtree:true});
+applyTalentDisplayNames();
+
+root.addEventListener('input',event=>{
+  const input=event.target;
+  if(input.id!=='talent-search')return;
+  event.stopImmediatePropagation();
+  const cursor=input.selectionStart??input.value.length;
+  talentSearch=input.value;
+  render();
+  const refreshed=document.getElementById('talent-search');
+  if(refreshed){refreshed.focus();refreshed.setSelectionRange(cursor,cursor)}
+},true);
