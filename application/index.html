@@ -77,7 +77,35 @@
               <option>Yemen</option>
               <option>Zambia</option><option>Zimbabwe</option>
             </select></label>
-<label class="field">Time zone<select name="timezone" required><option value="Asia/Manila" selected>Philippines — Asia/Manila (PHT, UTC+8)</option><option value="Pacific/Auckland">New Zealand — Pacific/Auckland</option><option value="Australia/Sydney">Australia — Australia/Sydney</option><option value="Asia/Tokyo">Japan — Asia/Tokyo</option><option value="Asia/Seoul">South Korea — Asia/Seoul</option><option value="Asia/Singapore">Singapore — Asia/Singapore</option><option value="Asia/Hong_Kong">Hong Kong — Asia/Hong_Kong</option><option value="Asia/Shanghai">China — Asia/Shanghai</option><option value="Asia/Bangkok">Thailand / Vietnam — Asia/Bangkok</option><option value="Asia/Jakarta">Indonesia (Western) — Asia/Jakarta</option><option value="Asia/Kolkata">India — Asia/Kolkata</option><option value="Asia/Dhaka">Bangladesh — Asia/Dhaka</option><option value="Asia/Dubai">United Arab Emirates — Asia/Dubai</option><option value="Europe/London">United Kingdom — Europe/London</option><option value="Europe/Paris">Central Europe — Europe/Paris</option><option value="Africa/Johannesburg">South Africa — Africa/Johannesburg</option><option value="Africa/Nairobi">East Africa — Africa/Nairobi</option><option value="America/Sao_Paulo">Brazil — America/Sao_Paulo</option><option value="America/New_York">United States / Canada Eastern — America/New_York</option><option value="America/Chicago">United States / Canada Central — America/Chicago</option><option value="America/Denver">United States / Canada Mountain — America/Denver</option><option value="America/Los_Angeles">United States / Canada Pacific — America/Los_Angeles</option><option value="America/Anchorage">Alaska — America/Anchorage</option><option value="Pacific/Honolulu">Hawaii — Pacific/Honolulu</option><option value="Other">Other / not listed</option></select></label>
+<label class="field">Time zone
+  <select name="timezone" required>
+    <option value="Asia/Manila" selected>Philippines — Asia/Manila (PHT, UTC+08:00)</option>
+    <option value="Pacific/Auckland">New Zealand — Pacific/Auckland (UTC+12:00 / UTC+13:00)</option>
+    <option value="Australia/Sydney">Australia — Australia/Sydney (UTC+10:00 / UTC+11:00)</option>
+    <option value="Asia/Tokyo">Japan — Asia/Tokyo (UTC+09:00)</option>
+    <option value="Asia/Seoul">South Korea — Asia/Seoul (UTC+09:00)</option>
+    <option value="Asia/Singapore">Singapore — Asia/Singapore (UTC+08:00)</option>
+    <option value="Asia/Hong_Kong">Hong Kong — Asia/Hong_Kong (UTC+08:00)</option>
+    <option value="Asia/Shanghai">China — Asia/Shanghai (UTC+08:00)</option>
+    <option value="Asia/Bangkok">Thailand / Vietnam — Asia/Bangkok (UTC+07:00)</option>
+    <option value="Asia/Jakarta">Indonesia (Western) — Asia/Jakarta (UTC+07:00)</option>
+    <option value="Asia/Kolkata">India — Asia/Kolkata (UTC+05:30)</option>
+    <option value="Asia/Dhaka">Bangladesh — Asia/Dhaka (UTC+06:00)</option>
+    <option value="Asia/Dubai">United Arab Emirates — Asia/Dubai (UTC+04:00)</option>
+    <option value="Europe/London">United Kingdom — Europe/London (UTC+00:00 / UTC+01:00)</option>
+    <option value="Europe/Paris">Central Europe — Europe/Paris (UTC+01:00 / UTC+02:00)</option>
+    <option value="Africa/Johannesburg">South Africa — Africa/Johannesburg (UTC+02:00)</option>
+    <option value="Africa/Nairobi">East Africa — Africa/Nairobi (UTC+03:00)</option>
+    <option value="America/Sao_Paulo">Brazil — America/Sao_Paulo (UTC-03:00)</option>
+    <option value="America/New_York">United States / Canada Eastern — America/New_York (UTC-05:00 / UTC-04:00)</option>
+    <option value="America/Chicago">United States / Canada Central — America/Chicago (UTC-06:00 / UTC-05:00)</option>
+    <option value="America/Denver">United States / Canada Mountain — America/Denver (UTC-07:00 / UTC-06:00)</option>
+    <option value="America/Los_Angeles">United States / Canada Pacific — America/Los_Angeles (UTC-08:00 / UTC-07:00)</option>
+    <option value="America/Anchorage">Alaska — America/Anchorage (UTC-09:00 / UTC-08:00)</option>
+    <option value="Pacific/Honolulu">Hawaii — Pacific/Honolulu (UTC-10:00)</option>
+    <option value="Other">Other / not listed — specify your UTC offset</option>
+  </select>
+</label>
             <label class="field field-wide">Street address <small>(private)</small><input name="addressLine1" autocomplete="street-address" spellcheck="true" placeholder="Street, building, barangay, or neighborhood"></label>
             <label class="field">City / municipality<input name="city" autocomplete="address-level2" required spellcheck="true"></label>
             <label class="field">Province / region<input name="provinceRegion" autocomplete="address-level1" required spellcheck="true"></label>
