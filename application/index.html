@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Apply | Soro Group</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/styles.css">
+  <link rel="stylesheet" href="application.css">
+</head>
+<body class="soro-application-page">
+  <header class="application-header">
+    <a class="application-brand" href="../" aria-label="Soro Group home">
+      <img src="../assets/soro-logo-horizontal.svg" alt="Soro Group">
+    </a>
+    <a class="application-help" href="../contact.html">Need help?</a>
+  </header>
+
+  <main>
+    <section class="application-intro">
+      <p class="eyebrow">Soro Talent application</p>
+      <h1>Every meaningful future begins with a first step.</h1>
+      <p>Taking this step is an investment in the future you want to create. Thank you for allowing Soro to be part of your journey—tell us about your experience, strengths, and goals.</p>
+        <div class="application-notice"><strong>Before you begin:</strong> plan for about 15–20 minutes. Every field and upload is required unless it is clearly labeled <strong>Optional</strong>.</div>
+    </section>
+
+    <section class="application-shell" aria-label="Talent application">
+      <ol class="application-steps" aria-label="Application progress">
+        <li class="is-active"><span>1</span> Basics</li>
+        <li><span>2</span> Work profile</li>
+        <li><span>3</span> Documents</li>
+        <li><span>4</span> Review</li>
+      </ol>
+
+      <div id="application-alert" class="application-alert" role="alert" hidden></div>
+      <div id="save-confirmation" class="save-confirmation" hidden></div>
+
+      <form id="talent-application" novalidate>
+        <section class="form-step is-active" data-step="1">
+          <div class="step-heading"><p class="eyebrow">Step 1 of 4</p><h2>Tell us who you are</h2><p>Your address and contact details stay private to Soro staff and you.</p></div>
+          <div class="field-grid">
+            <div class="name-fields field-wide">
+              <label class="field"><span class="field-label">First legal name</span><input name="firstName" autocomplete="given-name" required spellcheck="true" placeholder="First name"></label>
+            <label class="field"><span class="field-label">Middle legal name(s) <small>(Optional)</small></span><input name="middleName" autocomplete="additional-name" spellcheck="true" placeholder="Middle name(s)"></label>
+              <label class="field"><span class="field-label">Last / family name</span><input name="lastName" autocomplete="family-name" required spellcheck="true" placeholder="Last name"></label>
+            </div>
+            <label class="field">Email address<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
+            <label class="field">Phone / WhatsApp number<input name="phone" type="tel" autocomplete="tel" required placeholder="Include country code if possible"></label>
+            <label class="field">Country<select name="country" required>
+              <option value="Philippines" selected>Philippines</option>
+              <option disabled>──────────</option>
+              <option>Afghanistan</option><option>Albania</option><option>Algeria</option><option>Andorra</option><option>Angola</option><option>Antigua and Barbuda</option><option>Argentina</option><option>Armenia</option><option>Australia</option><option>Austria</option><option>Azerbaijan</option>
+              <option>Bahamas</option><option>Bahrain</option><option>Bangladesh</option><option>Barbados</option><option>Belarus</option><option>Belgium</option><option>Belize</option><option>Benin</option><option>Bhutan</option><option>Bolivia</option><option>Bosnia and Herzegovina</option><option>Botswana</option><option>Brazil</option><option>Brunei</option><option>Bulgaria</option><option>Burkina Faso</option><option>Burundi</option>
+              <option>Cabo Verde</option><option>Cambodia</option><option>Cameroon</option><option>Canada</option><option>Central African Republic</option><option>Chad</option><option>Chile</option><option>China</option><option>Colombia</option><option>Comoros</option><option>Congo (Republic of the)</option><option>Costa Rica</option><option>Côte d’Ivoire</option><option>Croatia</option><option>Cuba</option><option>Cyprus</option><option>Czechia</option>
+              <option>Democratic Republic of the Congo</option><option>Denmark</option><option>Djibouti</option><option>Dominica</option><option>Dominican Republic</option>
+              <option>Ecuador</option><option>Egypt</option><option>El Salvador</option><option>Equatorial Guinea</option><option>Eritrea</option><option>Estonia</option><option>Eswatini</option><option>Ethiopia</option>
+              <option>Fiji</option><option>Finland</option><option>France</option>
+              <option>Gabon</option><option>Gambia</option><option>Georgia</option><option>Germany</option><option>Ghana</option><option>Greece</option><option>Grenada</option><option>Guatemala</option><option>Guinea</option><option>Guinea-Bissau</option><option>Guyana</option>
+              <option>Haiti</option><option>Honduras</option><option>Hungary</option>
+              <option>Iceland</option><option>India</option><option>Indonesia</option><option>Iran</option><option>Iraq</option><option>Ireland</option><option>Israel</option><option>Italy</option>
+              <option>Jamaica</option><option>Japan</option><option>Jordan</option>
+              <option>Kazakhstan</option><option>Kenya</option><option>Kiribati</option><option>Kuwait</option><option>Kyrgyzstan</option>
+              <option>Laos</option><option>Latvia</option><option>Lebanon</option><option>Lesotho</option><option>Liberia</option><option>Libya</option><option>Liechtenstein</option><option>Lithuania</option><option>Luxembourg</option>
+              <option>Madagascar</option><option>Malawi</option><option>Malaysia</option><option>Maldives</option><option>Mali</option><option>Malta</option><option>Marshall Islands</option><option>Mauritania</option><option>Mauritius</option><option>Mexico</option><option>Micronesia</option><option>Moldova</option><option>Monaco</option><option>Mongolia</option><option>Montenegro</option><option>Morocco</option><option>Mozambique</option><option>Myanmar</option>
+              <option>Namibia</option><option>Nauru</option><option>Nepal</option><option>Netherlands</option><option>New Zealand</option><option>Nicaragua</option><option>Niger</option><option>Nigeria</option><option>North Korea</option><option>North Macedonia</option><option>Norway</option>
+              <option>Oman</option>
+              <option>Pakistan</option><option>Palau</option><option>Panama</option><option>Papua New Guinea</option><option>Paraguay</option><option>Peru</option><option>Poland</option><option>Portugal</option>
+              <option>Qatar</option>
+              <option>Romania</option><option>Russia</option><option>Rwanda</option>
+              <option>Saint Kitts and Nevis</option><option>Saint Lucia</option><option>Saint Vincent and the Grenadines</option><option>Samoa</option><option>San Marino</option><option>Sao Tome and Principe</option><option>Saudi Arabia</option><option>Senegal</option><option>Serbia</option><option>Seychelles</option><option>Sierra Leone</option><option>Singapore</option><option>Slovakia</option><option>Slovenia</option><option>Solomon Islands</option><option>Somalia</option><option>South Africa</option><option>South Korea</option><option>South Sudan</option><option>Spain</option><option>Sri Lanka</option><option>Sudan</option><option>Suriname</option><option>Sweden</option><option>Switzerland</option><option>Syria</option>
+              <option>Tajikistan</option><option>Tanzania</option><option>Thailand</option><option>Timor-Leste</option><option>Togo</option><option>Tonga</option><option>Trinidad and Tobago</option><option>Tunisia</option><option>Türkiye</option><option>Turkmenistan</option><option>Tuvalu</option>
+              <option>Uganda</option><option>Ukraine</option><option>United Arab Emirates</option><option>United Kingdom</option><option>United States</option><option>Uruguay</option><option>Uzbekistan</option>
+              <option>Vanuatu</option><option>Vatican City</option><option>Venezuela</option><option>Vietnam</option>
+              <option>Yemen</option>
+              <option>Zambia</option><option>Zimbabwe</option>
+            </select></label>
+<label class="field">Time zone<select name="timezone" required><option value="Asia/Manila" selected>Philippines — Asia/Manila (PHT, UTC+8)</option><option value="Pacific/Auckland">New Zealand — Pacific/Auckland</option><option value="Australia/Sydney">Australia — Australia/Sydney</option><option value="Asia/Tokyo">Japan — Asia/Tokyo</option><option value="Asia/Seoul">South Korea — Asia/Seoul</option><option value="Asia/Singapore">Singapore — Asia/Singapore</option><option value="Asia/Hong_Kong">Hong Kong — Asia/Hong_Kong</option><option value="Asia/Shanghai">China — Asia/Shanghai</option><option value="Asia/Bangkok">Thailand / Vietnam — Asia/Bangkok</option><option value="Asia/Jakarta">Indonesia (Western) — Asia/Jakarta</option><option value="Asia/Kolkata">India — Asia/Kolkata</option><option value="Asia/Dhaka">Bangladesh — Asia/Dhaka</option><option value="Asia/Dubai">United Arab Emirates — Asia/Dubai</option><option value="Europe/London">United Kingdom — Europe/London</option><option value="Europe/Paris">Central Europe — Europe/Paris</option><option value="Africa/Johannesburg">South Africa — Africa/Johannesburg</option><option value="Africa/Nairobi">East Africa — Africa/Nairobi</option><option value="America/Sao_Paulo">Brazil — America/Sao_Paulo</option><option value="America/New_York">United States / Canada Eastern — America/New_York</option><option value="America/Chicago">United States / Canada Central — America/Chicago</option><option value="America/Denver">United States / Canada Mountain — America/Denver</option><option value="America/Los_Angeles">United States / Canada Pacific — America/Los_Angeles</option><option value="America/Anchorage">Alaska — America/Anchorage</option><option value="Pacific/Honolulu">Hawaii — Pacific/Honolulu</option><option value="Other">Other / not listed</option></select></label>
+            <label class="field field-wide">Street address <small>(private)</small><input name="addressLine1" autocomplete="street-address" spellcheck="true" placeholder="Street, building, barangay, or neighborhood"></label>
+            <label class="field">City / municipality<input name="city" autocomplete="address-level2" required spellcheck="true"></label>
+            <label class="field">Province / region<input name="provinceRegion" autocomplete="address-level1" required spellcheck="true"></label>
+            <label class="field">Postal code <small>(if available)</small><input name="postalCode" autocomplete="postal-code"></label>
+          </div>
+        </section>
+
+        <section class="form-step" data-step="2">
+          <div class="step-heading"><p class="eyebrow">Step 2 of 4</p><h2>Your work profile</h2><p>Give Talent Management a clear picture of the work you do best.</p></div>
+          <div class="field-grid">
+            <label class="field field-wide">What is your greatest career goal or dream?<textarea name="greatestDream" required spellcheck="true" placeholder="Tell us what you are working toward and how meaningful work would help."></textarea></label>
+            <label class="field">Current work status<select name="currentWorkStatus" required><option value="">Choose one</option><option>Currently employed</option><option>Freelancer</option><option>Seeking work</option><option>Student</option><option>Other</option></select></label>
+            <label class="field">Availability<select name="availability" required><option value="">Choose one</option><option>Full time</option><option>Part time</option><option>Flexible</option></select></label>
+            <label class="field">Preferred work hours<input name="desiredHours" required spellcheck="true" placeholder="Example: 9 AM–6 PM PHT"></label>
+            <label class="field">Expected rate <small>(USD)</small><input name="expectedRate" required inputmode="decimal" placeholder="Example: 6–8 per hour"></label>
+            <label class="field field-wide">Skills and tools<input name="skills" required spellcheck="true" placeholder="Example: customer support, Canva, QuickBooks, HubSpot"></label>
+            <label class="field field-wide">Relevant work experience<textarea name="workBackground" required spellcheck="true" placeholder="Describe your most relevant work, responsibilities, and industries."></textarea></label>
+            <label class="field field-wide">Work interests<input name="workInterests" required spellcheck="true" placeholder="Tell us the specific industries or roles you would like to apply for"></label>
+            <label class="field field-wide">Education, certifications, or training<textarea name="education" required spellcheck="true" placeholder="Include degrees, certificates, and relevant training."></textarea></label>
+            <label class="field">Dedicated, quiet workspace?<select name="dedicatedWorkspace" required><option value="">Choose one</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+            <label class="field">Computer & equipment summary<input name="equipmentSummary" required spellcheck="true" placeholder="Computer, headset, backup power, etc."></label>
+            <label class="field field-wide">Internet summary<input name="internetSummary" required spellcheck="true" placeholder="Provider, plan speed, and backup connection if any"></label>
+          </div>
+        </section>
+
+        <section class="form-step" data-step="3">
+          <div class="step-heading"><p class="eyebrow">Step 3 of 4</p><h2>Upload your application materials</h2><p>Files are stored privately with your application. PDF, DOC, DOCX, JPG, PNG, MP4, MOV, and WebM are accepted.</p></div>
+          <div class="upload-grid">
+            <div class="upload-field"><span><strong>Résumé</strong><small>Upload your current résumé as a PDF, Word document, or image.</small></span><input id="resume-file" data-document="resume" name="resume" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="resume-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>English test / proof</strong><small>Please take the English assessment, save a screenshot of your result, then upload it here.</small><a class="assessment-link" href="https://www.efset.org/quick-check/" target="_blank" rel="noopener">Take the English assessment ↗</a></span><input id="english-proof-file" data-document="english_proof" name="englishProof" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="english-proof-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>DISC assessment</strong><small>Complete this assessment, save a screenshot or result file, then upload it here. It helps us understand communication style, pace, and decision-making.</small><a class="assessment-link" href="https://www.123test.com/disc-personality-test/" target="_blank" rel="noopener">Take the DISC assessment ↗</a></span><input id="disc-assessment-file" data-document="disc_assessment" name="discAssessment" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="disc-assessment-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>Enneagram test</strong><small>Complete this assessment, save a screenshot or result file, then upload it here. It helps us understand motivation, stress response, and growth patterns.</small><a class="assessment-link" href="https://www.eclecticenergies.com/enneagram/test" target="_blank" rel="noopener">Take the Enneagram test ↗</a></span><input id="enneagram-assessment-file" data-document="enneagram_assessment" name="enneagramAssessment" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="enneagram-assessment-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>MBTI-style assessment</strong><small>Complete this assessment, save a screenshot or result file, then upload it here. It helps us understand work style, collaboration preferences, and structure versus flexibility.</small><a class="assessment-link" href="https://www.16personalities.com/free-personality-test" target="_blank" rel="noopener">Take the MBTI-style assessment ↗</a></span><input id="mbti-assessment-file" data-document="mbti_assessment" name="mbtiAssessment" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="mbti-assessment-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>Internet-speed proof</strong><small>Please run a current speed test, take a screenshot of the result, then upload it here.</small><a class="assessment-link" href="https://www.speedtest.net/" target="_blank" rel="noopener">Run an internet speed test ↗</a></span><input id="internet-proof-file" data-document="internet_proof" name="internetProof" type="file" accept=".pdf,.jpg,.jpeg,.png" required><label class="file-picker-label" for="internet-proof-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>Equipment proof</strong><small>Upload a screenshot of your computer specifications or a clear photo of your equipment and workspace.</small></span><input id="equipment-proof-file" data-document="equipment_proof" name="equipmentProof" type="file" accept=".pdf,.jpg,.jpeg,.png" required><label class="file-picker-label" for="equipment-proof-file">Choose file</label></div>
+<div class="upload-field video-upload"><div class="video-method-intro"><strong>Introduction video <small>(Optional)</small></strong><small>An introduction video is not needed to submit your application. If you would like to share one, choose one method below; otherwise, leave this section blank.</small></div><fieldset class="video-methods"><legend>Choose one method only if you are including a video</legend><label class="video-method"><input name="videoMethod" type="radio" value="device"><span><strong>Upload from this device (recommended)</strong><small>Choose a video file saved on this computer.</small></span></label><label class="video-method"><input name="videoMethod" type="radio" value="phone"><span><strong>Upload from your phone (recommended)</strong><small>Save your draft, then scan the QR code on your phone.</small></span></label><label class="video-method"><input name="videoMethod" type="radio" value="loom"><span><strong>Use a Loom link</strong><small>Use this only if you cannot upload a video directly.</small></span></label></fieldset><div class="video-method-panel" data-video-method-panel="device" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Recommended: upload from this device</strong><small>Select an MP4, MOV, or WebM file saved on this computer.</small></div><div class="video-method-panel__action"><input id="introduction-video-file" data-document="introduction_video" name="introductionVideo" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"><label class="file-picker-label" for="introduction-video-file">Choose video file</label><small>MP4, MOV, or WebM.</small></div></div><div class="video-method-panel" data-video-method-panel="phone" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Recommended: upload from your phone</strong><small>Save your draft, then scan the QR code from your phone to choose a video.</small></div><div class="video-method-panel__action"><button class="phone-upload-button" id="generate-phone-upload" type="button">Save draft &amp; show phone QR</button></div><div class="phone-upload" id="phone-upload" hidden><img id="phone-upload-qr" alt="QR code for secure phone video upload"><div><strong>Upload from your phone</strong><small>Scan this code to reopen your saved application on your phone, then choose your video.</small><a id="phone-upload-link" class="assessment-link" target="_blank" rel="noopener">Open secure phone upload ↗</a></div></div></div><div class="video-method-panel" data-video-method-panel="loom" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Share a Loom link</strong><small>If direct upload is not available and you already use Loom, paste its share link below.</small></div><div class="video-method-panel__action loom-actions"><a class="assessment-link" href="https://www.loom.com/" target="_blank" rel="noopener">Open Loom ↗</a><label class="loom-field">Loom share link<input name="loomVideoUrl" type="url" placeholder="https://www.loom.com/share/…"></label></div></div></div>
+          </div>
+          <div id="upload-status" class="upload-status" aria-live="polite"></div>
+        </section>
+
+        <section class="form-step" data-step="4">
+          <div class="step-heading"><p class="eyebrow">Step 4 of 4</p><h2>Review and consent</h2><p>Review your answers, then submit when you are ready.</p></div>
+          <div class="field-grid">
+            <label class="field field-wide">How did you hear about Soro? <input name="referralSource" spellcheck="true" placeholder="Referral, social media, job board, etc."></label>
+          </div>
+          <div class="consent-list">
+            <label><input name="confirmAccurate" type="checkbox" required> I confirm that the information and files I submitted are accurate.</label>
+            <label><input name="confirmPrivacy" type="checkbox" required> I understand Soro will use this information to evaluate my application and keep it private.</label>
+            <label><input name="confirmContact" type="checkbox" required> I agree that Soro may contact me about this application.</label>
+          </div>
+          <label class="honeypot" aria-hidden="true">Leave this blank<input name="website" tabindex="-1" autocomplete="off"></label>
+        </section>
+
+        <footer class="application-actions">
+          <button class="button button-secondary" type="button" id="save-draft">Save &amp; continue later</button>
+          <div class="application-actions-right"><button class="button button-secondary" type="button" id="previous-step" hidden>Back</button><button class="button button-primary" type="button" id="next-step">Continue</button><button class="button button-primary" type="submit" id="submit-application" hidden>Submit application</button></div>
+        </footer>
+      </form>
+    </section>
+  </main>
+  <footer class="application-footer">© <span id="current-year"></span> Soro Group. Your application details are private.</footer>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
+  <script src="application.js"></script>
+</body>
+</html>

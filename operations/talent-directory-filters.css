@@ -1,0 +1,110 @@
+.directory-filters-grid {
+    display: grid;
+    grid-template-columns: minmax(240px, 1.8fr) repeat(4, minmax(132px, 0.55fr));
+    gap: 12px;
+    align-items: end;
+}
+
+.directory-filter-control {
+    display: grid;
+    gap: 6px;
+    color: var(--ink, #12355d);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.directory-filter-control select {
+    width: 100%;
+    min-height: 46px;
+    padding: 0 2.25rem 0 0.8rem;
+    border: 1px solid #cfdbe8;
+    border-radius: 10px;
+    background-color: #fff;
+    color: #102f56;
+    font: inherit;
+    font-size: 0.88rem;
+}
+
+.talent-directory-table th {
+    white-space: nowrap;
+}
+
+.directory-sort-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    font-weight: inherit;
+    cursor: pointer;
+}
+
+.directory-sort-button:hover,
+.directory-sort-button:focus-visible {
+    color: #f15a24;
+    outline: none;
+}
+
+.directory-sort-indicator {
+    display: inline-grid;
+    place-items: center;
+    width: 1rem;
+    height: 1rem;
+    color: #7b8da4;
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+.directory-sort-button.is-active .directory-sort-indicator {
+    color: #f15a24;
+}
+
+.directory-skill-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.32rem;
+    max-width: 250px;
+}
+
+.directory-skill-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.45rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 999px;
+    background: #edf5fb;
+    color: #28557d;
+    font-size: 0.72rem;
+    line-height: 1.2;
+}
+
+.directory-muted {
+    color: #6e7f93;
+    font-size: 0.82rem;
+}
+
+.directory-years {
+    color: #163b66;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+@media (max-width: 1220px) {
+    .directory-filters-grid {
+        grid-template-columns: minmax(260px, 1fr) repeat(2, minmax(150px, 0.5fr));
+    }
+}
+
+@media (max-width: 760px) {
+    .directory-filters-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .directory-skill-list {
+        max-width: none;
+    }
+}
