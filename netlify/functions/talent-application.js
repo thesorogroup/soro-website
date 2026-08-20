@@ -57,7 +57,16 @@ function escapeHtml(value) {
   }[character]));
 }
 async function sendEmail({ to, subject, text, html, replyTo }) {
-  if (!RESEND_API_KEY || !APPLICATION_FROM_EMAIL || !isEmail(to)) return { delivered: false };
+  if (!RESEND_API_KEY || !APPLICATION_FROM_EMAIL || !isEmail(to)) {
+    return {
+      delivered: false,
+      reason: !RESEND_API_KEY
+        ? 'RESEND_API_KEY is not configured.'
+        : !APPLICATION_FROM_EMAIL
+          ? 'APPLICATION_FROM_EMAIL is not configured.'
+          : 'The destination email address is invalid.'
+    };
+  }
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
@@ -96,7 +105,17 @@ async function sendApplicationNotifications(data) {
       html: `<p>Hi ${escapeHtml(firstName)},</p><p>Thank you for taking this first step with Soro Group. We received your application and stored your information privately. Talent Management will contact you if there is a next step.</p><p>Soro Group</p>`
     })
   ]);
-  return { applicantConfirmationSent: results[1].status === 'fulfilled' && results[1].value.delivered };
+  const talentNotificationSent = results[0].status === 'fulfilled' && results[0].value.delivered;
+  const applicantConfirmationSent = results[1].status === 'fulfilled' && results[1].value.delivered;
+  if (!talentNotificationSent || !applicantConfirmationSent) {
+    const reasons = results.map((result) => result.status === 'fulfilled' ? result.value.reason : result.reason?.message).filter(Boolean);
+    console.warn('Talent application email notification was skipped.', reasons.join(' '));
+  }
+  return {
+    configured: Boolean(RESEND_API_KEY && APPLICATION_FROM_EMAIL),
+    talentNotificationSent,
+    applicantConfirmationSent
+  };
 }
 async function supabase(path, options = {}) {
   if (!SERVICE_KEY) throw new Error('The Talent application service is not configured yet.');
@@ -283,7 +302,7 @@ exports.handler = async (event) => {
     await supabase(`/rest/v1/talent_application_drafts?resume_token_hash=eq.${tokenHash(request.resumeToken)}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ completed_at: new Date().toISOString(), applicant_id: applicant.id, form_data: data })
     });
-    let notificationStatus = { applicantConfirmationSent: false };
+    let notificationStatus = { configured: false, talentNotificationSent: false, applicantConfirmationSent: false };
     try {
       notificationStatus = await sendApplicationNotifications(data);
     } catch (notificationError) {
@@ -292,6 +311,7 @@ exports.handler = async (event) => {
     return json(201, {
       ok: true,
       applicantId: applicant.id,
+      notifications: notificationStatus,
       message: notificationStatus.applicantConfirmationSent
         ? 'Your application has been received. Please check your inbox for a confirmation.'
         : 'Your application has been received. Soro Talent Management will contact you if a next step is needed.'

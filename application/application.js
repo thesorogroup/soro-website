@@ -5,6 +5,7 @@
   const stepLinks = [...document.querySelectorAll('.application-steps li')];
   const alertBox = document.querySelector('#application-alert');
   const confirmation = document.querySelector('#save-confirmation');
+  const applicationShell = document.querySelector('.application-shell');
   const previous = document.querySelector('#previous-step');
   const next = document.querySelector('#next-step');
   const submit = document.querySelector('#submit-application');
@@ -219,9 +220,22 @@ updateVideoMethod();
       await saveDraft(false);
       await uploadSelectedFiles();
       submit.textContent = 'Submitting application…';
-      await call('submit', { data: formData() });
+      const result = await call('submit', { data: formData() });
+      message('');
       form.hidden = true;
-      confirmation.innerHTML = '<strong>Your application was submitted.</strong><br>Thank you for considering Soro. Talent Management will review your complete application and contact you if there is a next step.';
+      applicationShell.classList.add('is-submitted');
+      confirmation.classList.add('is-submission-success');
+      confirmation.innerHTML = `
+        <div class="submission-success__icon" aria-hidden="true">✓</div>
+        <p class="eyebrow">Application received</p>
+        <h2>Thank you for taking this step with Soro.</h2>
+        <p>Talent Management will review your complete application and contact you if there is a next step.</p>
+        <p class="submission-success__email">${result.notifications?.applicantConfirmationSent
+          ? 'A confirmation email is on its way to the address you provided.'
+          : 'Your application is safely submitted. If you do not receive a confirmation email, you do not need to submit it again.'}</p>
+        <div class="submission-success__actions">
+          <a class="button button-primary" href="../">Return to the Soro Group website</a>
+        </div>`;
       confirmation.hidden = false;
       confirmation.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch (error) { message(error.message); } finally { setBusy(false); }
