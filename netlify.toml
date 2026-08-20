@@ -1,5 +1,6 @@
 [build]
   publish = "."
+  command = "node scripts/email-delivery-smoke.mjs"
 
 [[redirects]]
   from = "/about-us/"

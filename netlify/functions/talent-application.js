@@ -16,7 +16,6 @@ const RESEND_API_KEY = (process.env.RESEND_API_KEY || '').trim();
 const APPLICATION_FROM_EMAIL = (process.env.APPLICATION_FROM_EMAIL || '').trim();
 const APPLICATION_NOTIFICATION_EMAIL = (process.env.APPLICATION_NOTIFICATION_EMAIL || 'talents@thesorogroup.com').trim();
 const APPLICATION_PORTAL_URL = (process.env.APPLICATION_PORTAL_URL || 'https://thesorogroup.com/operations/').trim();
-const EMAIL_DELIVERY_TEST_TOKEN_HASH = 'b9e2ea80418f65e331f80ad44b77713331652d57a9b1201840cc1f7dcdd49928';
 const BUCKET = 'soro-private-documents';
 const MAX_FILE_BYTES = 95 * 1024 * 1024;
 const REQUIRED_DOCUMENTS = ['resume', 'english_proof', 'disc_assessment', 'enneagram_assessment', 'mbti_assessment', 'internet_proof', 'equipment_proof'];
@@ -209,33 +208,7 @@ exports.handler = async (event) => {
   try {
     const request = parseBody(event);
     const action = request.action;
-    if (!['save_draft', 'load_draft', 'prepare_upload', 'complete_upload', 'submit', 'email_delivery_test'].includes(action)) return json(400, { error: 'Unknown application action.' });
-
-    if (action === 'email_delivery_test') {
-      const suppliedHash = tokenHash(cleanText(request.testToken, 200));
-      if (!crypto.timingSafeEqual(Buffer.from(suppliedHash), Buffer.from(EMAIL_DELIVERY_TEST_TOKEN_HASH))) {
-        return json(404, { error: 'Unknown application action.' });
-      }
-      const results = await Promise.all([
-        sendEmail({
-          to: 'matt@thesorogroup.com',
-          subject: 'Soro Talent email test — applicant confirmation',
-          text: 'This is a controlled delivery test for the Soro Talent application confirmation email. No applicant information is included.',
-          html: '<p>This is a controlled delivery test for the Soro Talent application confirmation email.</p><p>No applicant information is included.</p>'
-        }),
-        sendEmail({
-          to: APPLICATION_NOTIFICATION_EMAIL,
-          subject: 'Soro Talent email test — new application notification',
-          text: 'This is a controlled delivery test for the Soro Talent Management application notification. No applicant information is included.',
-          html: '<p>This is a controlled delivery test for the Soro Talent Management application notification.</p><p>No applicant information is included.</p>'
-        })
-      ]);
-      return json(results.every((result) => result.delivered) ? 200 : 503, {
-        ok: results.every((result) => result.delivered),
-        applicantConfirmationSent: results[0].delivered,
-        talentNotificationSent: results[1].delivered
-      });
-    }
+    if (!['save_draft', 'load_draft', 'prepare_upload', 'complete_upload', 'submit'].includes(action)) return json(400, { error: 'Unknown application action.' });
 
     if (action === 'load_draft') {
       const draft = await findDraft(request.resumeToken);
