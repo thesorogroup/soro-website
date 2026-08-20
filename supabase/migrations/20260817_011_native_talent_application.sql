@@ -38,23 +38,31 @@ for each row execute function public.set_updated_at();
 alter table public.talent_application_drafts enable row level security;
 alter table public.talent_applications enable row level security;
 
+drop policy if exists "Soro internal users can read application drafts"
+on public.talent_application_drafts;
 create policy "Soro internal users can read application drafts"
 on public.talent_application_drafts for select to authenticated
-using (public.is_internal_soro_user());
+using (private.is_internal_soro_user());
 
+drop policy if exists "Soro admin and talent management can manage application drafts"
+on public.talent_application_drafts;
 create policy "Soro admin and talent management can manage application drafts"
 on public.talent_application_drafts for all to authenticated
-using (public.current_soro_role() in ('admin'::public.platform_role, 'talent_management'::public.platform_role))
-with check (public.current_soro_role() in ('admin'::public.platform_role, 'talent_management'::public.platform_role));
+using (private.current_soro_role() in ('admin'::public.platform_role, 'talent_management'::public.platform_role))
+with check (private.current_soro_role() in ('admin'::public.platform_role, 'talent_management'::public.platform_role));
 
+drop policy if exists "Soro internal users can read submitted Talent applications"
+on public.talent_applications;
 create policy "Soro internal users can read submitted Talent applications"
 on public.talent_applications for select to authenticated
-using (public.is_internal_soro_user());
+using (private.is_internal_soro_user());
 
+drop policy if exists "Soro admin and talent management can manage submitted Talent applications"
+on public.talent_applications;
 create policy "Soro admin and talent management can manage submitted Talent applications"
 on public.talent_applications for all to authenticated
-using (public.current_soro_role() in ('admin'::public.platform_role, 'talent_management'::public.platform_role))
-with check (public.current_soro_role() in ('admin'::public.platform_role, 'talent_management'::public.platform_role));
+using (private.current_soro_role() in ('admin'::public.platform_role, 'talent_management'::public.platform_role))
+with check (private.current_soro_role() in ('admin'::public.platform_role, 'talent_management'::public.platform_role));
 
 grant select, insert, update on public.talent_application_drafts to authenticated;
 grant select, insert, update on public.talent_applications to authenticated;
