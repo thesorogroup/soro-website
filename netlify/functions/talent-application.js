@@ -100,13 +100,21 @@ async function sendApplicationNotifications(data) {
 }
 async function supabase(path, options = {}) {
   if (!SERVICE_KEY) throw new Error('The Talent application service is not configured yet.');
+  const headers = {
+    apikey: SERVICE_KEY,
+    ...(options.headers || {})
+  };
+
+  // Supabase's current sb_secret_* keys authenticate through the apikey
+  // header and are not JWTs. Legacy service_role keys remain JWT-backed and
+  // still need the Authorization header for the database role to be applied.
+  if (!SERVICE_KEY.startsWith('sb_secret_')) {
+    headers.Authorization = `Bearer ${SERVICE_KEY}`;
+  }
+
   const response = await fetch(`${SUPABASE_URL}${path}`, {
     ...options,
-    headers: {
-      apikey: SERVICE_KEY,
-      Authorization: `Bearer ${SERVICE_KEY}`,
-      ...(options.headers || {})
-    }
+    headers
   });
   if (!response.ok) {
     const detail = await response.text().catch(() => '');
