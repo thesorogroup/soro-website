@@ -13,6 +13,254 @@
   const escapeHtml = (value = '') => String(value).replace(/[&<>"]/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[char]));
   const fileSafeName = (name = 'file') => name.replace(/[^a-z0-9._-]+/gi, '-').replace(/-+/g, '-');
   const option = (value, currentValue) => `<option value="${value}" ${value === currentValue ? 'selected' : ''}>${escapeHtml(titleCase(value))}</option>`;
+  const countryNames = `Philippines
+Afghanistan
+Albania
+Algeria
+Andorra
+Angola
+Antigua and Barbuda
+Argentina
+Armenia
+Australia
+Austria
+Azerbaijan
+Bahamas
+Bahrain
+Bangladesh
+Barbados
+Belarus
+Belgium
+Belize
+Benin
+Bhutan
+Bolivia
+Bosnia and Herzegovina
+Botswana
+Brazil
+Brunei
+Bulgaria
+Burkina Faso
+Burundi
+Cabo Verde
+Cambodia
+Cameroon
+Canada
+Central African Republic
+Chad
+Chile
+China
+Colombia
+Comoros
+Congo (Republic of the)
+Costa Rica
+Côte d’Ivoire
+Croatia
+Cuba
+Cyprus
+Czechia
+Democratic Republic of the Congo
+Denmark
+Djibouti
+Dominica
+Dominican Republic
+Ecuador
+Egypt
+El Salvador
+Equatorial Guinea
+Eritrea
+Estonia
+Eswatini
+Ethiopia
+Fiji
+Finland
+France
+Gabon
+Gambia
+Georgia
+Germany
+Ghana
+Greece
+Grenada
+Guatemala
+Guinea
+Guinea-Bissau
+Guyana
+Haiti
+Honduras
+Hungary
+Iceland
+India
+Indonesia
+Iran
+Iraq
+Ireland
+Israel
+Italy
+Jamaica
+Japan
+Jordan
+Kazakhstan
+Kenya
+Kiribati
+Kuwait
+Kyrgyzstan
+Laos
+Latvia
+Lebanon
+Lesotho
+Liberia
+Libya
+Liechtenstein
+Lithuania
+Luxembourg
+Madagascar
+Malawi
+Malaysia
+Maldives
+Mali
+Malta
+Marshall Islands
+Mauritania
+Mauritius
+Mexico
+Micronesia
+Moldova
+Monaco
+Mongolia
+Montenegro
+Morocco
+Mozambique
+Myanmar
+Namibia
+Nauru
+Nepal
+Netherlands
+New Zealand
+Nicaragua
+Niger
+Nigeria
+North Korea
+North Macedonia
+Norway
+Oman
+Pakistan
+Palau
+Panama
+Papua New Guinea
+Paraguay
+Peru
+Poland
+Portugal
+Qatar
+Romania
+Russia
+Rwanda
+Saint Kitts and Nevis
+Saint Lucia
+Saint Vincent and the Grenadines
+Samoa
+San Marino
+Sao Tome and Principe
+Saudi Arabia
+Senegal
+Serbia
+Seychelles
+Sierra Leone
+Singapore
+Slovakia
+Slovenia
+Solomon Islands
+Somalia
+South Africa
+South Korea
+South Sudan
+Spain
+Sri Lanka
+Sudan
+Suriname
+Sweden
+Switzerland
+Syria
+Tajikistan
+Tanzania
+Thailand
+Timor-Leste
+Togo
+Tonga
+Trinidad and Tobago
+Tunisia
+Türkiye
+Turkmenistan
+Tuvalu
+Uganda
+Ukraine
+United Arab Emirates
+United Kingdom
+United States
+Uruguay
+Uzbekistan
+Vanuatu
+Vatican City
+Venezuela
+Vietnam
+Yemen
+Zambia
+Zimbabwe`.split('\n');
+  const timeZoneOptions = [
+    ['Asia/Manila', 'Philippines — Asia/Manila (PHT, UTC+08:00)'],
+    ['Pacific/Auckland', 'New Zealand — Pacific/Auckland (UTC+12:00 / UTC+13:00)'],
+    ['Australia/Sydney', 'Australia — Australia/Sydney (UTC+10:00 / UTC+11:00)'],
+    ['Asia/Tokyo', 'Japan — Asia/Tokyo (UTC+09:00)'],
+    ['Asia/Seoul', 'South Korea — Asia/Seoul (UTC+09:00)'],
+    ['Asia/Singapore', 'Singapore — Asia/Singapore (UTC+08:00)'],
+    ['Asia/Hong_Kong', 'Hong Kong — Asia/Hong_Kong (UTC+08:00)'],
+    ['Asia/Shanghai', 'China — Asia/Shanghai (UTC+08:00)'],
+    ['Asia/Bangkok', 'Thailand / Vietnam — Asia/Bangkok (UTC+07:00)'],
+    ['Asia/Jakarta', 'Indonesia (Western) — Asia/Jakarta (UTC+07:00)'],
+    ['Asia/Kolkata', 'India — Asia/Kolkata (UTC+05:30)'],
+    ['Asia/Dhaka', 'Bangladesh — Asia/Dhaka (UTC+06:00)'],
+    ['Asia/Dubai', 'United Arab Emirates — Asia/Dubai (UTC+04:00)'],
+    ['Europe/London', 'United Kingdom — Europe/London (UTC+00:00 / UTC+01:00)'],
+    ['Europe/Paris', 'Central Europe — Europe/Paris (UTC+01:00 / UTC+02:00)'],
+    ['Africa/Johannesburg', 'South Africa — Africa/Johannesburg (UTC+02:00)'],
+    ['Africa/Nairobi', 'East Africa — Africa/Nairobi (UTC+03:00)'],
+    ['America/Sao_Paulo', 'Brazil — America/Sao_Paulo (UTC-03:00)'],
+    ['America/New_York', 'United States / Canada Eastern — America/New_York (UTC-05:00 / UTC-04:00)'],
+    ['America/Chicago', 'United States / Canada Central — America/Chicago (UTC-06:00 / UTC-05:00)'],
+    ['America/Denver', 'United States / Canada Mountain — America/Denver (UTC-07:00 / UTC-06:00)'],
+    ['America/Los_Angeles', 'United States / Canada Pacific — America/Los_Angeles (UTC-08:00 / UTC-07:00)'],
+    ['America/Anchorage', 'Alaska — America/Anchorage (UTC-09:00 / UTC-08:00)'],
+    ['Pacific/Honolulu', 'Hawaii — Pacific/Honolulu (UTC-10:00)'],
+    ['Other', 'Other / not listed — specify your UTC offset']
+  ];
+
+  function locationOptions(options, currentValue, fallbackValue, includeDivider = false) {
+    const current = currentValue || fallbackValue;
+    const values = options.map(item => Array.isArray(item) ? item[0] : item);
+    const rows = values.includes(current) ? options : [[current, `${current} — current saved value`], ...options];
+    return rows.map((item, index) => {
+      const [value, label] = Array.isArray(item) ? item : [item, item];
+      const divider = includeDivider && index === 0 && value === 'Philippines' ? '<option disabled>──────────</option>' : '';
+      return `<option value="${escapeHtml(value)}" ${value === current ? 'selected' : ''}>${escapeHtml(label)}</option>${divider}`;
+    }).join('');
+  }
+
+  async function requireBrowserPlayableVideo(file) {
+    if (!file || (!String(file.type).startsWith('video/') && !/\.(mp4|mov|webm)$/i.test(file.name))) return;
+    if (/webm$/i.test(file.name) || file.type === 'video/webm') return;
+    const chunkSize = Math.min(file.size, 2 * 1024 * 1024);
+    const chunks = [file.slice(0, chunkSize)];
+    if (file.size > chunkSize) chunks.push(file.slice(Math.max(0, file.size - chunkSize)));
+    const signatures = (await Promise.all(chunks.map(chunk => chunk.arrayBuffer())))
+      .map(buffer => new TextDecoder('latin1').decode(buffer))
+      .join('');
+    const supportedVideo = /avc1|avc3|vp08|vp09|av01/.test(signatures);
+    const incompatibleVideo = /mp4v|s263|hvc1|hev1|dvh1|dvhe/.test(signatures);
+    if (incompatibleVideo && !supportedVideo) {
+      throw new Error('This video uses a codec that web browsers cannot reliably play. Convert it to an H.264 MP4 or WebM file, then upload the converted version.');
+    }
+  }
 
   function notify(message) {
     if (typeof toast === 'function') toast(message);
@@ -32,7 +280,7 @@
     dialog.innerHTML = `<div class="record-manager-shell"><header class="record-manager-header"><div><p class="record-manager-eyebrow">${escapeHtml(eyebrow)}</p><h2>${escapeHtml(title)}</h2></div><button type="button" class="record-manager-close" aria-label="Close">×</button></header><div class="record-manager-form">${note ? `<p class="record-manager-note">${escapeHtml(note)}</p>` : ''}${content}</div></div>`;
     document.body.append(dialog);
     $('.record-manager-close', dialog).addEventListener('click', closeModal);
-    dialog.addEventListener('click', event => { if (event.target === dialog) closeModal(); });
+    dialog.addEventListener('cancel', event => event.preventDefault());
     dialog.addEventListener('close', () => dialog.remove());
     dialog.showModal();
     onOpen?.(dialog);
@@ -78,8 +326,8 @@
         <div class="record-manager-field"><label for="talent-middle-name">Middle name <span aria-label="optional">(optional)</span></label><input id="talent-middle-name" name="middleName" value="${escapeHtml(names.middleName)}"></div>
         <div class="record-manager-field"><label for="talent-email">Email</label><input id="talent-email" type="email" name="email" required value="${value(record, 'email')}"></div>
         <div class="record-manager-field"><label for="talent-phone">Phone</label><input id="talent-phone" name="phone" value="${value(record, 'phone')}"></div>
-        <div class="record-manager-field"><label for="talent-country">Country</label><input id="talent-country" name="country" value="${value(record, 'country')}"></div>
-        <div class="record-manager-field"><label for="talent-timezone">Time zone</label><input id="talent-timezone" name="timezone" value="${value(record, 'timezone')}"></div>
+        <div class="record-manager-field"><label for="talent-country">Country</label><select id="talent-country" name="country">${locationOptions(countryNames, record.country, 'Philippines', true)}</select></div>
+        <div class="record-manager-field"><label for="talent-timezone">Time zone</label><select id="talent-timezone" name="timezone">${locationOptions(timeZoneOptions, record.timezone, 'Asia/Manila')}</select></div>
         <div class="record-manager-field"><label for="talent-work-status">Work status</label><select id="talent-work-status" name="workStatus"><option value="unemployed" ${record.work_status === 'unemployed' ? 'selected' : ''}>Unemployed</option><option value="employed" ${record.work_status === 'employed' ? 'selected' : ''}>Employed</option><option value="freelancer" ${record.work_status === 'freelancer' ? 'selected' : ''}>Freelancer</option></select></div>
         <div class="record-manager-field"><label for="talent-application-status">Application status</label><select id="talent-application-status" name="applicationStatus">${talentStatuses.map(status => option(status, currentStatus)).join('')}</select></div>
         <div class="record-manager-field"><label for="talent-rate">Expected hourly rate</label><input id="talent-rate" type="number" min="0" step="0.01" name="expectedRate" value="${value(record, 'expected_hourly_rate')}"></div>
@@ -142,7 +390,7 @@
 
   function uploadTalentFile(record) {
     const options = ['resume','english_proof','disc_assessment','enneagram_assessment','mbti_assessment','internet_proof','equipment_proof','introduction_video','profile_photo','application_attachment'];
-    openModal({ eyebrow: 'Private Talent document', title: `Upload for ${record.full_name}`, note: 'The file is stored privately and remains visible only to authorized Soro staff and this Talent.', content: `<form id="talent-upload-form"><div class="record-manager-grid"><div class="record-manager-field"><label for="document-type">File category</label><select id="document-type" name="documentType">${options.map(documentType => `<option value="${documentType}">${escapeHtml(documentLabels[documentType] || titleCase(documentType))}</option>`).join('')}</select></div><div class="record-manager-field"><label for="talent-file">Choose image, video, or document</label><input id="talent-file" name="file" type="file" required accept="image/jpeg,image/png,video/mp4,video/quicktime,video/webm,.pdf,.doc,.docx,.xls,.xlsx"></div><div class="record-manager-field record-manager-field--wide"><span class="admin-upload-status">JPG, PNG, PDF, Word, Excel, MP4, MOV, and WebM files up to 95 MB are accepted.</span></div></div><footer class="record-manager-footer"><button type="button" class="admin-record-button" data-close>Cancel</button><button type="submit" class="admin-record-button admin-record-button--primary">Upload private file</button></footer></form>`, onOpen(dialog) {
+    openModal({ eyebrow: 'Private Talent document', title: `Upload for ${record.full_name}`, note: 'The file is stored privately and remains visible only to authorized Soro staff and this Talent.', content: `<form id="talent-upload-form"><div class="record-manager-grid"><div class="record-manager-field"><label for="document-type">File category</label><select id="document-type" name="documentType">${options.map(documentType => `<option value="${documentType}">${escapeHtml(documentLabels[documentType] || titleCase(documentType))}</option>`).join('')}</select></div><div class="record-manager-field"><label for="talent-file">Choose image, video, or document</label><input id="talent-file" name="file" type="file" required accept="image/jpeg,image/png,video/mp4,video/quicktime,video/webm,.pdf,.doc,.docx,.xls,.xlsx"></div><div class="record-manager-field record-manager-field--wide"><span class="admin-upload-status">JPG, PNG, PDF, Word, Excel, MP4, MOV, and WebM files up to 95 MB are accepted. Videos must use browser-playable H.264 MP4 or WebM.</span></div></div><footer class="record-manager-footer"><button type="button" class="admin-record-button" data-close>Cancel</button><button type="submit" class="admin-record-button admin-record-button--primary">Upload private file</button></footer></form>`, onOpen(dialog) {
       $('[data-close]', dialog).addEventListener('click', closeModal);
       $('#talent-upload-form', dialog).addEventListener('submit', async event => {
         event.preventDefault(); const formData = new FormData(event.currentTarget); const file = formData.get('file');
@@ -150,6 +398,7 @@
         try {
           if (!(file instanceof File) || !file.size) throw new Error('Choose a file to upload.');
           if (file.size > 95 * 1024 * 1024) throw new Error('Choose a file smaller than 95 MB.');
+          await requireBrowserPlayableVideo(file);
           const path = `talent/${record.id}/${Date.now()}-${fileSafeName(file.name)}`;
           const { error: storageError } = await database().storage.from(bucket).upload(path, file, { contentType: file.type || undefined, upsert: false });
           if (storageError) throw storageError;

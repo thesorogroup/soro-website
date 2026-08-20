@@ -151,6 +151,22 @@ const updateVideoMethod = () => {
   else if (phoneUpload) phoneUpload.hidden = true;
 };
 
+  const requireBrowserPlayableVideo = async file => {
+    if (!file || (!String(file.type).startsWith('video/') && !/\.(mp4|mov|webm)$/i.test(file.name))) return;
+    if (/webm$/i.test(file.name) || file.type === 'video/webm') return;
+    const chunkSize = Math.min(file.size, 2 * 1024 * 1024);
+    const chunks = [file.slice(0, chunkSize)];
+    if (file.size > chunkSize) chunks.push(file.slice(Math.max(0, file.size - chunkSize)));
+    const signatures = (await Promise.all(chunks.map(chunk => chunk.arrayBuffer())))
+      .map(buffer => new TextDecoder('latin1').decode(buffer))
+      .join('');
+    const supportedVideo = /avc1|avc3|vp08|vp09|av01/.test(signatures);
+    const incompatibleVideo = /mp4v|s263|hvc1|hev1|dvh1|dvhe/.test(signatures);
+    if (incompatibleVideo && !supportedVideo) {
+      throw new Error('This video uses an older phone codec that Soro profiles cannot play. Convert it to an H.264 MP4 or WebM file, then choose the converted version.');
+    }
+  };
+
 videoMethodOptions.forEach((input) => input.addEventListener('change', updateVideoMethod));
 updateVideoMethod();
   const renderUploads = () => {
@@ -161,6 +177,7 @@ updateVideoMethod();
     const documentType = input.dataset.document;
     const file = input.files[0];
     if (!file) return;
+    if (documentType === 'introduction_video') await requireBrowserPlayableVideo(file);
     if (!state.resumeToken) await saveDraft(false);
     const prepared = await call('prepare_upload', { data: formData(), documentType, fileName: file.name, mimeType: file.type || 'application/octet-stream', size: file.size });
     state.resumeToken = prepared.resumeToken || state.resumeToken;
@@ -209,9 +226,18 @@ updateVideoMethod();
       confirmation.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } catch (error) { message(error.message); } finally { setBusy(false); }
   });
-  form.querySelectorAll('input[type="file"]').forEach(input => input.addEventListener('change', () => {
+  form.querySelectorAll('input[type="file"]').forEach(input => input.addEventListener('change', async () => {
     if (!input.files[0]) return;
     const picker = input.closest('.upload-field')?.querySelector(`label[for="${input.id}"]`);
+    if (input.dataset.document === 'introduction_video') {
+      try { await requireBrowserPlayableVideo(input.files[0]); }
+      catch (error) {
+        input.value = '';
+        if (picker) picker.textContent = 'Choose video file';
+        message(error.message);
+        return;
+      }
+    }
     if (picker) picker.textContent = input.files[0].name;
   }));
   phoneUploadButton?.addEventListener('click', async () => {

@@ -66,7 +66,7 @@ function canEditProfileDetails() {
         .from('soro-private-documents')
         .createSignedUrl(document.storage_path, 3600);
       if (signingError || !signed?.signedUrl) return '';
-      return `<section class="profile-introduction-video"><div><p class="eyebrow">${label}</p><strong>${escapeHtml(document.file_name)}</strong></div><video controls preload="metadata" playsinline aria-label="${escapeHtml(applicant.full_name)} ${label.toLowerCase()}"><source src="${escapeHtml(signed.signedUrl)}" type="video/mp4" />Your browser does not support video playback.</video><small>Private Soro file</small></section>`;
+      return `<section class="profile-introduction-video"><div><p class="eyebrow">${label}</p><strong>${escapeHtml(document.file_name)}</strong></div><video controls preload="metadata" playsinline src="${escapeHtml(signed.signedUrl)}" aria-label="${escapeHtml(applicant.full_name)} ${label.toLowerCase()}">Your browser does not support video playback.</video><p class="profile-video-error" hidden>This upload uses a video format this browser cannot play. Replace it with an H.264 MP4 or WebM file.</p><small>Private Soro file</small></section>`;
     }));
 
     if (!videoCards.filter(Boolean).length) {
@@ -74,6 +74,12 @@ function canEditProfileDetails() {
       return;
     }
     target.innerHTML = videoCards.join('');
+    target.querySelectorAll('video').forEach(video => {
+      video.addEventListener('error', () => {
+        const errorMessage = video.closest('.profile-introduction-video')?.querySelector('.profile-video-error');
+        if (errorMessage) errorMessage.hidden = false;
+      });
+    });
 
   };
 
