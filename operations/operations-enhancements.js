@@ -30,8 +30,7 @@
     const d = current === 'overview' ? (role === 'admin' ? data.overview : roleDashboards[role]) : data[current];
     const newAction = role === 'talent' ? 'New Talent' : role === 'client' ? 'Request Talent' : role === 'va' ? 'Start Day' : 'New Client';
     const primaryAction = role === 'va' ? 'Start Day' : role === 'client' ? 'Request another Talent' : '+ Add Task';
-    const importAction = current === 'vas' && role === 'admin' ? `<button class="button" id="import-drive">Import legacy files</button>` : '';
-    root.innerHTML = `<main class="page"><div class="page-heading"><div><p class="eyebrow">Soro Ops</p><h1>${d.title}</h1><p class="eyebrow" style="margin-top:9px">${d.caption}</p></div><div class="heading-actions"><button class="button primary" id="add-task">${primaryAction}</button>${current === 'overview' || current === 'clients' ? `<button class="button" id="new-record">+ ${newAction}</button>` : ''}${importAction}<button class="button">Customize</button></div></div>${current === 'overview' ? overview(d) : current === 'vas' ? talentDirectory() : table(d)}</main>`;
+    root.innerHTML = `<main class="page"><div class="page-heading"><div><p class="eyebrow">Soro Ops</p><h1>${d.title}</h1><p class="eyebrow" style="margin-top:9px">${d.caption}</p></div><div class="heading-actions"><button class="button primary" id="add-task">${primaryAction}</button>${current === 'overview' || current === 'clients' ? `<button class="button" id="new-record">+ ${newAction}</button>` : ''}<button class="button">Customize</button></div></div>${current === 'overview' ? overview(d) : current === 'vas' ? talentDirectory() : table(d)}</main>`;
     bindView();
   };
 

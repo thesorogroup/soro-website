@@ -1,0 +1,286 @@
+.admin-record-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.admin-record-button {
+  appearance: none;
+  border: 1px solid #d9c5b8;
+  border-radius: 10px;
+  background: #fffaf5;
+  color: #08366a;
+  font: 600 14px/1.2 Arial, sans-serif;
+  padding: 11px 14px;
+  cursor: pointer;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+
+.admin-record-button:hover {
+  background: #fff3ea;
+  border-color: #f15d2a;
+  transform: translateY(-1px);
+}
+
+.admin-record-button:disabled {
+  cursor: wait;
+  opacity: .65;
+  transform: none;
+}
+
+.admin-record-button--primary {
+  background: #f15d2a;
+  border-color: #f15d2a;
+  color: #fff;
+}
+
+.admin-record-button--primary:hover {
+  background: #d94d1e;
+  border-color: #d94d1e;
+}
+
+.admin-record-button--danger {
+  color: #a03120;
+  border-color: #e5b4aa;
+}
+
+.admin-record-button--danger:hover {
+  background: #fff0ec;
+  border-color: #d66a58;
+}
+
+.record-manager-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(88vh, 900px);
+  padding: 0;
+  border: 0;
+  border-radius: 20px;
+  background: #fffdf9;
+  box-shadow: 0 24px 75px rgba(6, 35, 73, .32);
+  overflow: hidden;
+}
+
+.record-manager-dialog::backdrop {
+  background: rgba(7, 34, 68, .48);
+  backdrop-filter: blur(3px);
+}
+
+.record-manager-shell {
+  max-height: min(88vh, 900px);
+  overflow: auto;
+}
+
+.record-manager-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 18px;
+  padding: 28px 30px 20px;
+  border-bottom: 1px solid #eadfd7;
+}
+
+.record-manager-eyebrow {
+  margin: 0 0 6px;
+  color: #e95b2b;
+  font: 700 11px/1.2 Arial, sans-serif;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.record-manager-header h2 {
+  margin: 0;
+  color: #07366d;
+  font: 700 29px/1.15 Georgia, serif;
+}
+
+.record-manager-close {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border: 1px solid #c9d5e2;
+  border-radius: 9px;
+  background: #fff;
+  color: #07366d;
+  font: 700 25px/1 Arial, sans-serif;
+  cursor: pointer;
+  line-height: 1;
+  transition: background .18s ease, border-color .18s ease, transform .18s ease;
+}
+
+.record-manager-close:hover {
+  background: #fff3ed;
+  border-color: #f15d2a;
+  transform: scale(1.04);
+}
+
+.record-manager-form {
+  padding: 25px 30px 30px;
+}
+
+.record-manager-note {
+  margin: 0 0 20px;
+  color: #536b85;
+  font: 400 14px/1.5 Arial, sans-serif;
+}
+
+.record-manager-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.record-manager-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.record-manager-field--wide {
+  grid-column: 1 / -1;
+}
+
+.record-manager-field label {
+  color: #163f70;
+  font: 700 12px/1.2 Arial, sans-serif;
+  letter-spacing: .03em;
+}
+
+.record-manager-field input,
+.record-manager-field textarea,
+.record-manager-field select {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #c9d7e6;
+  border-radius: 10px;
+  background: #fff;
+  color: #102f54;
+  font: 400 15px/1.35 Arial, sans-serif;
+  padding: 11px 12px;
+  outline: none;
+  transition: border-color .18s ease, box-shadow .18s ease;
+}
+
+.record-manager-field textarea {
+  min-height: 106px;
+  resize: vertical;
+}
+
+.record-manager-field input:focus,
+.record-manager-field textarea:focus,
+.record-manager-field select:focus {
+  border-color: #e95b2b;
+  box-shadow: 0 0 0 3px rgba(233, 91, 43, .13);
+}
+
+.record-manager-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid #eadfd7;
+}
+
+.admin-managed-records {
+  margin-top: 22px;
+  border: 1px solid #eadfd7;
+  border-radius: 16px;
+  background: #fffdf9;
+  padding: 20px;
+}
+
+.admin-managed-records h2 {
+  margin: 0;
+  color: #07366d;
+  font: 700 22px/1.2 Georgia, serif;
+}
+
+.admin-managed-records p {
+  margin: 6px 0 16px;
+  color: #5b7190;
+  font: 400 14px/1.4 Arial, sans-serif;
+}
+
+.admin-managed-list {
+  display: grid;
+  gap: 9px;
+}
+
+.admin-managed-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 14px;
+  border: 1px solid #e6edf5;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.admin-managed-item strong {
+  display: block;
+  color: #163f70;
+  font: 700 14px/1.3 Arial, sans-serif;
+}
+
+.admin-managed-item span {
+  display: block;
+  margin-top: 2px;
+  color: #647991;
+  font: 400 13px/1.3 Arial, sans-serif;
+}
+
+.admin-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px;
+  border: 1px dashed #bfcede;
+  border-radius: 12px;
+  background: #f8fbff;
+}
+
+.admin-upload-row input[type="file"] {
+  max-width: 100%;
+}
+
+.admin-upload-status {
+  color: #5b7190;
+  font: 400 13px/1.4 Arial, sans-serif;
+}
+
+@media (max-width: 640px) {
+  .record-manager-header {
+    padding: 22px 20px 16px;
+  }
+
+  .record-manager-form {
+    padding: 20px;
+  }
+
+  .record-manager-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .record-manager-field--wide {
+    grid-column: auto;
+  }
+
+  .record-manager-footer {
+    justify-content: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .record-manager-footer .admin-record-button {
+    width: 100%;
+  }
+
+  .admin-managed-item {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
