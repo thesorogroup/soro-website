@@ -66,3 +66,12 @@ with check (private.current_soro_role() in ('admin'::public.platform_role, 'tale
 
 grant select, insert, update on public.talent_application_drafts to authenticated;
 grant select, insert, update on public.talent_applications to authenticated;
+
+-- The Netlify application endpoint uses a Supabase secret key, which assumes
+-- the service_role database role. Grant only the table operations that endpoint
+-- performs; RLS remains enabled for signed-in browser users.
+grant select, insert on public.organizations to service_role;
+grant select, insert on public.applicants to service_role;
+grant insert on public.documents to service_role;
+grant select, insert, update on public.talent_application_drafts to service_role;
+grant insert on public.talent_applications to service_role;
