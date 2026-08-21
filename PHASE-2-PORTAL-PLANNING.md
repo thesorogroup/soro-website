@@ -1,6 +1,6 @@
 # Soro Operations Platform — Phase 2 Planning
 
-Last updated: August 13, 2026
+Last updated: August 21, 2026
 
 ## Product direction
 
@@ -208,6 +208,72 @@ Activity history should be readable by authorized staff, tamper-resistant, searc
 - Add Sales goals and structured scorecards.
 - Preserve reports in a dated archive so performance can be compared across time periods.
 - Include a Campaign & Source Manager with active/inactive status; inactive sources remain attached to historical applicants and reporting.
+
+## Next rollout — Secure access and Talent File experience
+
+Status: Implemented for the August 2026 Talent File rollout. The server-only database permissions were applied successfully on August 21, 2026; production deployment verification is in progress.
+
+Initial visual-direction reference: `planning/talent-file-concept-v1.png`. The implemented tab set expands the original two-tab concept as documented below.
+
+### Portal access hardening
+
+- Preserve the convenient remembered-session behavior on a user's own browser.
+- Replace the brief sign-in-screen flash with a neutral **Checking secure access…** state while the existing session is validated.
+- Do not reveal the application shell until Supabase confirms both a valid authenticated user and an active `platform_users` record with an authorized Soro role.
+- If the session is valid but the Soro access record is missing, inactive, or unauthorized, sign the user out and show a clear **This account does not have access to Soro Ops** message.
+- Keep database Row Level Security as the authoritative data boundary; the stricter screen gate is an additional defense and a clearer user experience.
+- Verify the flow in a remembered authorized session, a signed-out browser, an inactive employee account, and an authenticated account without a Soro role.
+
+### Admin-only permanent deletion
+
+- Keep **Archive** as the normal, reversible action for Talent and client records.
+- Add **Permanently delete** as an Administrator-only destructive action. Talent Operations and Sales may archive records when otherwise permitted, but they may not permanently delete them.
+- Place permanent deletion in a clearly separated danger area rather than beside routine edit actions.
+- Before deletion, show the record name and counts of connected files, contacts, applications, tasks, placements, and other dependent records that will be affected.
+- Offer **Archive instead** prominently in the warning so an Administrator can choose the safer reversible action.
+- Require two deliberate checks:
+  1. A recent authenticated Administrator session; request reauthentication when the security window has expired.
+  2. Entry of the exact Talent or client name, followed by a clearly labeled **Permanently delete** confirmation.
+- The confirmation must state that deletion cannot be undone and that associated private files may also be removed.
+- Block permanent deletion when an active placement, unresolved payment or invoice, legal/retention hold, or another protected dependency requires the record to remain. Explain the blocking item and keep Archive available.
+- Execute eligible deletion through an Administrator-authorized server-side operation, not a direct browser cascade. Remove dependent database records and private storage objects as one controlled workflow, and report partial failures without claiming success.
+- Retain only a minimal non-PII deletion event where policy permits: actor, timestamp, record type, internal reference, reason, and deletion result. Final retention requirements remain subject to Soro's legal and privacy decisions.
+
+Suggested first warning copy:
+
+> **Delete this profile permanently?**
+> Archiving keeps this record available for recovery. Permanent deletion removes the profile and eligible connected files and cannot be undone.
+
+Suggested actions: **Archive instead**, **Cancel**, and **Continue to permanent deletion**.
+
+### Talent File visual treatment
+
+- Keep the existing Profile Details area in its current home-page location and preserve the current summary-card structure.
+- Treat the profile header and content area as one restrained digital Manila personnel folder using warm ivory/kraft tones, light paper depth, Soro navy outlines, and small orange accents.
+- Use this folder-tab order:
+  1. **Profile** — the default home sheet containing the existing profile details, screening results, skills, and experience.
+  2. **Benefits** — the protected Growth & Support area, benefit enrollment, eligibility, requests, credit-ledger activity, and approved support records.
+  3. **Attendance** — scheduled work, Start Day activity, check-outs, recorded workdays, and attendance exceptions.
+  4. **Client** — shown only after a Talent has a client placement; contains the current or most recent client assignment, placement schedule, appropriately permissioned pay information, client notes, and placement tasks.
+  5. **Documents** — always the last tab; contains private application files, résumé, assessments, equipment and internet proofs, interviews, agreements, and later uploads.
+- Selecting a tab should change the file content in place while keeping the Talent identity header visible and providing a clear one-click return to the home profile.
+- Enforce Benefits access separately from general profile access. It is available only to the System Owner, Administrators, Talent Operations, and specifically authorized support roles. It remains hidden from Sales by default.
+- Present the headshot as a polished Polaroid-style card with a restrained one-to-two-degree rotation, a single silver paperclip, a subtle paper shadow, and the current upload/replace action attached to the photo area.
+- Keep the paper metaphor elegant and functional: no torn edges, tape, handwriting, scrapbook decoration, or unnecessary animation.
+- On mobile, straighten and reduce the Polaroid, keep both tabs keyboard-accessible and horizontally usable, and prevent the folder treatment from hiding actions or private-access labels.
+
+### Rollout acceptance checks
+
+- An unrelated visitor always receives the sign-in experience and cannot see the application shell or protected data.
+- A remembered authorized session opens without an unnecessary sign-in prompt.
+- An authenticated but unauthorized account is denied before the application shell is shown.
+- Only an Administrator can reach permanent deletion, and the action cannot complete without both security checks.
+- Archive remains available and reversible for eligible users.
+- A blocked deletion explains the protected dependency and removes no records or files.
+- All available tabs open within the Talent File without moving the Profile Details area on the Profile sheet.
+- Client appears only when at least one placement is connected to the Talent, and Documents remains the final tab in every state.
+- Benefits never appears to a Sales user and cannot be fetched through a direct client query.
+- The Talent File remains readable, keyboard-accessible, and usable on desktop and mobile.
 
 ## Guiding interaction rule
 

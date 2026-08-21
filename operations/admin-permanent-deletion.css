@@ -1,0 +1,36 @@
+.admin-record-button--permanent-delete {
+  border-color: #bd3f35;
+  background: #a9342d;
+  color: #fff;
+}
+
+.admin-record-button--permanent-delete:hover { border-color: #8f241f; background: #8f241f; }
+
+.permanent-delete-dialog {
+  width: min(610px, calc(100vw - 30px));
+  padding: 0;
+  border: 0;
+  border-radius: 19px;
+  color: #17324f;
+  background: #fffdf9;
+  box-shadow: 0 28px 85px rgba(37, 20, 17, .38);
+}
+
+.permanent-delete-dialog::backdrop { background: rgba(21, 30, 43, .62); backdrop-filter: blur(3px); }
+.permanent-delete-card { padding: 27px; }
+.permanent-delete-card header { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.permanent-delete-card h2 { margin: 4px 0 0; color: #8d2c25; font: 700 27px/1.18 Georgia, serif; }
+.permanent-delete-close { width: 34px; height: 34px; flex: 0 0 34px; border: 1px solid #d7c4bc; border-radius: 9px; background: #fff; color: #8d2c25; font-size: 24px; cursor: pointer; }
+.permanent-delete-warning { margin: 20px 0; padding: 15px 16px; border-left: 4px solid #c84538; border-radius: 9px; background: #fff0ed; }
+.permanent-delete-warning strong { color: #852e27; }
+.permanent-delete-warning p { margin: 6px 0 0; color: #5e413e; font-size: 14px; line-height: 1.5; }
+.permanent-delete-card label { display: grid; gap: 7px; margin-top: 15px; color: #183d68; font-size: 13px; font-weight: 800; }
+.permanent-delete-card input { width: 100%; box-sizing: border-box; padding: 11px 12px; border: 1px solid #c9d7e6; border-radius: 10px; color: #172033; font: inherit; }
+.permanent-delete-card input:focus { outline: 3px solid rgba(189,63,53,.15); border-color: #bd3f35; }
+.permanent-delete-error { margin: 15px 0 0; padding: 11px 13px; border-radius: 8px; background: #fff0ed; color: #962f27; font-size: 13px; line-height: 1.45; }
+.permanent-delete-card footer { display: flex; justify-content: flex-end; gap: 9px; flex-wrap: wrap; margin-top: 23px; padding-top: 19px; border-top: 1px solid #eadfd7; }
+
+@media (max-width: 560px) {
+  .permanent-delete-card { padding: 22px 19px; }
+  .permanent-delete-card footer { display: grid; }
+}
