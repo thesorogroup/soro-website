@@ -211,7 +211,7 @@ Activity history should be readable by authorized staff, tamper-resistant, searc
 
 ## Next rollout — Secure access and Talent File experience
 
-Status: Implemented for the August 2026 Talent File rollout. The server-only database permissions were applied successfully on August 21, 2026; production deployment verification is in progress.
+Status: Live as of August 21, 2026. The server-only database permissions were applied successfully, Netlify published the rollout, the unauthenticated employee-portal gate was verified, and the production Talent File assets and protected deletion endpoint were confirmed available.
 
 Initial visual-direction reference: `planning/talent-file-concept-v1.png`. The implemented tab set expands the original two-tab concept as documented below.
 
