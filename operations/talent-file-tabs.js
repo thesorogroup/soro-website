@@ -87,18 +87,6 @@
     const documents = layout?.querySelector('.profile-documents-section');
     if (!main || !hero || !stats || !layout || !documents) return markup;
 
-    const identity = hero.querySelector('.profile-identity');
-    const address = hero.querySelector('.profile-private-address');
-    const contact = identity?.querySelector('h1')?.nextElementSibling;
-    if (identity && address) {
-      if (contact) contact.insertAdjacentElement('afterend', address);
-      else identity.append(address);
-    }
-
-    const heroMedia = hero.querySelector('.profile-hero-media');
-    const actions = hero.querySelector('.profile-actions');
-    if (heroMedia && actions) heroMedia.prepend(actions);
-
     documents.remove();
     layout.classList.add('talent-profile-home-layout');
     const benefitsAvailable = canViewBenefits();
@@ -113,7 +101,13 @@
     const body = shell.querySelector('.talent-file-body');
     const panels = shell.querySelector('.talent-file-panels');
     body.append(hero);
-    shell.querySelector('[data-talent-file-panel="profile"]').append(stats, layout);
+    const profilePanel = shell.querySelector('[data-talent-file-panel="profile"]');
+    profilePanel.append(stats, layout);
+    const dangerZone = document.createElement('section');
+    dangerZone.className = 'talent-profile-danger-zone';
+    dangerZone.hidden = true;
+    dangerZone.innerHTML = '<div><p class="eyebrow">Administrator record controls</p><h2>Danger zone</h2><p>Permanent deletion is intentionally separated from everyday profile actions.</p></div><div class="talent-profile-danger-actions admin-record-actions"></div>';
+    profilePanel.append(dangerZone);
     shell.querySelector('[data-talent-file-panel="documents"]').append(documents);
     if (firstDialog && firstDialog.parentElement !== main) main.append(firstDialog);
     activateTab(activeTab, shell);

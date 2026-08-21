@@ -1,11 +1,23 @@
 /* A polished digital personnel-folder treatment for Talent profiles. */
 .talent-profile-page { max-width: 1260px; }
+.talent-profile-page .back-to-directory { margin-bottom: 22px; }
+
+@media (min-width: 1500px) {
+  .page.talent-profile-page {
+    max-width: calc(66.14vw + 84px);
+    padding-top: 26px;
+  }
+
+  .talent-profile-page .talent-file-shell { left: -1.41vw; }
+  .talent-profile-page .back-to-directory { margin-bottom: 22px; }
+}
 
 .talent-file-shell {
   --folder-ink: #0c4279;
   --folder-edge: #c49d5d;
-  --folder-paper: #fff9ec;
-  margin-top: 2px;
+  --folder-paper: #fff8e9;
+  position: relative;
+  margin-top: 0;
 }
 
 .talent-file-tabs {
@@ -13,7 +25,7 @@
   z-index: 3;
   display: flex;
   align-items: end;
-  gap: 7px;
+  gap: 0;
   padding: 0 20px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -25,15 +37,16 @@
 .talent-file-tab {
   position: relative;
   isolation: isolate;
-  flex: 1 0 148px;
-  max-width: 205px;
-  min-height: 52px;
-  margin-bottom: -2px;
-  padding: 14px 23px 13px;
+  flex: 1 1 0;
+  min-width: 210px;
+  max-width: 310px;
+  min-height: 44px;
+  margin: 0 -1px -1px 0;
+  padding: 12px 24px 11px;
   border: 0;
   background: transparent;
   color: #0b386a;
-  font: 750 13px/1.2 Arial, sans-serif;
+  font: 750 14px/1.2 Arial, sans-serif;
   letter-spacing: .01em;
   cursor: pointer;
   white-space: nowrap;
@@ -45,7 +58,7 @@
   position: absolute;
   inset: 0;
   z-index: -2;
-  clip-path: polygon(10px 100%, 0 17px, 3px 8px, 10px 2px, 17px 0, calc(100% - 22px) 0, calc(100% - 14px) 3px, 100% 100%);
+  clip-path: polygon(0 100%, 0 19px, 2px 11px, 8px 4px, 15px 0, calc(100% - 15px) 0, calc(100% - 8px) 4px, calc(100% - 2px) 11px, 100% 100%);
 }
 
 .talent-file-tab::before { background: var(--folder-edge); }
@@ -53,14 +66,14 @@
 .talent-file-tab::after {
   inset: 1px 1px 0;
   z-index: -1;
-  background: linear-gradient(180deg, #f8e9ca 0%, #eed5a6 100%);
+  background: linear-gradient(180deg, #f8ead0 0%, #efdbb6 100%);
 }
 
-.talent-file-tab:hover::after { background: linear-gradient(180deg, #fff1d5 0%, #f4ddb0 100%); }
+.talent-file-tab:hover::after { background: linear-gradient(180deg, #fff2dc 0%, #f4e2c2 100%); }
 
 .talent-file-tab[aria-selected="true"] {
   z-index: 4;
-  min-height: 57px;
+  min-height: 44px;
   color: #062f62;
 }
 
@@ -94,11 +107,11 @@
   position: relative;
   overflow: hidden;
   border: 2px solid var(--folder-ink);
-  border-radius: 17px;
+  border-radius: 18px;
   background:
-    linear-gradient(110deg, rgba(255,255,255,.72), rgba(255,249,232,.62)),
-    #f7e8c5;
-  box-shadow: 0 16px 38px rgba(39, 45, 53, .09);
+    linear-gradient(110deg, rgba(255,255,255,.5), rgba(255,249,234,.36)),
+    #fdf0d7;
+  box-shadow: 0 14px 34px rgba(39, 45, 53, .075);
 }
 
 .talent-file-body::before {
@@ -106,7 +119,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  opacity: .2;
+  opacity: .14;
   background-image: radial-gradient(rgba(122, 92, 48, .12) .55px, transparent .55px);
   background-size: 6px 6px;
 }
@@ -115,51 +128,51 @@
 
 .talent-file-body .talent-profile-hero {
   display: grid;
-  grid-template-columns: 196px minmax(0, 1fr) minmax(330px, 390px);
-  gap: 31px;
-  align-items: center;
-  min-height: 286px;
+  grid-template-columns: 245px minmax(0, 1fr) 435px;
+  gap: 40px;
+  align-items: start;
+  min-height: 392px;
   box-sizing: border-box;
   border: 0;
   border-radius: 0;
-  padding: 29px 30px 27px;
+  padding: 28px 28px 20px;
   background: transparent;
 }
 
 .talent-file-body .headshot-wrap {
   position: relative;
-  gap: 12px;
+  gap: 10px;
   justify-items: center;
-  align-self: center;
+  align-self: start;
   flex-basis: auto;
 }
 
 .talent-file-body .talent-headshot {
   position: relative;
-  width: 178px;
-  height: 214px;
+  width: 230px;
+  height: 270px;
   box-sizing: border-box;
   overflow: visible;
   display: grid;
   place-items: center;
-  padding: 11px 11px 39px;
+  padding: 11px 11px 43px;
   border: 1px solid #d4d1ca;
   border-radius: 1px;
   background: #fff;
-  box-shadow: 0 13px 26px rgba(30, 39, 50, .2), 0 2px 5px rgba(30, 39, 50, .12);
+  box-shadow: 0 15px 30px rgba(30, 39, 50, .19), 0 2px 5px rgba(30, 39, 50, .1);
   color: #fff;
   font-size: 34px;
-  transform: rotate(-3.1deg);
+  transform: rotate(-4deg);
 }
 
 .talent-file-body .talent-headshot::after {
   content: "";
   position: absolute;
   z-index: 2;
-  top: -16px;
-  left: 22px;
-  width: 19px;
-  height: 53px;
+  top: -11px;
+  left: 21px;
+  width: 20px;
+  height: 57px;
   border: 3px solid #959ca3;
   border-radius: 12px;
   box-shadow: inset 0 0 0 2px rgba(255,255,255,.62), 1px 2px 3px rgba(34,40,50,.2);
@@ -170,10 +183,10 @@
   content: "";
   position: absolute;
   z-index: 3;
-  top: -9px;
-  left: 28px;
-  width: 9px;
-  height: 38px;
+  top: -3px;
+  left: 27px;
+  width: 10px;
+  height: 42px;
   border: 1.5px solid rgba(242, 244, 246, .95);
   border-radius: 8px;
   transform: rotate(-6deg);
@@ -190,22 +203,28 @@
   object-fit: cover;
   overflow: hidden;
   border-radius: 0;
-  background: linear-gradient(140deg, #214c79, #79a6c8);
+  background:
+    radial-gradient(circle at 50% 29%, rgba(255,255,255,.2) 0 25px, transparent 26px),
+    radial-gradient(ellipse at 50% 101%, rgba(255,255,255,.13) 0 70px, transparent 71px),
+    linear-gradient(145deg, #214c79, #6f9fc2);
 }
 
 .talent-file-body .talent-headshot img { object-position: center 28%; }
+.talent-file-body .talent-headshot > span { font-size: 30px; font-weight: 780; letter-spacing: .045em; text-shadow: 0 2px 9px rgba(5,34,65,.24); }
 
-.talent-file-body .headshot-upload { min-height: 38px; background: #fffdf8; box-shadow: 0 2px 8px rgba(30,39,50,.05); }
-.talent-file-body .headshot-wrap small { max-width: 190px; }
-.talent-file-body .profile-identity { align-self: center; padding: 0; }
-.talent-file-body .profile-identity h1 { max-width: 660px; margin-top: 4px; font-size: clamp(27px, 2vw, 34px); line-height: 1.08; }
-.talent-file-body .profile-tags { margin-top: 12px; }
+.talent-file-body .headshot-upload { min-height: 40px; padding-inline: 15px; background: #fffdf8; box-shadow: 0 2px 8px rgba(30,39,50,.05); }
+.talent-file-body .headshot-wrap small { max-width: 220px; }
+.talent-file-body .profile-identity { align-self: start; padding: 62px 0 0; }
+.talent-file-body .profile-identity h1 { max-width: 660px; margin-top: 4px; font-size: clamp(29px, 1.9vw, 36px); line-height: 1.08; }
+.talent-file-body .profile-tags { margin-top: 16px; }
 
 .talent-file-body .profile-private-address {
-  width: min(100%, 565px);
+  width: min(100%, 310px);
   box-sizing: border-box;
-  margin: 14px 0 0;
-  padding: 11px 13px;
+  justify-self: end;
+  margin: 0;
+  margin-bottom: 25px;
+  padding: 22px 15px;
   border-color: #c7d8e7;
   background: rgba(255, 255, 255, .76);
   box-shadow: 0 3px 12px rgba(20, 55, 90, .04);
@@ -215,50 +234,63 @@
 
 .talent-file-body .profile-hero-media {
   width: 100%;
-  max-width: 390px;
+  max-width: 435px;
   display: grid;
   align-self: start;
   align-content: start;
-  gap: 13px;
+  gap: 0;
   justify-items: stretch;
   flex: none;
 }
 
 .talent-file-body .profile-actions {
-  order: -1;
   width: 100%;
   display: flex;
   justify-content: flex-end;
   align-items: flex-start;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 9px;
+  flex-wrap: nowrap;
+  margin-bottom: 12px;
 }
 
 .talent-file-body .profile-actions > .button,
 .talent-file-body .profile-actions .admin-record-button {
   min-height: 38px;
-  padding: 9px 13px;
+  padding: 9px 14px;
   border-radius: 9px;
   box-shadow: 0 2px 7px rgba(26, 47, 72, .04);
 }
 
-.talent-file-body .admin-profile-controls { display: contents; }
-.talent-file-body .admin-record-button--permanent-delete { border-color: #d69b92; background: #fff7f4; color: #9a312a; }
-.talent-file-body .admin-record-button--permanent-delete:hover { border-color: #b94a40; background: #fff0ec; color: #84261f; }
-.talent-file-body .profile-introduction-video { padding: 13px 14px; background: rgba(255,255,255,.82); box-shadow: 0 4px 14px rgba(27,49,74,.05); }
+.talent-file-body .admin-profile-controls { flex-wrap: nowrap; gap: 9px; }
+.talent-file-body .profile-introduction-video { padding: 20px 14px; background: rgba(255,255,255,.82); box-shadow: 0 4px 14px rgba(27,49,74,.05); }
 
-.talent-file-panels { padding: 18px 0 0; }
+.talent-file-panels { padding: 9px 0 0; }
 .talent-file-panel[hidden] { display: none !important; }
 .talent-file-panel { min-width: 0; }
 .talent-file-profile-panel .profile-stat-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
-  margin: 0 0 18px;
+  margin: 0 0 10px;
 }
 
 .talent-file-profile-panel .profile-stat-grid article { background: #fff; box-shadow: 0 4px 14px rgba(25,48,74,.035); }
 .talent-file-profile-panel .profile-layout { margin: 0; }
 .talent-file-documents-panel .profile-documents-section { margin: 0; }
+.talent-profile-danger-zone {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 18px;
+  padding: 18px 20px;
+  border: 1px solid #ead7d2;
+  border-radius: 14px;
+  background: #fffaf8;
+}
+.talent-profile-danger-zone[hidden] { display: none !important; }
+.talent-profile-danger-zone h2 { margin: 2px 0 4px; color: #7f302a; font-size: 17px; }
+.talent-profile-danger-zone p:last-child { margin: 0; color: #6f5960; font-size: 13px; }
+.talent-profile-danger-actions { flex: 0 0 auto; }
 .talent-file-panel[data-talent-file-panel="benefits"],
 .talent-file-panel[data-talent-file-panel="attendance"],
 .talent-file-panel[data-talent-file-panel="client"] {
@@ -309,14 +341,18 @@
 
 @media (max-width: 1100px) {
   .talent-file-body .talent-profile-hero { grid-template-columns: 190px minmax(0, 1fr); gap: 28px; }
-  .talent-file-body .profile-hero-media { grid-column: 1 / -1; max-width: none; grid-template-columns: minmax(280px, .8fr) minmax(340px, 1.2fr); align-items: start; }
-  .talent-file-body .profile-actions { justify-content: flex-start; }
+  .talent-file-body .talent-headshot { width: 180px; height: 218px; padding: 10px 10px 36px; }
+  .talent-file-body .profile-identity { padding-top: 38px; }
+  .talent-file-body .profile-hero-media { grid-column: 1 / -1; max-width: none; grid-template-columns: minmax(280px, .8fr) minmax(340px, 1.2fr); align-items: start; gap: 12px; }
+  .talent-file-body .profile-private-address { justify-self: start; margin-bottom: 0; padding: 13px 15px; }
+  .talent-file-body .profile-actions { justify-content: flex-start; margin-bottom: 0; }
+  .talent-file-body .profile-introduction-video { padding: 13px 14px; }
 }
 
 @media (max-width: 760px) {
   .talent-file-tabs { padding: 0 9px; gap: 5px; }
-  .talent-file-tab { flex-basis: 132px; min-width: 132px; min-height: 48px; padding-inline: 18px; }
-  .talent-file-tab[aria-selected="true"] { min-height: 53px; }
+  .talent-file-tab { flex: 0 0 148px; min-width: 148px; min-height: 44px; padding-inline: 18px; }
+  .talent-file-tab[aria-selected="true"] { min-height: 44px; }
   .talent-file-body { border-radius: 14px; }
   .talent-file-body .talent-profile-hero { grid-template-columns: 150px minmax(0, 1fr); gap: 24px 18px; min-height: 0; padding: 27px 18px 22px; align-items: start; }
   .talent-file-body .headshot-wrap { justify-self: center; }
@@ -325,12 +361,15 @@
   .talent-file-body .profile-identity > p:not(.eyebrow) { font-size: 13px; line-height: 1.4; }
   .talent-file-body .profile-private-address { padding: 10px 11px; }
   .talent-file-body .profile-hero-media { grid-column: 1 / -1; grid-template-columns: 1fr; }
+  .talent-file-body .profile-actions { flex-wrap: wrap; }
+  .talent-file-body .admin-profile-controls { flex-wrap: wrap; }
   .talent-file-profile-panel .profile-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .talent-file-panels { padding-top: 15px; }
   .talent-file-panel[data-talent-file-panel="benefits"],
   .talent-file-panel[data-talent-file-panel="attendance"],
   .talent-file-panel[data-talent-file-panel="client"] { padding: 18px; }
   .talent-tab-summary, .client-work-grid { grid-template-columns: 1fr; }
+  .talent-profile-danger-zone { display: grid; }
 }
 
 @media (max-width: 520px) {

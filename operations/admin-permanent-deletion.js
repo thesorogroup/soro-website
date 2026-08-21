@@ -17,12 +17,14 @@
     button.dataset.permanentDeleteArchived = String(Boolean(archived));
     button.textContent = 'Delete permanently';
     actions.append(button);
+    const dangerZone = actions.closest('.talent-profile-danger-zone');
+    if (dangerZone) dangerZone.hidden = false;
   }
 
   function addDeleteControls() {
     if (!isAdministrator()) return;
     const applicant = typeof liveApplicants !== 'undefined' ? liveApplicants.find(item => item.id === selectedTalentId) : null;
-    const profileActions = document.querySelector('.admin-profile-controls');
+    const profileActions = document.querySelector('.talent-profile-danger-actions') || document.querySelector('.admin-profile-controls');
     if (applicant && profileActions) addButton(profileActions, 'talent', applicant.id, applicant.full_name, false);
 
     document.querySelectorAll('[data-edit-client]').forEach(edit => {
