@@ -106,15 +106,14 @@
 
     const shell = document.createElement('section');
     shell.className = 'talent-file-shell';
-    shell.innerHTML = `<div class="talent-file-tabs" role="tablist" aria-label="Talent file sections">${tabButton('profile', 'Profile')}${benefitsAvailable ? tabButton('benefits', 'Benefits', '<span class="tab-lock" aria-hidden="true">▣</span>') : ''}${tabButton('attendance', 'Attendance')}${tabButton('documents', 'Documents')}</div><div class="talent-file-body"><div class="talent-file-panels">${panel('profile', '', 'talent-file-profile-panel')}${benefitsAvailable ? panel('benefits', benefitsPanel(applicant)) : ''}${panel('attendance', attendancePanel())}${panel('documents', '', 'talent-file-documents-panel')}</div></div>`;
+    shell.innerHTML = `<div class="talent-file-tabs" role="tablist" aria-label="Talent file sections">${tabButton('profile', 'Profile')}${benefitsAvailable ? tabButton('benefits', 'Benefits', '<span class="tab-lock" aria-hidden="true"></span>') : ''}${tabButton('attendance', 'Attendance')}${tabButton('documents', 'Documents')}</div><div class="talent-file-body"></div><div class="talent-file-panels">${panel('profile', '', 'talent-file-profile-panel')}${benefitsAvailable ? panel('benefits', benefitsPanel(applicant)) : ''}${panel('attendance', attendancePanel())}${panel('documents', '', 'talent-file-documents-panel')}</div>`;
 
     const firstDialog = main.querySelector('dialog');
     main.insertBefore(shell, hero);
     const body = shell.querySelector('.talent-file-body');
     const panels = shell.querySelector('.talent-file-panels');
-    body.insertBefore(hero, panels);
-    body.insertBefore(stats, panels);
-    shell.querySelector('[data-talent-file-panel="profile"]').append(layout);
+    body.append(hero);
+    shell.querySelector('[data-talent-file-panel="profile"]').append(stats, layout);
     shell.querySelector('[data-talent-file-panel="documents"]').append(documents);
     if (firstDialog && firstDialog.parentElement !== main) main.append(firstDialog);
     activateTab(activeTab, shell);
