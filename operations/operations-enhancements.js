@@ -62,6 +62,12 @@
       .join(' · ');
   }
 
+  function profilePronouns(applicant) {
+    const values = Array.isArray(applicant.pronouns) ? applicant.pronouns : [];
+    if (values.includes('prefer_not_to_disclose')) return 'Prefer not to disclose';
+    return displayedPronouns(applicant) || 'Not shared';
+  }
+
   function displayedGender(applicant) {
     const value = String(applicant.gender_identity || '').trim();
     if (!value) return 'Not shared';
@@ -192,7 +198,7 @@
   function privateProfileDetailRows(applicant) {
     if (!canViewPrivateProfileDetails(applicant)) return '';
     const age = profileDetailsTools.ageFromBirthDate(applicant.birth_date, profileDetailsTimeZone(applicant));
-    return `<div class="private-identity-detail"><dt>Date of birth <span>Private</span></dt><dd>${escapeHtml(profileDetailsTools.formatBirthDate(applicant.birth_date))}</dd></div><div class="private-identity-detail"><dt>Age <span>Calculated</span></dt><dd>${age === null ? 'Not available' : escapeHtml(age)}</dd></div><div class="private-identity-detail"><dt>Gender identity <span>Private</span></dt><dd>${escapeHtml(displayedGender(applicant))}</dd></div>`;
+    return `<div class="private-identity-detail"><dt>Date of birth <span>Private</span></dt><dd>${escapeHtml(profileDetailsTools.formatBirthDate(applicant.birth_date))}</dd></div><div class="private-identity-detail"><dt>Age <span>Calculated</span></dt><dd>${age === null ? 'Not available' : escapeHtml(age)}</dd></div><div class="private-identity-detail"><dt>Gender identity <span>Private</span></dt><dd>${escapeHtml(displayedGender(applicant))}</dd></div><div class="private-identity-detail"><dt>Pronouns <span>Private</span></dt><dd>${escapeHtml(profilePronouns(applicant))}</dd></div>`;
   }
 
   function privateProfileDetailsDialog(applicant) {
