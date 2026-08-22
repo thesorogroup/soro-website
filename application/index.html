@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../assets/styles.css">
-  <link rel="stylesheet" href="application.css">
+  <link rel="stylesheet" href="application.css?v=20260821-native-application-v2">
 </head>
 <body class="soro-application-page">
   <header class="application-header">
@@ -29,10 +29,10 @@
 
     <section class="application-shell" aria-label="Talent application">
       <ol class="application-steps" aria-label="Application progress">
-        <li class="is-active"><span>1</span> Basics</li>
-        <li><span>2</span> Work profile</li>
-        <li><span>3</span> Documents</li>
-        <li><span>4</span> Review</li>
+        <li class="is-active"><button type="button" aria-current="step"><span>1</span><b>Basics</b></button></li>
+        <li><button type="button"><span>2</span><b>Work profile</b></button></li>
+        <li><button type="button"><span>3</span><b>Documents</b></button></li>
+        <li><button type="button"><span>4</span><b>Review</b></button></li>
       </ol>
 
       <div id="application-alert" class="application-alert" role="alert" hidden></div>
@@ -78,7 +78,7 @@
               <option>Zambia</option><option>Zimbabwe</option>
             </select></label>
 <label class="field">Time zone
-  <select name="timezone" required>
+  <select name="timezone" required aria-controls="timezone-other-field">
     <option value="Asia/Manila" selected>Philippines — Asia/Manila (PHT, UTC+08:00)</option>
     <option value="Pacific/Auckland">New Zealand — Pacific/Auckland (UTC+12:00 / UTC+13:00)</option>
     <option value="Australia/Sydney">Australia — Australia/Sydney (UTC+10:00 / UTC+11:00)</option>
@@ -106,7 +106,14 @@
     <option value="Other">Other / not listed — specify your UTC offset</option>
   </select>
 </label>
-            <label class="field field-wide">Street address <small>(private)</small><input name="addressLine1" autocomplete="street-address" spellcheck="true" placeholder="Street, building, barangay, or neighborhood"></label>
+            <label class="field field-wide conditional-field" id="timezone-other-field" hidden>Time zone or UTC offset
+              <input name="timezoneOther" autocomplete="off" spellcheck="true" placeholder="Example: Pacific/Guam or UTC+10:00" aria-describedby="timezone-other-help">
+              <small id="timezone-other-help">Enter your IANA time zone if you know it, or your current UTC offset.</small>
+            </label>
+            <label class="field field-wide">Street address
+              <input name="addressLine1" autocomplete="address-line1" required spellcheck="true" placeholder="House or building number, street, barangay, or neighborhood">
+              <small>Enter your house or building number, street, barangay, or neighborhood.</small>
+            </label>
             <label class="field">City / municipality<input name="city" autocomplete="address-level2" required spellcheck="true"></label>
             <label class="field">Province / region<input name="provinceRegion" autocomplete="address-level1" required spellcheck="true"></label>
             <label class="field">Postal code <small>(if available)</small><input name="postalCode" autocomplete="postal-code"></label>
@@ -116,38 +123,80 @@
         <section class="form-step" data-step="2">
           <div class="step-heading"><p class="eyebrow">Step 2 of 4</p><h2>Your work profile</h2><p>Give Talent Management a clear picture of the work you do best.</p></div>
           <div class="field-grid">
-            <label class="field field-wide">What is your greatest career goal or dream?<textarea name="greatestDream" required spellcheck="true" placeholder="Tell us what you are working toward and how meaningful work would help."></textarea></label>
-            <label class="field">Current work status<select name="currentWorkStatus" required><option value="">Choose one</option><option>Currently employed</option><option>Freelancer</option><option>Seeking work</option><option>Student</option><option>Other</option></select></label>
+            <label class="field field-wide">What is your biggest dream in life?<textarea name="greatestDream" required spellcheck="true" placeholder="Tell us what you hope to achieve and what a meaningful future looks like to you."></textarea></label>
+            <label class="field">Current work status<select name="currentWorkStatus" required aria-controls="work-status-other-field"><option value="">Choose one</option><option>Currently employed</option><option>Freelancer</option><option>Seeking work</option><option>Student</option><option>Other</option></select></label>
+            <label class="field conditional-field" id="work-status-other-field" hidden>Describe your current work status
+              <input name="currentWorkStatusOther" spellcheck="true" placeholder="Example: Between contracts or taking a career break">
+            </label>
             <label class="field">Availability<select name="availability" required><option value="">Choose one</option><option>Full time</option><option>Part time</option><option>Flexible</option></select></label>
             <label class="field">Preferred work hours<input name="desiredHours" required spellcheck="true" placeholder="Example: 9 AM–6 PM PHT"></label>
-            <label class="field">Expected rate <small>(USD)</small><input name="expectedRate" required inputmode="decimal" placeholder="Example: 6–8 per hour"></label>
-            <label class="field field-wide">Skills and tools<input name="skills" required spellcheck="true" placeholder="Example: customer support, Canva, QuickBooks, HubSpot"></label>
-            <label class="field field-wide">Relevant work experience<textarea name="workBackground" required spellcheck="true" placeholder="Describe your most relevant work, responsibilities, and industries."></textarea></label>
+            <fieldset class="rate-fieldset field-wide" aria-describedby="expected-rate-help expected-rate-preview">
+              <legend>Expected hourly rate range</legend>
+              <p class="field-help" id="expected-rate-help">Enter the minimum and maximum hourly rate you would like to earn.</p>
+              <div class="rate-input-grid">
+                <label class="rate-input"><span>Minimum</span><span class="rate-control"><b aria-hidden="true">$</b><input name="expectedRateMin" type="number" min="1" step="1" inputmode="numeric" required aria-label="Minimum expected hourly rate in US dollars"><em>USD per hour</em></span></label>
+                <span class="rate-separator" aria-hidden="true">to</span>
+                <label class="rate-input"><span>Maximum</span><span class="rate-control"><b aria-hidden="true">$</b><input name="expectedRateMax" type="number" min="1" step="1" inputmode="numeric" required aria-label="Maximum expected hourly rate in US dollars"><em>USD per hour</em></span></label>
+              </div>
+              <p class="rate-preview" id="expected-rate-preview" aria-live="polite">Your rate will appear as: <strong>$6-$8 USD per hour</strong></p>
+            </fieldset>
+
+            <fieldset class="experience-fieldset field-wide" aria-describedby="experience-areas-help">
+              <legend>Which types of work have you done before?</legend>
+              <p class="field-help" id="experience-areas-help">Select all areas where you have hands-on experience, including paid work, freelance work, internships, or volunteer work.</p>
+              <div class="checkbox-card-grid">
+                <label class="checkbox-card"><input name="experienceAreas" type="checkbox" value="healthcare"><span><strong>Medical &amp; healthcare support</strong><small>Patient, insurance, billing, coding, or medical-office support</small></span></label>
+                <label class="checkbox-card"><input name="experienceAreas" type="checkbox" value="general_admin"><span><strong>General administrative &amp; executive support</strong><small>Inbox, calendar, documents, research, or project coordination</small></span></label>
+                <label class="checkbox-card"><input name="experienceAreas" type="checkbox" value="social_media"><span><strong>Social media &amp; digital marketing</strong><small>Content, community engagement, publishing, or campaign support</small></span></label>
+                <label class="checkbox-card"><input name="experienceAreas" type="checkbox" value="customer_support"><span><strong>Customer service &amp; client support</strong><small>Email, chat, phone, order, or appointment support</small></span></label>
+                <label class="checkbox-card"><input name="experienceAreas" type="checkbox" value="ecommerce"><span><strong>E-commerce support</strong><small>Product listings, orders, inventory, or marketplace operations</small></span></label>
+                <label class="checkbox-card"><input name="experienceAreas" type="checkbox" value="other" aria-controls="experience-other-field"><span><strong>Other</strong><small>Select this to enter another specialty</small></span></label>
+                <label class="checkbox-card checkbox-card--exclusive"><input name="experienceAreas" type="checkbox" value="no_prior" aria-controls="experience-no-prior-note"><span><strong>I do not have prior professional experience</strong><small>Training, school, volunteer work, and transferable skills still count.</small></span></label>
+              </div>
+            </fieldset>
+
+            <label class="field field-wide conditional-field" id="experience-other-field" hidden>Other work specialty
+              <input name="experienceOther" spellcheck="true" placeholder="Enter the type of work you have experience in">
+            </label>
+
+            <div class="no-experience-note field-wide" id="experience-no-prior-note" role="status" hidden>
+              <strong>No previous work experience is required to take this step.</strong>
+              <p>We will focus on your training, interests, and transferable strengths.</p>
+            </div>
+
+            <div class="skills-container field-wide" id="experience-skills" aria-live="polite" hidden></div>
+
+            <label class="field field-wide conditional-field" id="other-skills-field" hidden>Other skills, tools, or specialties not listed <small>(Optional)</small>
+              <input name="otherSkills" spellcheck="true" placeholder="Separate multiple skills with commas">
+            </label>
             <label class="field field-wide">Work interests<input name="workInterests" required spellcheck="true" placeholder="Tell us the specific industries or roles you would like to apply for"></label>
             <label class="field field-wide">Education, certifications, or training<textarea name="education" required spellcheck="true" placeholder="Include degrees, certificates, and relevant training."></textarea></label>
-            <label class="field">Dedicated, quiet workspace?<select name="dedicatedWorkspace" required><option value="">Choose one</option><option value="yes">Yes</option><option value="no">No</option></select></label>
-            <label class="field">Computer & equipment summary<input name="equipmentSummary" required spellcheck="true" placeholder="Computer, headset, backup power, etc."></label>
-            <label class="field field-wide">Internet summary<input name="internetSummary" required spellcheck="true" placeholder="Provider, plan speed, and backup connection if any"></label>
+            <label class="field">Do you have a dedicated, quiet workspace?<select name="dedicatedWorkspace" required><option value="">Select an answer</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+            <label class="field">Do you have a laptop you can use for work?<select name="hasLaptop" required><option value="">Select an answer</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+            <label class="field">Do you have a noise-canceling headset?<select name="hasNoiseCancelingHeadset" required><option value="">Select an answer</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+            <label class="field">Do you have a reliable internet connection?<select name="hasReliableInternet" required><option value="">Select an answer</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+            <label class="field">Do you have a backup internet connection?<select name="hasBackupInternet" required><option value="">Select an answer</option><option value="yes">Yes</option><option value="no">No</option></select></label>
+            <label class="field">If your usual workspace, power, or internet becomes unavailable, do you have a backup place or plan that would allow you to continue working?<select name="hasEmergencyWorkspace" required><option value="">Select an answer</option><option value="yes">Yes</option><option value="no">No</option></select></label>
           </div>
         </section>
 
         <section class="form-step" data-step="3">
-          <div class="step-heading"><p class="eyebrow">Step 3 of 4</p><h2>Upload your application materials</h2><p>Files are stored privately with your application. PDF, DOC, DOCX, JPG, PNG, MP4, MOV, and WebM are accepted.</p></div>
+          <div class="step-heading"><p class="eyebrow">Step 3 of 4</p><h2>Upload your application materials</h2><p>Files are stored privately with your application. Each item below shows the file types it accepts. The maximum file size is 95 MB per file.</p></div>
           <div class="upload-grid">
-            <div class="upload-field"><span><strong>Résumé</strong><small>Upload your current résumé as a PDF, Word document, or image.</small></span><input id="resume-file" data-document="resume" name="resume" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="resume-file">Choose file</label></div>
-            <div class="upload-field"><span><strong>English test / proof</strong><small>Please take the English assessment, save a screenshot of your result, then upload it here.</small><a class="assessment-link" href="https://www.efset.org/quick-check/" target="_blank" rel="noopener">Take the English assessment ↗</a></span><input id="english-proof-file" data-document="english_proof" name="englishProof" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="english-proof-file">Choose file</label></div>
-            <div class="upload-field"><span><strong>DISC assessment</strong><small>Complete this assessment, save a screenshot or result file, then upload it here. It helps us understand communication style, pace, and decision-making.</small><a class="assessment-link" href="https://www.123test.com/disc-personality-test/" target="_blank" rel="noopener">Take the DISC assessment ↗</a></span><input id="disc-assessment-file" data-document="disc_assessment" name="discAssessment" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="disc-assessment-file">Choose file</label></div>
-            <div class="upload-field"><span><strong>Enneagram test</strong><small>Complete this assessment, save a screenshot or result file, then upload it here. It helps us understand motivation, stress response, and growth patterns.</small><a class="assessment-link" href="https://www.eclecticenergies.com/enneagram/test" target="_blank" rel="noopener">Take the Enneagram test ↗</a></span><input id="enneagram-assessment-file" data-document="enneagram_assessment" name="enneagramAssessment" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="enneagram-assessment-file">Choose file</label></div>
-            <div class="upload-field"><span><strong>MBTI-style assessment</strong><small>Complete this assessment, save a screenshot or result file, then upload it here. It helps us understand work style, collaboration preferences, and structure versus flexibility.</small><a class="assessment-link" href="https://www.16personalities.com/free-personality-test" target="_blank" rel="noopener">Take the MBTI-style assessment ↗</a></span><input id="mbti-assessment-file" data-document="mbti_assessment" name="mbtiAssessment" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="mbti-assessment-file">Choose file</label></div>
-            <div class="upload-field"><span><strong>Internet-speed proof</strong><small>Please run a current speed test, take a screenshot of the result, then upload it here.</small><a class="assessment-link" href="https://www.speedtest.net/" target="_blank" rel="noopener">Run an internet speed test ↗</a></span><input id="internet-proof-file" data-document="internet_proof" name="internetProof" type="file" accept=".pdf,.jpg,.jpeg,.png" required><label class="file-picker-label" for="internet-proof-file">Choose file</label></div>
-            <div class="upload-field"><span><strong>Equipment proof</strong><small>Upload a screenshot of your computer specifications or a clear photo of your equipment and workspace.</small></span><input id="equipment-proof-file" data-document="equipment_proof" name="equipmentProof" type="file" accept=".pdf,.jpg,.jpeg,.png" required><label class="file-picker-label" for="equipment-proof-file">Choose file</label></div>
-<div class="upload-field video-upload"><div class="video-method-intro"><strong>Introduction video <small>(Optional)</small></strong><small>An introduction video is not needed to submit your application. If you would like to share one, choose one method below; otherwise, leave this section blank.</small></div><fieldset class="video-methods"><legend>Choose one method only if you are including a video</legend><label class="video-method"><input name="videoMethod" type="radio" value="device"><span><strong>Upload from this device (recommended)</strong><small>Choose a video file saved on this computer.</small></span></label><label class="video-method"><input name="videoMethod" type="radio" value="phone"><span><strong>Upload from your phone (recommended)</strong><small>Save your draft, then scan the QR code on your phone.</small></span></label><label class="video-method"><input name="videoMethod" type="radio" value="loom"><span><strong>Use a Loom link</strong><small>Use this only if you cannot upload a video directly.</small></span></label></fieldset><div class="video-method-panel" data-video-method-panel="device" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Recommended: upload from this device</strong><small>Select an H.264 MP4 or WebM file saved on this computer.</small></div><div class="video-method-panel__action"><input id="introduction-video-file" data-document="introduction_video" name="introductionVideo" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"><label class="file-picker-label" for="introduction-video-file">Choose video file</label><small>H.264 MP4 or WebM provides reliable playback on Soro profiles.</small></div></div><div class="video-method-panel" data-video-method-panel="phone" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Recommended: upload from your phone</strong><small>Save your draft, then scan the QR code on your phone to choose a browser-compatible video.</small></div><div class="video-method-panel__action"><button class="phone-upload-button" id="generate-phone-upload" type="button">Save draft &amp; show phone QR</button></div><div class="phone-upload" id="phone-upload" hidden><img id="phone-upload-qr" alt="QR code for secure phone video upload"><div><strong>Upload from your phone</strong><small>Scan this code to reopen your saved application on your phone, then choose your video.</small><a id="phone-upload-link" class="assessment-link" target="_blank" rel="noopener">Open secure phone upload ↗</a></div></div></div><div class="video-method-panel" data-video-method-panel="loom" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Share a Loom link</strong><small>If direct upload is not available and you already use Loom, paste its share link below.</small></div><div class="video-method-panel__action loom-actions"><a class="assessment-link" href="https://www.loom.com/" target="_blank" rel="noopener">Open Loom ↗</a><label class="loom-field">Loom share link<input name="loomVideoUrl" type="url" placeholder="https://www.loom.com/share/…"></label></div></div></div>
+            <div class="upload-field"><span><strong>Résumé</strong><small>Upload your current résumé.</small><small class="accepted-formats">Accepted: PDF, DOC, DOCX, JPG, JPEG, or PNG · maximum 95 MB</small></span><input id="resume-file" data-document="resume" name="resume" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="resume-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>English test / proof</strong><small>Please take the English assessment, save a screenshot of your result, then upload it here.</small><small class="accepted-formats">Accepted: PDF, DOC, DOCX, JPG, JPEG, or PNG · maximum 95 MB</small><a class="assessment-link" href="https://www.efset.org/quick-check/" target="_blank" rel="noopener">Take the English assessment ↗</a></span><input id="english-proof-file" data-document="english_proof" name="englishProof" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="english-proof-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>DISC assessment</strong><small>Complete this assessment, save a screenshot or result file, then upload it here. It helps us understand communication style, pace, and decision-making.</small><small class="accepted-formats">Accepted: PDF, DOC, DOCX, JPG, JPEG, or PNG · maximum 95 MB</small><a class="assessment-link" href="https://www.123test.com/disc-personality-test/" target="_blank" rel="noopener">Take the DISC assessment ↗</a></span><input id="disc-assessment-file" data-document="disc_assessment" name="discAssessment" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="disc-assessment-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>Enneagram test</strong><small>Complete this assessment, save a screenshot or result file, then upload it here. It helps us understand motivation, stress response, and growth patterns.</small><small class="accepted-formats">Accepted: PDF, DOC, DOCX, JPG, JPEG, or PNG · maximum 95 MB</small><a class="assessment-link" href="https://www.eclecticenergies.com/enneagram/test" target="_blank" rel="noopener">Take the Enneagram test ↗</a></span><input id="enneagram-assessment-file" data-document="enneagram_assessment" name="enneagramAssessment" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="enneagram-assessment-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>MBTI-style assessment</strong><small>Complete this assessment, save a screenshot or result file, then upload it here. It helps us understand work style, collaboration preferences, and structure versus flexibility.</small><small class="accepted-formats">Accepted: PDF, DOC, DOCX, JPG, JPEG, or PNG · maximum 95 MB</small><a class="assessment-link" href="https://www.16personalities.com/free-personality-test" target="_blank" rel="noopener">Take the MBTI-style assessment ↗</a></span><input id="mbti-assessment-file" data-document="mbti_assessment" name="mbtiAssessment" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="mbti-assessment-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>Internet-speed proof</strong><small>Please run a current speed test, take a screenshot of the result, then upload it here.</small><small class="accepted-formats">Accepted: PDF, JPG, JPEG, or PNG · maximum 95 MB</small><a class="assessment-link" href="https://www.speedtest.net/" target="_blank" rel="noopener">Run an internet speed test ↗</a></span><input id="internet-proof-file" data-document="internet_proof" name="internetProof" type="file" accept=".pdf,.jpg,.jpeg,.png" required><label class="file-picker-label" for="internet-proof-file">Choose file</label></div>
+            <div class="upload-field"><span><strong>Equipment proof</strong><small>Upload a screenshot of your computer specifications or a clear photo of your equipment and workspace.</small><small class="accepted-formats">Accepted: PDF, JPG, JPEG, or PNG · maximum 95 MB</small></span><input id="equipment-proof-file" data-document="equipment_proof" name="equipmentProof" type="file" accept=".pdf,.jpg,.jpeg,.png" required><label class="file-picker-label" for="equipment-proof-file">Choose file</label></div>
+<div class="upload-field video-upload"><div class="video-method-intro"><strong>Introduction video <small>(Optional)</small></strong><small>An introduction video is not needed to submit your application. If you would like to share one, choose one method below; otherwise, leave this section blank.</small><small class="accepted-formats">Direct uploads accepted: MP4 (H.264), MOV (H.264), or WebM · maximum 95 MB</small></div><fieldset class="video-methods"><legend>Choose one method only if you are including a video</legend><label class="video-method"><input name="videoMethod" type="radio" value="device"><span><strong>Upload from this device (recommended)</strong><small>Choose a video file saved on this computer.</small></span></label><label class="video-method"><input name="videoMethod" type="radio" value="phone"><span><strong>Upload from your phone (recommended)</strong><small>Save your draft, then scan the QR code on your phone.</small></span></label><label class="video-method"><input name="videoMethod" type="radio" value="loom"><span><strong>Use a Loom link</strong><small>Use this only if you cannot upload a video directly.</small></span></label></fieldset><div class="video-method-panel" data-video-method-panel="device" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Recommended: upload from this device</strong><small>Select an MP4 (H.264), MOV (H.264), or WebM file saved on this computer.</small></div><div class="video-method-panel__action"><input id="introduction-video-file" data-document="introduction_video" name="introductionVideo" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"><label class="file-picker-label" for="introduction-video-file">Choose video file</label><small class="accepted-formats">Accepted: MP4 (H.264), MOV (H.264), or WebM · maximum 95 MB</small></div></div><div class="video-method-panel" data-video-method-panel="phone" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Recommended: upload from your phone</strong><small>Save your draft, then scan the QR code on your phone to choose an MP4 (H.264), MOV (H.264), or WebM video.</small></div><div class="video-method-panel__action"><button class="phone-upload-button" id="generate-phone-upload" type="button">Save draft &amp; show phone QR</button></div><div class="phone-upload" id="phone-upload" hidden><img id="phone-upload-qr" alt="QR code for secure phone video upload"><div><strong>Upload from your phone</strong><small>Scan this code to reopen your saved application on your phone, then choose your video.</small><a id="phone-upload-link" class="assessment-link" target="_blank" rel="noopener">Open secure phone upload ↗</a></div></div></div><div class="video-method-panel" data-video-method-panel="loom" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Share a Loom link</strong><small>If direct upload is not available and you already use Loom, paste its share link below.</small></div><div class="video-method-panel__action loom-actions"><a class="assessment-link" href="https://www.loom.com/" target="_blank" rel="noopener">Open Loom ↗</a><label class="loom-field">Loom share link<input name="loomVideoUrl" type="url" placeholder="https://www.loom.com/share/…"></label></div></div></div>
           </div>
           <div id="upload-status" class="upload-status" aria-live="polite"></div>
         </section>
 
         <section class="form-step" data-step="4">
-          <div class="step-heading"><p class="eyebrow">Step 4 of 4</p><h2>Review and consent</h2><p>Review your answers, then submit when you are ready.</p></div>
+          <div class="step-heading"><p class="eyebrow">Step 4 of 4</p><h2>Review and submit</h2><p>Use Back or select any completed step above to review your answers. Your information will stay in place.</p></div>
           <div class="field-grid">
             <label class="field field-wide">How did you hear about Soro? <input name="referralSource" spellcheck="true" placeholder="Referral, social media, job board, etc."></label>
           </div>
@@ -161,13 +210,13 @@
 
         <footer class="application-actions">
           <button class="button button-secondary" type="button" id="save-draft">Save &amp; continue later</button>
-          <div class="application-actions-right"><button class="button button-secondary" type="button" id="previous-step" hidden>Back</button><button class="button button-primary" type="button" id="next-step">Continue</button><button class="button button-primary" type="submit" id="submit-application" hidden>Submit application</button></div>
+          <div class="application-actions-right"><button class="button button-secondary" type="button" id="previous-step" hidden>← Back</button><button class="button button-primary" type="button" id="next-step">Continue</button><button class="button button-primary" type="submit" id="submit-application" hidden>Submit application</button></div>
         </footer>
       </form>
     </section>
   </main>
   <footer class="application-footer">© <span id="current-year"></span> Soro Group. Your application details are private.</footer>
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
-  <script src="application.js?v=20260820-submission-success"></script>
+  <script src="application.js?v=20260821-native-application-v2"></script>
 </body>
 </html>

@@ -56,11 +56,14 @@
 
   profilePage = function (applicant) {
     if (!applicant) return originalProfilePage(applicant);
+    const timeZone = String(applicant.timezone || '').toLowerCase() === 'other' && applicant.timezone_other_detail
+      ? applicant.timezone_other_detail
+      : applicant.timezone || 'Asia/Manila';
     const preparedApplicant = {
       ...applicant,
       country: applicant.country || 'Philippines',
       location: applicant.location || applicant.country || 'Philippines',
-      timezone: applicant.timezone || 'Asia/Manila'
+      timezone: timeZone
     };
     return originalProfilePage(preparedApplicant).replace(
       '<div class="profile-actions">',

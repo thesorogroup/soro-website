@@ -11,6 +11,48 @@
     return `<main class="page talent-profile-page"><button class="text-button back-to-directory">← Back to Talent Directory</button><section class="talent-profile-hero"><div class="headshot-wrap"><div class="talent-headshot" id="talent-headshot"><span>${escapeHtml(initials(a.full_name))}</span></div><label class="button headshot-upload">Upload headshot<input type="file" id="headshot-input" accept="image/jpeg,image/png,image/webp" hidden /></label><small>JPG, PNG, or WebP · up to 5 MB</small></div><div class="profile-identity"><p class="eyebrow">Talent profile</p><h1>${escapeHtml(a.full_name)}</h1><p>${escapeHtml(contact)}</p><div class="profile-tags"><span class="tag">${escapeHtml(titleCase(a.status))}</span><span class="tag neutral">${escapeHtml(titleCase(a.work_status))}</span></div></div><div class="profile-actions"><button class="button" id="profile-add-task">+ Add task</button></div></section><section class="profile-stat-grid"><article><p>Location & time zone</p><strong>${escapeHtml([a.location, a.timezone].filter(Boolean).join(' · ') || 'Not recorded')}</strong></article><article><p>Availability</p><strong>${escapeHtml(a.availability_note || a.dedicated_workspace || 'Availability to review')}</strong></article><article><p>Application received</p><strong>${a.application_received_at ? escapeHtml(new Date(a.application_received_at).toLocaleDateString()) : 'Not recorded'}</strong></article><article><p>Profile owner</p><strong>${a.talent_review_owner_id ? 'Assigned' : 'Unassigned'}</strong></article></section><div class="profile-layout"><section class="panel profile-section"><div class="panel-head"><div><p class="eyebrow">At a glance</p><h2>Profile details</h2></div></div><dl class="profile-details"><div><dt>Work status</dt><dd>${escapeHtml(titleCase(a.work_status))}</dd></div><div><dt>Expected rate</dt><dd>${escapeHtml(a.expected_hourly_rate_text || a.expected_hourly_rate || 'Not recorded')}</dd></div><div><dt>Dream / goal</dt><dd>${escapeHtml(a.greatest_dream || 'To be discussed in the Talent interview')}</dd></div></dl><div class="screening-heading"><h3 class="screening-title">Screening results</h3><button class="text-button" id="edit-screening-results">Record results</button></div><p class="eyebrow">These are verified review values, separate from the supporting private files.</p><dl class="screening-results"><div class="screening-result"><dt>English test result</dt><dd>${resultValue(a.english_test_result)}</dd></div><div class="screening-result"><dt>Personality profile / score</dt><dd>${resultValue(a.personality_profile_score)}</dd></div><div class="screening-result"><dt>Computer specs</dt><dd>${resultValue(a.computer_specs)}</dd></div><div class="screening-result"><dt>Internet speed</dt><dd>${resultValue(a.internet_speed)}</dd></div></dl></section><section class="panel profile-section profile-documents-section"><div class="panel-head"><div><p class="eyebrow">Private files</p><h2>Documents & assessments</h2></div><span class="tag">Secure</span></div><p class="eyebrow">Select a file to open its protected preview. Results are summarized at left for faster review.</p><div id="profile-documents"><p class="eyebrow">Loading documents…</p></div></section></div><dialog id="screening-results-dialog"><form id="screening-results-form" class="modal screening-results-modal"><div class="modal-title"><div><p class="eyebrow">Talent screening</p><h2>Record screening results</h2></div><button type="button" class="modal-close" aria-label="Close screening results">×</button></div><p class="eyebrow">Enter the verified result from the attached file. Supporting files remain private and unchanged.</p><label>English test result<input name="english_test_result" maxlength="240" value="${resultInputValue(a.english_test_result)}" placeholder="Example: CEFR B2 · 86%" /></label><label>Personality profile / score<input name="personality_profile_score" maxlength="240" value="${resultInputValue(a.personality_profile_score)}" placeholder="Example: Enneagram Type 3 · 86th percentile" /></label><label>Computer specs<input name="computer_specs" maxlength="300" value="${resultInputValue(a.computer_specs)}" placeholder="Example: Intel i5 · 16 GB RAM · Windows 11" /></label><label>Internet speed<input name="internet_speed" maxlength="240" value="${resultInputValue(a.internet_speed)}" placeholder="Example: 95 Mbps download · 48 Mbps upload" /></label><div class="modal-actions"><button class="button modal-cancel" type="button">Cancel</button><button class="button primary" type="submit">Save results</button></div><div id="screening-results-confirmation" aria-live="polite"></div></form></dialog></main>`;
   };
 
+  const profilePageWithScreening = profilePage;
+  profilePage = function (applicant) {
+    if (!applicant) return profilePageWithScreening(applicant);
+    const workStatus = String(applicant.work_status || '').toLowerCase() === 'other' && applicant.work_status_other_detail
+      ? applicant.work_status_other_detail : applicant.work_status;
+    const timeZone = String(applicant.timezone || '').toLowerCase() === 'other' && applicant.timezone_other_detail
+      ? applicant.timezone_other_detail : applicant.timezone;
+    const displayApplicant = { ...applicant, work_status: workStatus, timezone: timeZone };
+    const markup = profilePageWithScreening(displayApplicant);
+    const areaLabels = {
+      healthcare: 'Healthcare & Medical Support',
+      general_admin: 'General & Administrative VA',
+      social_media: 'Social Media & Digital Marketing',
+      customer_support: 'Customer Service & Client Support',
+      ecommerce: 'E-commerce Support',
+      other: applicant.other_experience_specialty ? `Other — ${applicant.other_experience_specialty}` : 'Other specialty',
+      no_prior: 'No prior experience in these fields'
+    };
+    const list = (values, empty) => {
+      const items = Array.isArray(values) ? values.filter(Boolean) : [];
+      return items.length
+        ? `<div class="profile-skill-chips">${items.map((value) => `<span>${escapeHtml(value)}</span>`).join('')}</div>`
+        : `<p class="profile-skill-empty">${escapeHtml(empty)}</p>`;
+    };
+    const reportedAreas = (applicant.self_reported_experience_areas || []).map((area) => areaLabels[area] || titleCase(area));
+    const skillReview = `<section class="profile-skill-review" aria-label="Talent skill profile">
+      <div class="profile-skill-review__group profile-skill-review__group--verified">
+        <p class="eyebrow">Talent Management review</p><h3>Verified skills</h3>
+        ${list(applicant.verified_skills, 'No skills have been verified yet.')}
+      </div>
+      <div class="profile-skill-review__group">
+        <p class="eyebrow">From this application</p><h3>Applicant-reported work areas</h3>
+        ${list(reportedAreas, 'No work areas were reported.')}
+      </div>
+      <div class="profile-skill-review__group">
+        <p class="eyebrow">From this application</p><h3>Applicant-reported skills</h3>
+        ${list(applicant.self_reported_skills, 'No skills were reported for the selected work areas.')}
+      </div>
+    </section>`;
+    return markup.replace('</dl><div class="screening-heading">', `</dl>${skillReview}<div class="screening-heading">`);
+  };
+
   function supportPage() {
     return `<main class="page support-page"><div class="page-heading"><div><p class="eyebrow">Soro Ops support</p><h1>Help & Support</h1><p class="eyebrow" style="margin-top:9px">Report a technical issue or ask for help using Soro Ops.</p></div></div><div class="support-grid"><section class="panel"><div class="panel-head"><div><p class="eyebrow">Technical support ticket</p><h2>Tell us what happened</h2></div></div><form id="help-ticket-form" class="support-form"><label>What do you need help with?<input name="subject" required maxlength="120" placeholder="Example: I cannot open a Talent document" /></label><label>Area<select name="area"><option>Sign-in and account access</option><option>Talent profiles and documents</option><option>Client records and placements</option><option>Tasks and notifications</option><option>Other technical issue</option></select></label><label>What happened?<textarea name="details" required placeholder="Include what you were trying to do, what you expected, and any message you saw."></textarea></label><small>Do not include passwords, payment details, or other sensitive information in a ticket.</small><button class="button primary" type="submit">Submit support ticket</button><div id="ticket-confirmation" aria-live="polite"></div></form></section><aside class="panel support-contact"><div><p class="eyebrow">Before submitting</p><h2>Quick checks</h2></div><article><h3>Document will not open?</h3><p>Allow pop-ups for Soro Ops, then select the file’s View button again.</p></article><article><h3>Can’t sign in?</h3><p>Use Forgot password on the sign-in screen. Admin and Talent Management can also send a secure reset link.</p></article><article><h3>Need an urgent workaround?</h3><p>Include the Talent or client name and the action that is blocked so the team can triage it quickly.</p></article></aside></div></main>`;
   }

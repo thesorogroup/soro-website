@@ -385,3 +385,56 @@
   .talent-tab-heading { display: grid; padding: 18px; }
   .talent-file-body .profile-actions { justify-content: flex-start; }
 }
+
+.profile-skill-review {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0 24px;
+}
+
+.profile-skill-review__group {
+  padding: 15px 16px;
+  border: 1px solid #e4d8c5;
+  border-radius: 12px;
+  background: #fffdf9;
+}
+
+.profile-skill-review__group--verified {
+  border-color: #bfd5e8;
+  background: #f7fbff;
+}
+
+.profile-skill-review__group h3 {
+  margin: 2px 0 10px;
+  color: #123b69;
+  font-size: 15px;
+}
+
+.profile-skill-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.profile-skill-chips span {
+  display: inline-flex;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #edf3f9;
+  color: #234b73;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.profile-skill-review__group--verified .profile-skill-chips span {
+  background: #e4f2ee;
+  color: #17655a;
+}
+
+.profile-skill-empty {
+  margin: 0;
+  color: #6b7788;
+  font-size: 13px;
+  line-height: 1.45;
+}
