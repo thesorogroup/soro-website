@@ -838,7 +838,7 @@ updateVideoMethod();
         <svg class="submission-success__icon" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#f45c26"></circle><path d="M19 33.5 27.5 42 46 22" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
         <p class="eyebrow">Application received</p>
         <h2 id="application-success-heading" tabindex="-1">Thank you for applying to Soro.</h2>
-        <p>We’ve securely received your application and files. Talent Management will review everything and contact you if there is a next step.</p>
+        <p>We’ve securely received your application and files. Talent Management will review everything and reach out to you shortly.</p>
         <p class="submission-success__email">${result.notifications?.applicantConfirmationSent
           ? 'A confirmation email is on its way to the address you provided.'
           : 'Your application is safely submitted. If you do not receive a confirmation email, you do not need to submit it again.'}</p>
