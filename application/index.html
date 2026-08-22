@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../assets/styles.css">
-  <link rel="stylesheet" href="application.css?v=20260821-native-application-v2">
+  <link rel="stylesheet" href="application.css?v=20260822-phone-qr4">
 </head>
 <body class="soro-application-page">
   <header class="application-header">
@@ -190,7 +190,34 @@
             <div class="upload-field"><span><strong>MBTI-style assessment</strong><small>Complete this assessment, save a screenshot or result file, then upload it here. It helps us understand work style, collaboration preferences, and structure versus flexibility.</small><small class="accepted-formats">Accepted: PDF, DOC, DOCX, JPG, JPEG, or PNG · maximum 95 MB</small><a class="assessment-link" href="https://www.16personalities.com/free-personality-test" target="_blank" rel="noopener">Take the MBTI-style assessment ↗</a></span><input id="mbti-assessment-file" data-document="mbti_assessment" name="mbtiAssessment" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" required><label class="file-picker-label" for="mbti-assessment-file">Choose file</label></div>
             <div class="upload-field"><span><strong>Internet-speed proof</strong><small>Please run a current speed test, take a screenshot of the result, then upload it here.</small><small class="accepted-formats">Accepted: PDF, JPG, JPEG, or PNG · maximum 95 MB</small><a class="assessment-link" href="https://www.speedtest.net/" target="_blank" rel="noopener">Run an internet speed test ↗</a></span><input id="internet-proof-file" data-document="internet_proof" name="internetProof" type="file" accept=".pdf,.jpg,.jpeg,.png" required><label class="file-picker-label" for="internet-proof-file">Choose file</label></div>
             <div class="upload-field"><span><strong>Equipment proof</strong><small>Upload a screenshot of your computer specifications or a clear photo of your equipment and workspace.</small><small class="accepted-formats">Accepted: PDF, JPG, JPEG, or PNG · maximum 95 MB</small></span><input id="equipment-proof-file" data-document="equipment_proof" name="equipmentProof" type="file" accept=".pdf,.jpg,.jpeg,.png" required><label class="file-picker-label" for="equipment-proof-file">Choose file</label></div>
-<div class="upload-field video-upload"><div class="video-method-intro"><strong>Introduction video <small>(Optional)</small></strong><small>An introduction video is not needed to submit your application. If you would like to share one, choose one method below; otherwise, leave this section blank.</small><small class="accepted-formats">Direct uploads accepted: MP4 (H.264), MOV (H.264), or WebM · maximum 95 MB</small></div><fieldset class="video-methods"><legend>Choose one method only if you are including a video</legend><label class="video-method"><input name="videoMethod" type="radio" value="device"><span><strong>Upload from this device (recommended)</strong><small>Choose a video file saved on this computer.</small></span></label><label class="video-method"><input name="videoMethod" type="radio" value="phone"><span><strong>Upload from your phone (recommended)</strong><small>Save your draft, then scan the QR code on your phone.</small></span></label><label class="video-method"><input name="videoMethod" type="radio" value="loom"><span><strong>Use a Loom link</strong><small>Use this only if you cannot upload a video directly.</small></span></label></fieldset><div class="video-method-panel" data-video-method-panel="device" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Recommended: upload from this device</strong><small>Select an MP4 (H.264), MOV (H.264), or WebM file saved on this computer.</small></div><div class="video-method-panel__action"><input id="introduction-video-file" data-document="introduction_video" name="introductionVideo" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"><label class="file-picker-label" for="introduction-video-file">Choose video file</label><small class="accepted-formats">Accepted: MP4 (H.264), MOV (H.264), or WebM · maximum 95 MB</small></div></div><div class="video-method-panel" data-video-method-panel="phone" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Recommended: upload from your phone</strong><small>Save your draft, then scan the QR code on your phone to choose an MP4 (H.264), MOV (H.264), or WebM video.</small></div><div class="video-method-panel__action"><button class="phone-upload-button" id="generate-phone-upload" type="button">Save draft &amp; show phone QR</button></div><div class="phone-upload" id="phone-upload" hidden><img id="phone-upload-qr" alt="QR code for secure phone video upload"><div><strong>Upload from your phone</strong><small>Scan this code to reopen your saved application on your phone, then choose your video.</small><a id="phone-upload-link" class="assessment-link" target="_blank" rel="noopener">Open secure phone upload ↗</a></div></div></div><div class="video-method-panel" data-video-method-panel="loom" hidden aria-live="polite"><div class="video-method-panel__header"><strong>Share a Loom link</strong><small>If direct upload is not available and you already use Loom, paste its share link below.</small></div><div class="video-method-panel__action loom-actions"><a class="assessment-link" href="https://www.loom.com/" target="_blank" rel="noopener">Open Loom ↗</a><label class="loom-field">Loom share link<input name="loomVideoUrl" type="url" placeholder="https://www.loom.com/share/…"></label></div></div></div>
+            <div class="upload-field video-upload">
+              <div class="video-method-intro">
+                <strong>Introduction video <small>(Optional)</small></strong>
+                <small>An introduction video is not needed to submit your application. If you would like to share one, choose one method below; otherwise, leave this section blank.</small>
+                <small class="accepted-formats">Direct uploads accepted: MP4 (H.264), MOV (H.264), or WebM · maximum 95 MB</small>
+              </div>
+              <fieldset class="video-methods">
+                <legend>Choose one method only if you are including a video</legend>
+                <label class="video-method"><input name="videoMethod" type="radio" value="device"><span><strong>Upload from this device (recommended)</strong><small>Choose a video file saved on this computer.</small></span></label>
+                <label class="video-method"><input name="videoMethod" type="radio" value="phone"><span><strong>Upload from your phone (recommended)</strong><small>Generate a secure QR code to continue on your phone.</small></span></label>
+                <label class="video-method"><input name="videoMethod" type="radio" value="loom"><span><strong>Use a Loom link</strong><small>Use this only if you cannot upload a video directly.</small></span></label>
+              </fieldset>
+              <div class="video-method-panel" data-video-method-panel="device" hidden aria-live="polite">
+                <div class="video-method-panel__header"><strong>Recommended: upload from this device</strong><small>Select an MP4 (H.264), MOV (H.264), or WebM file saved on this computer.</small></div>
+                <div class="video-method-panel__action"><input id="introduction-video-file" data-document="introduction_video" name="introductionVideo" type="file" accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"><label class="file-picker-label" for="introduction-video-file">Choose video file</label><small class="accepted-formats">Accepted: MP4 (H.264), MOV (H.264), or WebM · maximum 95 MB</small></div>
+              </div>
+              <div class="video-method-panel" data-video-method-panel="phone" hidden aria-live="polite">
+                <div class="video-method-panel__action"><button class="phone-upload-button" id="generate-phone-upload" type="button" aria-controls="phone-upload" aria-expanded="false">Generate QR Code</button></div>
+                <div class="phone-upload" id="phone-upload" hidden tabindex="-1">
+                  <img id="phone-upload-qr" alt="Secure QR code for uploading your introduction video from your phone">
+                  <div><strong id="phone-upload-heading">Scan with your phone</strong><small>Open your phone’s camera and scan this QR code to upload your introduction video.</small><small>After uploading, return to this page and refresh it to continue.</small><small class="phone-upload-privacy">This private, time-limited code can only upload your introduction video. Keep it private.</small><a id="phone-upload-link" class="assessment-link" target="_blank" rel="noopener">Open secure upload link ↗</a></div>
+                </div>
+              </div>
+              <div class="video-method-panel" data-video-method-panel="loom" hidden aria-live="polite">
+                <div class="video-method-panel__header"><strong>Share a Loom link</strong><small>If direct upload is not available and you already use Loom, paste its share link below.</small></div>
+                <div class="video-method-panel__action loom-actions"><a class="assessment-link" href="https://www.loom.com/" target="_blank" rel="noopener">Open Loom ↗</a><label class="loom-field">Loom share link<input name="loomVideoUrl" type="url" placeholder="https://www.loom.com/share/…"></label></div>
+              </div>
+            </div>
           </div>
           <div id="upload-status" class="upload-status" aria-live="polite"></div>
         </section>
@@ -216,7 +243,7 @@
     </section>
   </main>
   <footer class="application-footer">© <span id="current-year"></span> Soro Group. Your application details are private.</footer>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"></script>
-  <script src="application.js?v=20260821-native-application-v2"></script>
+  <script src="vendor/qrcode-generator.js?v=2.0.4-soro-20260822"></script>
+  <script src="application.js?v=20260822-phone-qr5"></script>
 </body>
 </html>

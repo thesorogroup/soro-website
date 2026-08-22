@@ -17,7 +17,15 @@ const phoneUploadLink = document.querySelector('#phone-upload-link');
 const phoneUploadButton = document.querySelector('#generate-phone-upload');
 const videoMethodOptions = Array.from(form.querySelectorAll('input[name="videoMethod"]'));
 const videoMethodPanels = Array.from(form.querySelectorAll('[data-video-method-panel]'));
-  const state = { step: 1, maxVisitedStep: 1, resumeToken: new URLSearchParams(location.search).get('resume') || new URLSearchParams(location.hash.slice(1)).get('resume'), uploads: {}, uploadIds: {} };
+  const state = {
+    step: 1,
+    maxVisitedStep: 1,
+    resumeToken: new URLSearchParams(location.search).get('resume') || new URLSearchParams(location.hash.slice(1)).get('resume'),
+    mobileUploadToken: new URLSearchParams(location.search).get('uploadToken'),
+    uploads: {},
+    uploadIds: {},
+    mobileDraftReady: false
+  };
   const mobileVideoMode = new URLSearchParams(location.search).has('mobileVideo');
   const localPreview = location.protocol === 'file:' || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
   // Local previews (and an explicit ?review=1 link) let Soro review layout freely.
@@ -117,13 +125,13 @@ const videoMethodPanels = Array.from(form.querySelectorAll('[data-video-method-p
     if (isBusy && label) submit.textContent = label;
     if (!isBusy) submit.textContent = 'Submit application';
   };
-const message = (text, kind = 'error') => {
+const message = (text, kind = 'error', options = {}) => {
   const hasMessage = Boolean(text);
   alertBox.textContent = hasMessage ? text : '';
   alertBox.hidden = !hasMessage;
   alertBox.classList.toggle('is-success', hasMessage && kind === 'success');
   alertBox.style.display = hasMessage ? 'block' : 'none';
-  if (hasMessage) alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  if (hasMessage && options.scroll !== false) alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
   const namedControls = name => [...form.querySelectorAll('[name]')].filter(control => control.name === name);
   const selectedExperienceAreas = () => namedControls('experienceAreas').filter(input => input.checked && !input.disabled).map(input => input.value);
@@ -306,7 +314,7 @@ const message = (text, kind = 'error') => {
     return value;
   };
   const call = async (action, body = {}) => {
-    const response = await fetch('/.netlify/functions/talent-application', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, resumeToken: state.resumeToken, ...body }) });
+    const response = await fetch('/.netlify/functions/talent-application', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, resumeToken: state.resumeToken, mobileUploadToken: state.mobileUploadToken, ...body }) });
     const json = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(json.error || 'We could not complete that request. Please try again.');
     return json;
@@ -377,7 +385,6 @@ const message = (text, kind = 'error') => {
       const previewData = formData();
       try { sessionStorage.setItem(localDraftKey, JSON.stringify(previewData)); } catch (_) { /* Preview still works without storage. */ }
       state.resumeToken = state.resumeToken || 'local-preview';
-      await renderPhoneUploadQr();
       if (announce) {
         confirmation.innerHTML = '<strong>Preview progress saved in this browser tab.</strong><br>This local review does not send applicant information or files to the live application service.';
         confirmation.hidden = false;
@@ -388,7 +395,6 @@ const message = (text, kind = 'error') => {
     const result = await call('save_draft', { data: formData() });
     state.resumeToken = result.resumeToken;
     if (history.replaceState) history.replaceState(null, '', `${location.pathname}?resume=${encodeURIComponent(result.resumeToken)}`);
-    await renderPhoneUploadQr();
     if (announce) {
       confirmation.innerHTML = `<strong>Your progress is saved.</strong><br>Copy and keep this private return link: <a href="${result.resumeUrl}">${result.resumeUrl}</a>`;
       confirmation.hidden = false;
@@ -396,31 +402,54 @@ const message = (text, kind = 'error') => {
     }
     return result;
   };
-const renderPhoneUploadQr = async () => {
-  if (!state.resumeToken || !phoneUpload || !phoneUploadQr || !phoneUploadLink) return;
-  if (form.elements.videoMethod?.value !== 'phone' && !mobileVideoMode) return;
-    // A file:// preview cannot create a server-backed draft token that a phone can
-    // reopen. Still show a deliberate preview state so the application layout is
-    // reviewable instead of displaying a broken image.
-    if (localPreview) {
-      phoneUploadQr.src = 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200"><rect width="200" height="200" fill="white"/><g fill="#0d3b70"><path d="M12 12h52v52H12zm12 12v28h28V24zM136 12h52v52h-52zm12 12v28h28V24zM12 136h52v52H12zm12 12v28h28v-28zM78 12h12v12H78zm18 0h12v12H96zm-18 18h12v12H78zm18 18h12v12H96zm18-18h12v12h-12zm-36 36h12v12H78zm18 0h12v12H96zm18 0h12v12h-12zm18 0h12v12h-12zm-54 18h12v12H60zm18 0h12v12H78zm36 0h12v12h-12zm18 0h12v12h-12zm-72 18h12v12H60zm36 0h12v12H96zm18 0h12v12h-12zm18 0h12v12h-12zm-54 18h12v12H60zm18 0h12v12H78zm18 0h12v12H96zm36 0h12v12h-12zm18 0h12v12h-12zm-54 18h12v12H78zm18 0h12v12H96zm36 0h12v12h-12z"/></g><text x="100" y="196" text-anchor="middle" font-family="Arial" font-size="8" fill="#5c7186">LOCAL PREVIEW</text></svg>`);
-      phoneUploadLink.removeAttribute('href');
-      phoneUploadLink.textContent = 'Secure link available after draft save';
-      phoneUpload.hidden = false;
-      return;
+
+  const resetPhoneUploadQr = () => {
+    if (phoneUpload) phoneUpload.hidden = true;
+    if (phoneUploadQr) phoneUploadQr.removeAttribute('src');
+    if (phoneUploadLink) phoneUploadLink.removeAttribute('href');
+    if (phoneUploadButton) {
+      phoneUploadButton.hidden = false;
+      phoneUploadButton.textContent = 'Generate QR Code';
+      phoneUploadButton.setAttribute('aria-expanded', 'false');
     }
+  };
+
+  const renderPhoneUploadQr = async (mobileUploadToken) => {
+    resetPhoneUploadQr();
+    if (!mobileUploadToken || !phoneUpload || !phoneUploadQr || !phoneUploadLink || !phoneUploadButton) {
+      throw new Error('We could not create a secure phone-upload link. Please try again.');
+    }
+    if (form.elements.videoMethod?.value !== 'phone' && !mobileVideoMode) return false;
+    if (typeof window.qrcode !== 'function') {
+      throw new Error('We could not generate the QR code. Please refresh the page and try again.');
+    }
+
     const phoneUrl = new URL(location.href);
-    phoneUrl.searchParams.set('resume', state.resumeToken);
+    phoneUrl.search = '';
+    phoneUrl.hash = '';
+    phoneUrl.searchParams.set('uploadToken', mobileUploadToken);
     phoneUrl.searchParams.set('mobileVideo', '1');
-    phoneUploadLink.href = phoneUrl.toString();
-    phoneUpload.hidden = false;
-    if (!window.QRCode || typeof window.QRCode.toDataURL !== 'function') return;
+
     try {
-      phoneUploadQr.src = await window.QRCode.toDataURL(phoneUrl.toString(), { width: 200, margin: 1, errorCorrectionLevel: 'M' });
+      const qr = window.qrcode(0, 'M');
+      qr.addData(phoneUrl.toString());
+      qr.make();
+      const qrSvg = qr.createSvgTag({ cellSize: 6, margin: 24, scalable: true });
+      const qrSource = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(qrSvg)}`;
+      if (!qrSource) throw new Error('QR image was empty.');
+
+      phoneUploadQr.src = qrSource;
+      phoneUploadLink.href = phoneUrl.toString();
+      phoneUpload.hidden = false;
+      phoneUploadButton.textContent = 'Generate a New QR Code';
+      phoneUploadButton.setAttribute('aria-expanded', 'true');
+      phoneUpload.focus({ preventScroll: true });
+      return true;
     } catch (_) {
-      phoneUpload.hidden = true;
+      resetPhoneUploadQr();
+      throw new Error('We could not generate the QR code. Please try again.');
     }
-};
+  };
 
 const updateVideoMethod = () => {
   const selected = videoMethodOptions.find((input) => input.checked)?.value || '';
@@ -435,8 +464,7 @@ const updateVideoMethod = () => {
   videoMethodOptions.forEach((input) => {
     input.closest('.video-method')?.classList.toggle('is-selected', input.checked);
   });
-  if (selected === 'phone') renderPhoneUploadQr();
-  else if (phoneUpload) phoneUpload.hidden = true;
+  resetPhoneUploadQr();
 };
 
   const requireBrowserPlayableVideo = async file => {
@@ -480,12 +508,15 @@ updateVideoMethod();
     const file = input.files[0];
     if (!file) return;
     if (documentType === 'introduction_video') await requireBrowserPlayableVideo(file);
-    if (!state.resumeToken) await saveDraft(false);
-    const prepared = await call('prepare_upload', { data: formData(), documentType, fileName: file.name, mimeType: file.type || 'application/octet-stream', size: file.size });
+    if (!state.resumeToken && !mobileVideoMode) await saveDraft(false);
+    if (mobileVideoMode && !state.mobileDraftReady) {
+      throw new Error('This secure upload link is no longer available. Generate a new QR code from the application on your computer.');
+    }
+    const prepared = await call('prepare_upload', { data: formData(), documentType, fileName: file.name, mimeType: file.type || 'application/octet-stream', size: file.size, mobileVideoUpload: mobileVideoMode });
     state.resumeToken = prepared.resumeToken || state.resumeToken;
     const transfer = await fetch(prepared.signedUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' }, body: file });
     if (!transfer.ok) throw new Error(`Could not upload ${file.name}. Please choose the file again.`);
-    const complete = await call('complete_upload', { documentType, storagePath: prepared.storagePath, fileName: file.name, mimeType: file.type || 'application/octet-stream', size: file.size });
+    const complete = await call('complete_upload', { documentType, storagePath: prepared.storagePath, fileName: file.name, mimeType: file.type || 'application/octet-stream', size: file.size, mobileVideoUpload: mobileVideoMode });
     state.uploads[documentType] = (complete.uploads || []).find(item => item.documentType === documentType) || { fileName: file.name };
     renderUploads();
   };
@@ -495,18 +526,20 @@ updateVideoMethod();
     }
   };
   const loadDraft = async () => {
-    if (!state.resumeToken && !localPreview) return;
+    if (!state.resumeToken && !state.mobileUploadToken && !localPreview) return false;
     try {
       let result;
       if (localPreview) {
         let data = {};
         try { data = JSON.parse(sessionStorage.getItem(localDraftKey) || '{}'); } catch (_) { data = {}; }
-        if (!Object.keys(data).length) return;
+        if (!Object.keys(data).length && !mobileVideoMode) return false;
         result = { data, uploads: [] };
+      } else if (mobileVideoMode) {
+        result = await call('load_mobile_upload');
       } else {
         result = await call('load_draft');
       }
-      Object.entries(result.data || {}).forEach(([name, value]) => {
+      if (!mobileVideoMode) Object.entries(result.data || {}).forEach(([name, value]) => {
         const controls = namedControls(name);
         if (!controls.length) return;
         const values = Array.isArray(value) ? value.map(String) : [String(value ?? '')];
@@ -523,16 +556,26 @@ updateVideoMethod();
         });
       });
       state.uploads = Object.fromEntries((result.uploads || []).map(file => [file.documentType, file]));
+      state.mobileDraftReady = mobileVideoMode;
       renderUploads();
       updateExperienceUI();
       updateConditionalFields();
       updateExpectedRatePreview();
       updateVideoMethod();
-      confirmation.innerHTML = localPreview
-        ? '<strong>Your local preview answers have been restored.</strong> Nothing has been sent to the live application service.'
-        : '<strong>Your saved application has been restored.</strong> Previously uploaded files remain attached. You may replace a file by selecting a new version.';
-      confirmation.hidden = false;
-    } catch (error) { message('We could not restore that saved application link. You can start a new application below.'); }
+      if (!mobileVideoMode) {
+        confirmation.innerHTML = localPreview
+          ? '<strong>Your local preview answers have been restored.</strong> Nothing has been sent to the live application service.'
+          : '<strong>Your saved application has been restored.</strong> Previously uploaded files remain attached. You may replace a file by selecting a new version.';
+        confirmation.hidden = false;
+      }
+      return true;
+    } catch (error) {
+      state.mobileDraftReady = false;
+      message(mobileVideoMode
+        ? 'This secure upload link is no longer available. Generate a new QR code from the application on your computer.'
+        : 'We could not restore that saved application link. You can start a new application below.');
+      return false;
+    }
   };
 
   next.addEventListener('click', async () => { if (!visibleFieldsValid()) return; try { setBusy(true); await saveDraft(false); showStep(Math.min(4, state.step + 1)); } catch (error) { message(error.message); } finally { setBusy(false); } });
@@ -584,30 +627,71 @@ updateVideoMethod();
       }
     }
     if (picker) picker.textContent = input.files[0].name;
+    if (mobileVideoMode && input.dataset.document === 'introduction_video') {
+      try {
+        input.disabled = true;
+        if (picker) picker.setAttribute('aria-busy', 'true');
+        if (picker) picker.textContent = 'Uploading video…';
+        await uploadFile(input);
+        input.value = '';
+        if (picker) picker.textContent = 'Video uploaded';
+        message('Your introduction video is uploaded securely. Return to the application on your computer and refresh the page to continue.', 'success');
+      } catch (error) {
+        input.value = '';
+        if (picker) picker.textContent = 'Choose video file';
+        message(error.message || 'We could not upload that video. Please choose the file and try again.');
+      } finally {
+        input.disabled = false;
+        if (picker) picker.removeAttribute('aria-busy');
+      }
+    }
   }));
   phoneUploadButton?.addEventListener('click', async () => {
     try {
+      resetPhoneUploadQr();
       phoneUploadButton.disabled = true;
-      phoneUploadButton.textContent = localPreview ? 'Showing QR preview…' : 'Creating secure QR…';
-      if (localPreview) {
-        state.resumeToken = state.resumeToken || 'local-preview';
-        await renderPhoneUploadQr();
-        message('QR preview shown. On the live application, Save & continue later creates the secure phone-upload link.', 'success');
-        return;
-      }
+      phoneUploadButton.setAttribute('aria-busy', 'true');
+      phoneUploadButton.textContent = 'Generating QR Code…';
       await saveDraft(false);
+      const mobileSession = localPreview
+        ? { mobileUploadToken: 'local-preview-mobile-upload' }
+        : await call('create_mobile_upload');
+      await renderPhoneUploadQr(mobileSession.mobileUploadToken);
+      message(localPreview
+        ? 'QR code preview generated. The live application will link securely to the saved application.'
+        : 'QR code generated. Scan it with your phone to upload your introduction video.', 'success', { scroll: false });
     } catch (error) {
       message(error.message);
     } finally {
+      phoneUploadButton.removeAttribute('aria-busy');
       phoneUploadButton.disabled = false;
-    phoneUploadButton.textContent = 'Save draft & show phone QR';
+      phoneUploadButton.textContent = phoneUpload && !phoneUpload.hidden ? 'Generate a New QR Code' : 'Generate QR Code';
     }
   });
-loadDraft().finally(() => {
-  if (mobileVideoMode) showStep(3);
+loadDraft().then((draftLoaded) => {
+  if (mobileVideoMode) {
+    document.body.classList.add('mobile-video-upload');
+    const deviceOption = videoMethodOptions.find(input => input.value === 'device');
+    if (deviceOption) deviceOption.checked = true;
+    const documentsStep = form.querySelector('[data-step="3"]');
+    const stepHeading = documentsStep?.querySelector('h2');
+    const stepIntro = documentsStep?.querySelector('h2 + p');
+    const deviceHeader = form.querySelector('[data-video-method-panel="device"] .video-method-panel__header');
+    if (stepHeading) stepHeading.textContent = 'Upload your introduction video';
+    if (stepIntro) stepIntro.textContent = 'Choose the video from this phone. It will be attached securely to your saved application.';
+    if (deviceHeader) deviceHeader.innerHTML = '<strong>Choose your video</strong><small>Select an MP4 (H.264), MOV (H.264), or WebM file from this phone.</small>';
+    showStep(3);
+  }
   updateExperienceUI();
   updateConditionalFields();
   updateExpectedRatePreview();
   updateVideoMethod();
+  if (mobileVideoMode) {
+    const mobileVideoInput = form.elements.introductionVideo;
+    if (mobileVideoInput) mobileVideoInput.disabled = !draftLoaded;
+    if (!draftLoaded) {
+      message('This secure upload link is no longer available. Generate a new QR code from the application on your computer.');
+    }
+  }
 });
 })();

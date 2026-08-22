@@ -18,6 +18,8 @@ const APPLICATION_NOTIFICATION_EMAIL = (process.env.APPLICATION_NOTIFICATION_EMA
 const APPLICATION_PORTAL_URL = (process.env.APPLICATION_PORTAL_URL || 'https://thesorogroup.com/operations/').trim();
 const BUCKET = 'soro-private-documents';
 const MAX_FILE_BYTES = 95 * 1024 * 1024;
+const MOBILE_UPLOAD_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
+const MOBILE_UPLOAD_SIGNING_KEY = (process.env.MOBILE_UPLOAD_SECRET || SERVICE_KEY).trim();
 const FORM_VERSION = '2026-08-v2';
 const REQUIRED_DOCUMENTS = ['resume', 'english_proof', 'disc_assessment', 'enneagram_assessment', 'mbti_assessment', 'internet_proof', 'equipment_proof'];
 const DOCUMENT_TYPES = new Set([...REQUIRED_DOCUMENTS, 'introduction_video']);
@@ -100,6 +102,26 @@ function compactFormData(data) {
 function email(value) { return cleanText(value, 254).toLowerCase(); }
 function tokenHash(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
 function newToken() { return crypto.randomBytes(32).toString('base64url'); }
+function createMobileUploadToken(draftId) {
+  if (!MOBILE_UPLOAD_SIGNING_KEY) throw new Error('Secure phone uploads are not configured.');
+  const payload = Buffer.from(JSON.stringify({ draftId, purpose: 'mobile-video', expiresAt: Date.now() + MOBILE_UPLOAD_TOKEN_TTL_MS, nonce: crypto.randomBytes(12).toString('base64url') })).toString('base64url');
+  const signature = crypto.createHmac('sha256', MOBILE_UPLOAD_SIGNING_KEY).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+function readMobileUploadToken(value) {
+  if (!MOBILE_UPLOAD_SIGNING_KEY || typeof value !== 'string') return null;
+  const [payload, signature, extra] = value.split('.');
+  if (!payload || !signature || extra) return null;
+  const expected = crypto.createHmac('sha256', MOBILE_UPLOAD_SIGNING_KEY).update(payload).digest();
+  let supplied;
+  try { supplied = Buffer.from(signature, 'base64url'); } catch { return null; }
+  if (supplied.length !== expected.length || !crypto.timingSafeEqual(supplied, expected)) return null;
+  try {
+    const decoded = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    if (decoded.purpose !== 'mobile-video' || !/^[0-9a-f-]{36}$/i.test(decoded.draftId) || !Number.isFinite(decoded.expiresAt) || decoded.expiresAt < Date.now()) return null;
+    return decoded;
+  } catch { return null; }
+}
 function safeFileName(value) { return cleanText(value, 180).replace(/[^a-zA-Z0-9._ -]/g, '_') || 'attachment'; }
 function safePath(value) { return safeFileName(value).replace(/\s+/g, '_'); }
 function fileExtension(value) {
@@ -241,6 +263,16 @@ async function findDraft(token) {
   const response = await supabase(`/rest/v1/talent_application_drafts?resume_token_hash=eq.${hash}&select=*`);
   return (await response.json())[0] || null;
 }
+async function findDraftById(id) {
+  if (!id || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const response = await supabase(`/rest/v1/talent_application_drafts?id=eq.${encodeURIComponent(id)}&select=*`);
+  return (await response.json())[0] || null;
+}
+async function findMobileUploadDraft(token) {
+  const session = readMobileUploadToken(token);
+  if (!session) return null;
+  return findDraftById(session.draftId);
+}
 async function ensureDraft(token, data) {
   let actualToken = token;
   let draft = await findDraft(token);
@@ -345,12 +377,28 @@ exports.handler = async (event) => {
   try {
     const request = parseBody(event);
     const action = request.action;
-    if (!['save_draft', 'load_draft', 'prepare_upload', 'complete_upload', 'submit'].includes(action)) return json(400, { error: 'Unknown application action.' });
+    if (!['save_draft', 'load_draft', 'create_mobile_upload', 'load_mobile_upload', 'prepare_upload', 'complete_upload', 'submit'].includes(action)) return json(400, { error: 'Unknown application action.' });
 
     if (action === 'load_draft') {
       const draft = await findDraft(request.resumeToken);
       if (!draft || draft.completed_at) return json(404, { error: 'This saved application link is no longer available.' });
       return json(200, { data: draft.form_data || {}, uploads: draft.uploaded_documents || [] });
+    }
+
+    if (action === 'create_mobile_upload') {
+      const draft = await findDraft(request.resumeToken);
+      if (!draft || draft.completed_at) return json(404, { error: 'This saved application link is no longer available.' });
+      const mobileUploadToken = createMobileUploadToken(draft.id);
+      return json(200, { mobileUploadToken, expiresAt: new Date(Date.now() + MOBILE_UPLOAD_TOKEN_TTL_MS).toISOString() });
+    }
+
+    if (action === 'load_mobile_upload') {
+      const draft = await findMobileUploadDraft(request.mobileUploadToken);
+      if (!draft || draft.completed_at) return json(404, { error: 'This secure upload link is no longer available.' });
+      const uploads = (draft.uploaded_documents || [])
+        .filter((item) => item.documentType === 'introduction_video')
+        .map(({ documentType, fileName, size, uploadedAt }) => ({ documentType, fileName, size, uploadedAt }));
+      return json(200, { uploads });
     }
 
     if (action === 'save_draft') {
@@ -359,10 +407,18 @@ exports.handler = async (event) => {
     }
 
     if (action === 'prepare_upload') {
-      const saved = await ensureDraft(request.resumeToken, request.data || {});
+      let saved;
+      if (request.mobileVideoUpload) {
+        const draft = await findMobileUploadDraft(request.mobileUploadToken);
+        if (!draft || draft.completed_at) return json(404, { error: 'This secure upload link is no longer available. Generate a new QR code from the application on your computer.' });
+        saved = { token: null, draft };
+      } else {
+        saved = await ensureDraft(request.resumeToken, request.data || {});
+      }
       const documentType = cleanText(request.documentType, 40);
       const mimeType = cleanText(request.mimeType, 120);
       const size = Number(request.size);
+      if (request.mobileVideoUpload && documentType !== 'introduction_video') return json(400, { error: 'This secure link only accepts an introduction video.' });
       if (!DOCUMENT_TYPES.has(documentType)) return json(400, { error: 'This application file type is not supported.' });
       if (!allowedFile(documentType, request.fileName, mimeType, size)) {
         return json(400, { error: fileRuleMessage(documentType) });
@@ -374,21 +430,31 @@ exports.handler = async (event) => {
       const payload = await signing.json();
       const signedUrl = payload.url?.startsWith('http') ? payload.url : `${SUPABASE_URL}/storage/v1${payload.url || ''}`;
       if (!payload.url) throw new Error('Soro could not prepare this file upload.');
-      return json(200, { resumeToken: saved.token, resumeUrl: publicResumeUrl(event, saved.token), storagePath: path, signedUrl });
+      return json(200, {
+        ...(saved.token ? { resumeToken: saved.token, resumeUrl: publicResumeUrl(event, saved.token) } : {}),
+        storagePath: path,
+        signedUrl
+      });
     }
 
     if (action === 'complete_upload') {
-      const draft = await findDraft(request.resumeToken);
+      const draft = request.mobileVideoUpload
+        ? await findMobileUploadDraft(request.mobileUploadToken)
+        : await findDraft(request.resumeToken);
       if (!draft || draft.completed_at) return json(404, { error: 'Your saved application session is no longer available.' });
       const documentType = cleanText(request.documentType, 40);
       const storagePath = cleanText(request.storagePath, 500);
+      if (request.mobileVideoUpload && documentType !== 'introduction_video') return json(400, { error: 'This secure link only accepts an introduction video.' });
       if (!DOCUMENT_TYPES.has(documentType) || !storagePath.startsWith(`applications/drafts/${draft.id}/${documentType}/`)) return json(400, { error: 'This file upload could not be verified.' });
       const mimeType = cleanText(request.mimeType, 120);
       const size = Number(request.size);
       if (!allowedFile(documentType, request.fileName, mimeType, size)) return json(400, { error: fileRuleMessage(documentType) });
       const document = { documentType, storagePath, fileName: safeFileName(request.fileName), mimeType, size, uploadedAt: new Date().toISOString() };
       const uploads = [...(draft.uploaded_documents || []).filter((item) => item.documentType !== documentType), document];
-      await supabase(`/rest/v1/talent_application_drafts?resume_token_hash=eq.${tokenHash(request.resumeToken)}`, {
+      const draftFilter = request.mobileVideoUpload
+        ? `id=eq.${encodeURIComponent(draft.id)}`
+        : `resume_token_hash=eq.${tokenHash(request.resumeToken)}`;
+      await supabase(`/rest/v1/talent_application_drafts?${draftFilter}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uploaded_documents: uploads })
       });
       return json(200, { uploads });
