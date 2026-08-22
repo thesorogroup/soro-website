@@ -56,7 +56,9 @@
   }
 
   function activateTab(name, scope = document) {
-    const shell = scope.querySelector?.('.talent-file-shell') || document.querySelector('.talent-file-shell');
+    const shell = scope.matches?.('.talent-file-shell')
+      ? scope
+      : scope.querySelector?.('.talent-file-shell') || document.querySelector('.talent-file-shell');
     if (!shell) return;
     const requested = shell.querySelector(`[data-talent-file-tab="${name}"]`) ? name : 'profile';
     activeTab = requested;
