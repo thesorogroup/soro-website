@@ -673,6 +673,10 @@
 .personality-type-explanation summary:focus-visible { outline: 3px solid #9ec8ed; outline-offset: 3px; border-radius: 3px; }
 .personality-type-explanation > div { margin-top: 9px; padding: 11px 12px; border-left: 3px solid #5f86a7; border-radius: 0 8px 8px 0; color: #31465f; background: #fff; }
 .personality-type-explanation p { margin: 6px 0 0; color: #53657b; font-size: 11px; line-height: 1.5; }
+.personality-reference-link { width:fit-content; display:inline-flex; align-items:center; gap:5px; margin-top:10px; color:#174f7f; font-size:11px; font-weight:800; text-decoration:none; }
+.personality-reference-link:hover { color:#0b3159; text-decoration:underline; text-underline-offset:3px; }
+.personality-reference-link:focus-visible { outline:3px solid #9ec8ed; outline-offset:3px; border-radius:3px; }
+.personality-reference-link span { padding:0; color:inherit; font-size:12px; font-weight:inherit; text-transform:none; }
 
 .screening-card__layout--device { grid-template-columns: 128px minmax(0, 1fr); }
 .screening-device-visual { display: grid; place-items: center; align-content: center; gap: 8px; min-height: 120px; padding: 10px; border: 1px solid #dce6ee; border-radius: 12px; background: linear-gradient(150deg,#eaf2f7,#f8fbfd); }
