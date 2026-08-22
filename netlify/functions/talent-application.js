@@ -377,12 +377,21 @@ exports.handler = async (event) => {
   try {
     const request = parseBody(event);
     const action = request.action;
-    if (!['save_draft', 'load_draft', 'create_mobile_upload', 'load_mobile_upload', 'prepare_upload', 'complete_upload', 'submit'].includes(action)) return json(400, { error: 'Unknown application action.' });
+    if (!['save_draft', 'load_draft', 'check_uploads', 'create_mobile_upload', 'load_mobile_upload', 'prepare_upload', 'complete_upload', 'submit'].includes(action)) return json(400, { error: 'Unknown application action.' });
 
     if (action === 'load_draft') {
       const draft = await findDraft(request.resumeToken);
       if (!draft || draft.completed_at) return json(404, { error: 'This saved application link is no longer available.' });
       return json(200, { data: draft.form_data || {}, uploads: draft.uploaded_documents || [] });
+    }
+
+    if (action === 'check_uploads') {
+      const draft = await findDraft(request.resumeToken);
+      if (!draft || draft.completed_at) return json(404, { error: 'This saved application link is no longer available.' });
+      const uploads = (draft.uploaded_documents || [])
+        .filter((item) => item.documentType === 'introduction_video')
+        .map(({ documentType, fileName, size, uploadedAt }) => ({ documentType, fileName, size, uploadedAt }));
+      return json(200, { uploads });
     }
 
     if (action === 'create_mobile_upload') {
@@ -450,14 +459,27 @@ exports.handler = async (event) => {
       const size = Number(request.size);
       if (!allowedFile(documentType, request.fileName, mimeType, size)) return json(400, { error: fileRuleMessage(documentType) });
       const document = { documentType, storagePath, fileName: safeFileName(request.fileName), mimeType, size, uploadedAt: new Date().toISOString() };
-      const uploads = [...(draft.uploaded_documents || []).filter((item) => item.documentType !== documentType), document];
-      const draftFilter = request.mobileVideoUpload
-        ? `id=eq.${encodeURIComponent(draft.id)}`
-        : `resume_token_hash=eq.${tokenHash(request.resumeToken)}`;
-      await supabase(`/rest/v1/talent_application_drafts?${draftFilter}`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ uploaded_documents: uploads })
-      });
-      return json(200, { uploads });
+      let currentDraft = draft;
+      for (let attempt = 0; attempt < 5; attempt += 1) {
+        if (!currentDraft || currentDraft.completed_at) return json(404, { error: 'Your saved application session is no longer available.' });
+        const uploads = [...(currentDraft.uploaded_documents || []).filter((item) => item.documentType !== documentType), document];
+        const update = await supabase(`/rest/v1/talent_application_drafts?id=eq.${encodeURIComponent(currentDraft.id)}&updated_at=eq.${encodeURIComponent(currentDraft.updated_at)}&select=uploaded_documents,updated_at`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+          body: JSON.stringify({ uploaded_documents: uploads })
+        });
+        const updated = (await update.json())[0];
+        if (updated) {
+          const responseUploads = (updated.uploaded_documents || uploads)
+            .filter((item) => !request.mobileVideoUpload || item.documentType === 'introduction_video')
+            .map(({ documentType: type, fileName, size: fileSize, uploadedAt }) => ({ documentType: type, fileName, size: fileSize, uploadedAt }));
+          return json(200, { uploads: responseUploads });
+        }
+        // Another upload or autosave updated this draft after it was read. Reload,
+        // merge this document into the newest array, and retry without dropping it.
+        currentDraft = await findDraftById(draft.id);
+      }
+      throw new Error('Soro could not finish registering this file. Please choose it again.');
     }
 
     const draft = await findDraft(request.resumeToken);

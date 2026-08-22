@@ -11,12 +11,14 @@
   const submit = document.querySelector('#submit-application');
   const save = document.querySelector('#save-draft');
   const uploadStatus = document.querySelector('#upload-status');
+  const prepNote = document.querySelector('#application-prep-note');
   const phoneUpload = document.querySelector('#phone-upload');
   const phoneUploadQr = document.querySelector('#phone-upload-qr');
-const phoneUploadLink = document.querySelector('#phone-upload-link');
-const phoneUploadButton = document.querySelector('#generate-phone-upload');
-const videoMethodOptions = Array.from(form.querySelectorAll('input[name="videoMethod"]'));
-const videoMethodPanels = Array.from(form.querySelectorAll('[data-video-method-panel]'));
+  const phoneUploadLink = document.querySelector('#phone-upload-link');
+  const phoneUploadButton = document.querySelector('#generate-phone-upload');
+  const phoneVideoStatus = document.querySelector('#phone-video-status');
+  const videoMethodOptions = Array.from(form.querySelectorAll('input[name="videoMethod"]'));
+  const videoMethodPanels = Array.from(form.querySelectorAll('[data-video-method-panel]'));
   const state = {
     step: 1,
     maxVisitedStep: 1,
@@ -28,11 +30,24 @@ const videoMethodPanels = Array.from(form.querySelectorAll('[data-video-method-p
   };
   const mobileVideoMode = new URLSearchParams(location.search).has('mobileVideo');
   const localPreview = location.protocol === 'file:' || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
-  // Local previews (and an explicit ?review=1 link) let Soro review layout freely.
+  // Local preview origins let Soro review layout freely without sending data.
   // The deployed applicant experience remains a guided, validated step-by-step flow.
-  const reviewMode = localPreview || new URLSearchParams(location.search).has('review');
+  const reviewMode = localPreview;
+  if (mobileVideoMode) {
+    document.body.classList.add('mobile-video-upload');
+    if (prepNote) prepNote.hidden = true;
+  }
   const localDraftKey = 'soro-talent-application-preview-draft-v2';
+  const phoneUploadWatchKey = 'soro-talent-phone-upload-watch-v1';
   const arrayFieldNames = new Set(['experienceAreas', 'skillsByCategory']);
+  const pendingUploads = new Set();
+  let uploadQueue = Promise.resolve();
+  let phonePollTimer = null;
+  let phonePollVersion = 0;
+  let phonePollExpiresAt = 0;
+  let phonePollStartedAt = 0;
+  let phoneUploadAwaitingReplacement = false;
+  let applicationSubmitted = false;
   const experienceCatalog = [
     {
       id: 'healthcare',
@@ -337,8 +352,9 @@ const message = (text, kind = 'error', options = {}) => {
   const showStep = (number, { focusHeading = true } = {}) => {
     state.step = Math.max(1, Math.min(steps.length, number));
     state.maxVisitedStep = Math.max(state.maxVisitedStep, state.step);
-    steps.forEach(section => section.classList.toggle('is-active', Number(section.dataset.step) === number));
+    steps.forEach(section => section.classList.toggle('is-active', Number(section.dataset.step) === state.step));
     updateStepNavigation();
+    if (prepNote) prepNote.hidden = state.step !== 1;
     previous.hidden = state.step === 1;
     next.hidden = state.step === steps.length;
     submit.hidden = state.step !== steps.length;
@@ -383,7 +399,7 @@ const message = (text, kind = 'error', options = {}) => {
     if (form.elements.website.value) throw new Error('Unable to save this application.');
     if (localPreview) {
       const previewData = formData();
-      try { sessionStorage.setItem(localDraftKey, JSON.stringify(previewData)); } catch (_) { /* Preview still works without storage. */ }
+      try { sessionStorage.setItem(localDraftKey, JSON.stringify({ data: previewData, uploads: Object.values(state.uploads) })); } catch (_) { /* Preview still works without storage. */ }
       state.resumeToken = state.resumeToken || 'local-preview';
       if (announce) {
         confirmation.innerHTML = '<strong>Preview progress saved in this browser tab.</strong><br>This local review does not send applicant information or files to the live application service.';
@@ -494,46 +510,250 @@ form.elements.currentWorkStatus?.addEventListener('change', updateConditionalFie
   input.setCustomValidity('');
   updateExpectedRatePreview();
 }));
-videoMethodOptions.forEach((input) => input.addEventListener('change', updateVideoMethod));
+videoMethodOptions.forEach((input) => input.addEventListener('change', () => {
+  updateVideoMethod();
+  if (input.checked && input.value !== 'phone') {
+    phoneUploadAwaitingReplacement = false;
+    clearPhoneUploadWatch();
+  }
+  renderPhoneVideoStatus();
+}));
 updateExperienceUI();
 updateConditionalFields();
 updateExpectedRatePreview();
 updateVideoMethod();
-  const renderUploads = () => {
-    const entries = Object.entries(state.uploads);
-    uploadStatus.innerHTML = entries.length ? entries.map(([type, file]) => `<p>✓ ${file.fileName || file.filename || file.name || type} is saved for this application.</p>`).join('') : '';
+  const fileInputs = Array.from(form.querySelectorAll('input[type="file"][data-document]'));
+  fileInputs.forEach((input) => {
+    const picker = input.closest('.upload-field')?.querySelector(`label[for="${input.id}"]`);
+    input.dataset.originallyRequired = String(input.required);
+    if (picker) input.dataset.defaultPickerLabel = picker.textContent.trim();
+  });
+
+  const renderPhoneVideoStatus = () => {
+    if (!phoneVideoStatus) return;
+    const phoneSelected = form.elements.videoMethod?.value === 'phone';
+    const received = phoneSelected && Boolean(state.uploads.introduction_video) && !phoneUploadAwaitingReplacement;
+    phoneVideoStatus.hidden = !received;
+    if (!received || mobileVideoMode) return;
+    if (phoneUpload) phoneUpload.hidden = true;
+    if (phoneUploadButton) {
+      phoneUploadButton.hidden = false;
+      phoneUploadButton.textContent = 'Upload a different video';
+      phoneUploadButton.setAttribute('aria-expanded', 'false');
+    }
   };
-  const uploadFile = async input => {
+
+  const renderUploads = () => {
+    fileInputs.forEach((input) => {
+      const documentType = input.dataset.document;
+      const wrapper = input.closest('.upload-field');
+      const picker = wrapper?.querySelector(`label[for="${input.id}"]`);
+      const received = state.uploads[documentType];
+      const uploading = wrapper?.classList.contains('is-uploading');
+      input.required = input.dataset.originallyRequired === 'true' && !received;
+      wrapper?.classList.toggle('is-received', Boolean(received) && !uploading);
+      if (!picker || uploading) return;
+      if (received) {
+        picker.textContent = documentType === 'introduction_video' ? 'Video received' : 'File received';
+        picker.title = received.fileName || received.filename || received.name || '';
+      } else {
+        picker.textContent = input.dataset.defaultPickerLabel || (documentType === 'introduction_video' ? 'Choose video file' : 'Choose file');
+        picker.removeAttribute('title');
+      }
+    });
+
+    uploadStatus.replaceChildren();
+    Object.entries(state.uploads).forEach(([type, file]) => {
+      const row = document.createElement('p');
+      row.textContent = `${file.fileName || file.filename || file.name || type} is securely saved with this application.`;
+      uploadStatus.append(row);
+    });
+    renderPhoneVideoStatus();
+  };
+
+  const uploadFile = async (input, selectedFile = input.files[0]) => {
     const documentType = input.dataset.document;
-    const file = input.files[0];
+    const file = selectedFile;
     if (!file) return;
     if (documentType === 'introduction_video') await requireBrowserPlayableVideo(file);
+    if (localPreview) {
+      await new Promise((resolve) => window.setTimeout(resolve, 180));
+      state.uploads[documentType] = { documentType, fileName: file.name, size: file.size, uploadedAt: new Date().toISOString() };
+      try { sessionStorage.setItem(localDraftKey, JSON.stringify({ data: formData(), uploads: Object.values(state.uploads) })); } catch (_) { /* Preview still works without storage. */ }
+      renderUploads();
+      return { uploads: Object.values(state.uploads) };
+    }
     if (!state.resumeToken && !mobileVideoMode) await saveDraft(false);
     if (mobileVideoMode && !state.mobileDraftReady) {
       throw new Error('This secure upload link is no longer available. Generate a new QR code from the application on your computer.');
     }
     const prepared = await call('prepare_upload', { data: formData(), documentType, fileName: file.name, mimeType: file.type || 'application/octet-stream', size: file.size, mobileVideoUpload: mobileVideoMode });
     state.resumeToken = prepared.resumeToken || state.resumeToken;
+    if (prepared.resumeToken && history.replaceState) history.replaceState(null, '', `${location.pathname}?resume=${encodeURIComponent(prepared.resumeToken)}`);
     const transfer = await fetch(prepared.signedUrl, { method: 'PUT', headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'false' }, body: file });
     if (!transfer.ok) throw new Error(`Could not upload ${file.name}. Please choose the file again.`);
     const complete = await call('complete_upload', { documentType, storagePath: prepared.storagePath, fileName: file.name, mimeType: file.type || 'application/octet-stream', size: file.size, mobileVideoUpload: mobileVideoMode });
-    state.uploads[documentType] = (complete.uploads || []).find(item => item.documentType === documentType) || { fileName: file.name };
+    state.uploads = Object.fromEntries((complete.uploads || []).map((item) => [item.documentType, item]));
+    if (!state.uploads[documentType]) state.uploads[documentType] = { documentType, fileName: file.name };
     renderUploads();
+    return complete;
   };
-  const uploadSelectedFiles = async () => {
-    for (const input of form.querySelectorAll('input[type="file"]')) {
-      if (input.files.length) await uploadFile(input);
+
+  const showMobileVideoSuccess = () => {
+    message('');
+    if (prepNote) prepNote.hidden = true;
+    document.body.classList.add('mobile-upload-complete');
+    applicationShell.classList.add('is-mobile-upload-complete');
+    form.hidden = true;
+    confirmation.classList.add('is-mobile-upload-success');
+    confirmation.setAttribute('role', 'status');
+    confirmation.innerHTML = `
+      <svg class="mobile-upload-success__icon" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="22" fill="#2f8b68"></circle><path d="m14.5 24.5 6.2 6.2 13-15" fill="none" stroke="#fff" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <div><p class="eyebrow">Video received</p><h2 id="mobile-video-success-heading" tabindex="-1">Your video uploaded successfully.</h2><p>Please return to your application and continue submitting.</p><small>You may close this page.</small></div>`;
+    confirmation.hidden = false;
+    confirmation.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    requestAnimationFrame(() => document.querySelector('#mobile-video-success-heading')?.focus({ preventScroll: true }));
+  };
+
+  const enqueueFileUpload = (input, file) => {
+    const documentType = input.dataset.document;
+    const wrapper = input.closest('.upload-field');
+    const picker = wrapper?.querySelector(`label[for="${input.id}"]`);
+    const priorUpload = state.uploads[documentType];
+    input.disabled = true;
+    wrapper?.classList.remove('is-received');
+    wrapper?.classList.add('is-uploading');
+    picker?.setAttribute('aria-busy', 'true');
+    if (picker) picker.textContent = pendingUploads.size ? 'Waiting to upload…' : (documentType === 'introduction_video' ? 'Uploading video…' : 'Uploading file…');
+
+    const task = uploadQueue.catch(() => {}).then(async () => {
+      if (picker) picker.textContent = documentType === 'introduction_video' ? 'Uploading video…' : 'Uploading file…';
+      return uploadFile(input, file);
+    });
+    uploadQueue = task.catch(() => {});
+    pendingUploads.add(task);
+
+    task.then(() => {
+      input.value = '';
+      wrapper?.classList.remove('is-uploading');
+      picker?.removeAttribute('aria-busy');
+      input.disabled = false;
+      pendingUploads.delete(task);
+      renderUploads();
+      if (mobileVideoMode && documentType === 'introduction_video') {
+        showMobileVideoSuccess();
+      } else {
+        message(`${file.name} is securely saved with your application.`, 'success', { scroll: false });
+      }
+    }, (error) => {
+      input.value = '';
+      wrapper?.classList.remove('is-uploading');
+      picker?.removeAttribute('aria-busy');
+      input.disabled = false;
+      pendingUploads.delete(task);
+      renderUploads();
+      if (picker) picker.textContent = priorUpload ? 'Replacement failed — current file kept' : 'Upload failed — choose again';
+      message(error.message || `We could not upload ${file.name}. Please choose the file and try again.`);
+    });
+    return task;
+  };
+
+  const waitForPendingUploads = async () => {
+    while (pendingUploads.size) {
+      const results = await Promise.allSettled(Array.from(pendingUploads));
+      const failure = results.find((result) => result.status === 'rejected');
+      if (failure) throw failure.reason;
     }
   };
+
+  function stopPhoneUploadPolling() {
+    phonePollVersion += 1;
+    if (phonePollTimer) window.clearTimeout(phonePollTimer);
+    phonePollTimer = null;
+  }
+
+  function clearPhoneUploadWatch() {
+    stopPhoneUploadPolling();
+    phonePollExpiresAt = 0;
+    phonePollStartedAt = 0;
+    try { sessionStorage.removeItem(phoneUploadWatchKey); } catch (_) { /* Polling still stops without storage. */ }
+  }
+
+  function savePhoneUploadWatch(previousVideoUploadedAt, expiresAt) {
+    phonePollExpiresAt = expiresAt;
+    phonePollStartedAt = Date.now();
+    try {
+      sessionStorage.setItem(phoneUploadWatchKey, JSON.stringify({
+        resumeToken: state.resumeToken,
+        previousVideoUploadedAt,
+        startedAt: phonePollStartedAt,
+        expiresAt
+      }));
+    } catch (_) { /* The active page can still poll without storage. */ }
+  }
+
+  function restorePhoneUploadWatch() {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(phoneUploadWatchKey) || '{}');
+      if (saved.resumeToken !== state.resumeToken || !Number.isFinite(saved.expiresAt) || saved.expiresAt <= Date.now()) {
+        sessionStorage.removeItem(phoneUploadWatchKey);
+        return null;
+      }
+      phonePollExpiresAt = saved.expiresAt;
+      phonePollStartedAt = Number.isFinite(saved.startedAt) ? saved.startedAt : Date.now();
+      return saved;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function startPhoneUploadPolling(previousVideoUploadedAt = '') {
+    stopPhoneUploadPolling();
+    if (localPreview || mobileVideoMode || applicationSubmitted || !state.resumeToken || phonePollExpiresAt <= Date.now() || form.elements.videoMethod?.value !== 'phone' || (state.uploads.introduction_video && !previousVideoUploadedAt)) return;
+    const version = phonePollVersion;
+    const poll = async () => {
+      if (version !== phonePollVersion || applicationSubmitted || form.elements.videoMethod?.value !== 'phone') return;
+      if (phonePollExpiresAt <= Date.now()) {
+        clearPhoneUploadWatch();
+        return;
+      }
+      if (document.visibilityState === 'hidden') {
+        phonePollTimer = window.setTimeout(poll, 5000);
+        return;
+      }
+      try {
+        const result = await call('check_uploads');
+        const receivedVideo = (result.uploads || []).find((file) => file.documentType === 'introduction_video');
+        (result.uploads || []).forEach((file) => { state.uploads[file.documentType] = file; });
+        const isNewVideo = receivedVideo && (!previousVideoUploadedAt || receivedVideo.uploadedAt !== previousVideoUploadedAt);
+        if (isNewVideo) phoneUploadAwaitingReplacement = false;
+        renderUploads();
+        if (isNewVideo) {
+          message('Video received. Your introduction video is securely attached, and you can continue your application.', 'success', { scroll: false });
+          clearPhoneUploadWatch();
+          return;
+        }
+      } catch (_) {
+        // A temporary connection issue should not interrupt the applicant. Retry quietly.
+      }
+      if (version === phonePollVersion) {
+        const elapsed = Date.now() - phonePollStartedAt;
+        const delay = elapsed < (5 * 60 * 1000) ? 2800 : (elapsed < (20 * 60 * 1000) ? 10000 : 30000);
+        phonePollTimer = window.setTimeout(poll, delay);
+      }
+    };
+    poll();
+  }
   const loadDraft = async () => {
     if (!state.resumeToken && !state.mobileUploadToken && !localPreview) return false;
     try {
       let result;
       if (localPreview) {
-        let data = {};
-        try { data = JSON.parse(sessionStorage.getItem(localDraftKey) || '{}'); } catch (_) { data = {}; }
+        let stored = {};
+        try { stored = JSON.parse(sessionStorage.getItem(localDraftKey) || '{}'); } catch (_) { stored = {}; }
+        const data = stored.data && typeof stored.data === 'object' ? stored.data : stored;
         if (!Object.keys(data).length && !mobileVideoMode) return false;
-        result = { data, uploads: [] };
+        result = { data, uploads: Array.isArray(stored.uploads) ? stored.uploads : [] };
       } else if (mobileVideoMode) {
         result = await call('load_mobile_upload');
       } else {
@@ -547,7 +767,8 @@ updateVideoMethod();
           if (field.type === 'checkbox') {
             field.checked = Array.isArray(value) ? values.includes(field.value) : (typeof value === 'boolean' ? value : values.includes(field.value));
           } else if (field.type === 'radio') {
-            field.checked = values.includes(field.value);
+            const restoredValue = typeof value === 'boolean' ? (value ? 'yes' : 'no') : values[0];
+            field.checked = String(restoredValue) === field.value;
           } else if (field.tagName === 'SELECT' && typeof value === 'boolean' && [...field.options].some(option => option.value === 'yes')) {
             field.value = value ? 'yes' : 'no';
           } else {
@@ -562,6 +783,7 @@ updateVideoMethod();
       updateConditionalFields();
       updateExpectedRatePreview();
       updateVideoMethod();
+      renderPhoneVideoStatus();
       if (!mobileVideoMode) {
         confirmation.innerHTML = localPreview
           ? '<strong>Your local preview answers have been restored.</strong> Nothing has been sent to the live application service.'
@@ -578,32 +800,45 @@ updateVideoMethod();
     }
   };
 
-  next.addEventListener('click', async () => { if (!visibleFieldsValid()) return; try { setBusy(true); await saveDraft(false); showStep(Math.min(4, state.step + 1)); } catch (error) { message(error.message); } finally { setBusy(false); } });
+  next.addEventListener('click', async () => {
+    try {
+      setBusy(true);
+      await waitForPendingUploads();
+      if (!visibleFieldsValid()) return;
+      await saveDraft(false);
+      showStep(Math.min(4, state.step + 1));
+    } catch (error) { message(error.message); } finally { setBusy(false); }
+  });
   previous.addEventListener('click', () => showStep(Math.max(1, state.step - 1)));
-  save.addEventListener('click', async () => { try { setBusy(true); await saveDraft(true); } catch (error) { message(error.message); } finally { setBusy(false); } });
+  save.addEventListener('click', async () => { try { setBusy(true); await waitForPendingUploads(); await saveDraft(true); } catch (error) { message(error.message); } finally { setBusy(false); } });
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    if (!visibleFieldsValid()) return;
     try {
       setBusy(true, 'Uploading files…');
+      await waitForPendingUploads();
+      if (!visibleFieldsValid()) return;
       if (reviewMode) {
         await saveDraft(false);
         message('Preview complete. No application data or files were sent.', 'success');
         return;
       }
       await saveDraft(false);
-      await uploadSelectedFiles();
       submit.textContent = 'Submitting application…';
       const result = await call('submit', { data: formData() });
       message('');
       form.hidden = true;
+      applicationSubmitted = true;
+      clearPhoneUploadWatch();
+      document.body.classList.add('application-complete');
+      if (prepNote) prepNote.hidden = true;
       applicationShell.classList.add('is-submitted');
       confirmation.classList.add('is-submission-success');
+      confirmation.setAttribute('role', 'status');
       confirmation.innerHTML = `
-        <div class="submission-success__icon" aria-hidden="true">✓</div>
+        <svg class="submission-success__icon" viewBox="0 0 64 64" aria-hidden="true"><circle cx="32" cy="32" r="30" fill="#f45c26"></circle><path d="M19 33.5 27.5 42 46 22" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
         <p class="eyebrow">Application received</p>
-        <h2>Thank you for taking this step with Soro.</h2>
-        <p>Talent Management will review your complete application and contact you if there is a next step.</p>
+        <h2 id="application-success-heading" tabindex="-1">Thank you for applying to Soro.</h2>
+        <p>We’ve securely received your application and files. Talent Management will review everything and contact you if there is a next step.</p>
         <p class="submission-success__email">${result.notifications?.applicantConfirmationSent
           ? 'A confirmation email is on its way to the address you provided.'
           : 'Your application is safely submitted. If you do not receive a confirmation email, you do not need to submit it again.'}</p>
@@ -612,13 +847,15 @@ updateVideoMethod();
         </div>`;
       confirmation.hidden = false;
       confirmation.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      requestAnimationFrame(() => document.querySelector('#application-success-heading')?.focus({ preventScroll: true }));
     } catch (error) { message(error.message); } finally { setBusy(false); }
   });
-  form.querySelectorAll('input[type="file"]').forEach(input => input.addEventListener('change', async () => {
-    if (!input.files[0]) return;
+  fileInputs.forEach(input => input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
     const picker = input.closest('.upload-field')?.querySelector(`label[for="${input.id}"]`);
     if (input.dataset.document === 'introduction_video') {
-      try { await requireBrowserPlayableVideo(input.files[0]); }
+      try { await requireBrowserPlayableVideo(file); }
       catch (error) {
         input.value = '';
         if (picker) picker.textContent = 'Choose video file';
@@ -626,46 +863,39 @@ updateVideoMethod();
         return;
       }
     }
-    if (picker) picker.textContent = input.files[0].name;
-    if (mobileVideoMode && input.dataset.document === 'introduction_video') {
-      try {
-        input.disabled = true;
-        if (picker) picker.setAttribute('aria-busy', 'true');
-        if (picker) picker.textContent = 'Uploading video…';
-        await uploadFile(input);
-        input.value = '';
-        if (picker) picker.textContent = 'Video uploaded';
-        message('Your introduction video is uploaded securely. Return to the application on your computer and refresh the page to continue.', 'success');
-      } catch (error) {
-        input.value = '';
-        if (picker) picker.textContent = 'Choose video file';
-        message(error.message || 'We could not upload that video. Please choose the file and try again.');
-      } finally {
-        input.disabled = false;
-        if (picker) picker.removeAttribute('aria-busy');
-      }
-    }
+    enqueueFileUpload(input, file);
   }));
   phoneUploadButton?.addEventListener('click', async () => {
     try {
       resetPhoneUploadQr();
+      if (phoneVideoStatus) phoneVideoStatus.hidden = true;
+      const previousVideoUploadedAt = state.uploads.introduction_video?.uploadedAt || '';
+      phoneUploadAwaitingReplacement = Boolean(previousVideoUploadedAt);
       phoneUploadButton.disabled = true;
       phoneUploadButton.setAttribute('aria-busy', 'true');
       phoneUploadButton.textContent = 'Generating QR Code…';
+      await waitForPendingUploads();
       await saveDraft(false);
       const mobileSession = localPreview
         ? { mobileUploadToken: 'local-preview-mobile-upload' }
         : await call('create_mobile_upload');
       await renderPhoneUploadQr(mobileSession.mobileUploadToken);
+      savePhoneUploadWatch(previousVideoUploadedAt, Date.parse(mobileSession.expiresAt) || (Date.now() + (2 * 60 * 60 * 1000)));
+      startPhoneUploadPolling(previousVideoUploadedAt);
       message(localPreview
         ? 'QR code preview generated. The live application will link securely to the saved application.'
         : 'QR code generated. Scan it with your phone to upload your introduction video.', 'success', { scroll: false });
     } catch (error) {
+      phoneUploadAwaitingReplacement = false;
+      clearPhoneUploadWatch();
+      renderPhoneVideoStatus();
       message(error.message);
     } finally {
       phoneUploadButton.removeAttribute('aria-busy');
       phoneUploadButton.disabled = false;
-      phoneUploadButton.textContent = phoneUpload && !phoneUpload.hidden ? 'Generate a New QR Code' : 'Generate QR Code';
+      phoneUploadButton.textContent = state.uploads.introduction_video && !phoneUploadAwaitingReplacement
+        ? 'Upload a different video'
+        : (phoneUpload && !phoneUpload.hidden ? 'Generate a New QR Code' : 'Generate QR Code');
     }
   });
 loadDraft().then((draftLoaded) => {
@@ -686,12 +916,35 @@ loadDraft().then((draftLoaded) => {
   updateConditionalFields();
   updateExpectedRatePreview();
   updateVideoMethod();
+  renderPhoneVideoStatus();
   if (mobileVideoMode) {
     const mobileVideoInput = form.elements.introductionVideo;
     if (mobileVideoInput) mobileVideoInput.disabled = !draftLoaded;
     if (!draftLoaded) {
       message('This secure upload link is no longer available. Generate a new QR code from the application on your computer.');
     }
+  } else if (form.elements.videoMethod?.value === 'phone') {
+    const savedWatch = restorePhoneUploadWatch();
+    if (savedWatch) {
+      phoneUploadAwaitingReplacement = Boolean(savedWatch.previousVideoUploadedAt);
+      renderPhoneVideoStatus();
+      startPhoneUploadPolling(savedWatch.previousVideoUploadedAt || '');
+    }
+    else if (state.uploads.introduction_video) clearPhoneUploadWatch();
+  } else if (state.uploads.introduction_video) {
+    clearPhoneUploadWatch();
+  }
+});
+
+window.addEventListener('beforeunload', (event) => {
+  if (!pendingUploads.size) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && phonePollExpiresAt > Date.now() && form.elements.videoMethod?.value === 'phone') {
+    const savedWatch = restorePhoneUploadWatch();
+    if (savedWatch) startPhoneUploadPolling(savedWatch.previousVideoUploadedAt || '');
   }
 });
 })();
