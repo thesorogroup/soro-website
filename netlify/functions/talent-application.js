@@ -20,7 +20,7 @@ const BUCKET = 'soro-private-documents';
 const MAX_FILE_BYTES = 95 * 1024 * 1024;
 const MOBILE_UPLOAD_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
 const MOBILE_UPLOAD_SIGNING_KEY = (process.env.MOBILE_UPLOAD_SECRET || SERVICE_KEY).trim();
-const FORM_VERSION = '2026-08-v2';
+const FORM_VERSION = '2026-08-v3';
 const REQUIRED_DOCUMENTS = ['resume', 'english_proof', 'disc_assessment', 'enneagram_assessment', 'mbti_assessment', 'internet_proof', 'equipment_proof'];
 const DOCUMENT_TYPES = new Set([...REQUIRED_DOCUMENTS, 'introduction_video']);
 const DOCUMENT_FILE_RULES = {
@@ -36,6 +36,8 @@ const DOCUMENT_FILE_RULES = {
   introduction_video: { extensions: ['mp4', 'mov', 'webm'], mimeTypes: ['video/mp4', 'video/quicktime', 'video/webm'] }
 };
 const EXPERIENCE_AREA_IDS = new Set(['healthcare', 'general_admin', 'social_media', 'customer_support', 'ecommerce', 'other', 'no_prior']);
+const GENDER_IDENTITY_IDS = new Set(['female', 'male', 'nonbinary', 'self_describe', 'prefer_not_to_disclose']);
+const PRONOUN_IDS = new Set(['she_her', 'he_him', 'they_them', 'use_name', 'self_describe', 'prefer_not_to_disclose']);
 const SKILL_LABELS_BY_AREA = {
   healthcare: {
     patient_scheduling: 'Patient appointment scheduling and confirmation', patient_intake: 'Patient intake and demographic updates',
@@ -98,6 +100,20 @@ function compactFormValue(value) {
 }
 function compactFormData(data) {
   return Object.fromEntries(Object.entries(data || {}).slice(0, 200).map(([key, value]) => [cleanText(key, 80), compactFormValue(value)]).filter(([key]) => key));
+}
+function isBirthDateAlias(key) {
+  const normalized = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  return normalized === 'dob'
+    || normalized.endsWith('birthdate')
+    || normalized.endsWith('dateofbirth')
+    || normalized.endsWith('birthday');
+}
+function sanitizeRawSubmission(value) {
+  if (Array.isArray(value)) return value.map(item => sanitizeRawSubmission(item));
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value)
+    .filter(([key]) => !isBirthDateAlias(key))
+    .map(([key, item]) => [key, sanitizeRawSubmission(item)]));
 }
 function email(value) { return cleanText(value, 254).toLowerCase(); }
 function tokenHash(value) { return crypto.createHash('sha256').update(value).digest('hex'); }
@@ -320,6 +336,28 @@ function validateApplication(data) {
   if (cleanText(data.timezone).toLowerCase() === 'other' && !cleanText(data.timezoneOther)) errors.push('other time zone details');
   if (cleanText(data.currentWorkStatus).toLowerCase() === 'other' && !cleanText(data.currentWorkStatusOther)) errors.push('other work status details');
 
+  const preferredName = cleanText(data.preferredName, 100);
+  if (cleanText(data.preferredName, 101).length > 100) errors.push('a preferred name that is 100 characters or fewer');
+  const rawGenderIdentity = cleanText(data.genderIdentity, 40).toLowerCase();
+  const genderIdentity = GENDER_IDENTITY_IDS.has(rawGenderIdentity) ? rawGenderIdentity : '';
+  if (rawGenderIdentity && !genderIdentity) errors.push('a recognized gender identity preference');
+  const genderIdentitySelfDescription = genderIdentity === 'self_describe'
+    ? cleanText(data.genderIdentitySelfDescription, 120)
+    : '';
+  if (genderIdentity === 'self_describe' && !genderIdentitySelfDescription) errors.push('gender self-description');
+  if (genderIdentity === 'self_describe' && cleanText(data.genderIdentitySelfDescription, 121).length > 120) errors.push('a gender self-description that is 120 characters or fewer');
+
+  const rawPronouns = cleanStringArray(data.pronouns, 40, 12).map(value => value.toLowerCase());
+  if (data.pronouns != null && !Array.isArray(data.pronouns) && cleanText(data.pronouns)) errors.push('pronoun preferences in the expected format');
+  const pronouns = rawPronouns.filter(value => PRONOUN_IDS.has(value));
+  if (rawPronouns.length !== pronouns.length) errors.push('recognized pronoun preferences');
+  if (pronouns.includes('prefer_not_to_disclose') && pronouns.length > 1) errors.push('either pronouns or prefer not to disclose, not both');
+  const pronounsSelfDescription = pronouns.includes('self_describe')
+    ? cleanText(data.pronounsSelfDescription, 120)
+    : '';
+  if (pronouns.includes('self_describe') && !pronounsSelfDescription) errors.push('pronoun self-description');
+  if (pronouns.includes('self_describe') && cleanText(data.pronounsSelfDescription, 121).length > 120) errors.push('a pronoun self-description that is 120 characters or fewer');
+
   const rateMin = positiveNumber(data.expectedRateMin);
   const rateMax = positiveNumber(data.expectedRateMax);
   if (rateMin === null) errors.push('positive minimum expected rate');
@@ -355,7 +393,19 @@ function validateApplication(data) {
   };
   Object.entries(yesNoFields).forEach(([key, label]) => { if (!yesNo(data[key])) errors.push(label); });
 
-  return { errors, rateMin, rateMax, experienceAreas, selfReportedSkills, selectedSkillIds };
+  return {
+    errors,
+    rateMin,
+    rateMax,
+    experienceAreas,
+    selfReportedSkills,
+    selectedSkillIds,
+    preferredName,
+    genderIdentity,
+    genderIdentitySelfDescription,
+    pronouns,
+    pronounsSelfDescription
+  };
 }
 function applicantDisplayName(data) {
   const first = cleanText(data.firstName, 80);
@@ -506,6 +556,11 @@ exports.handler = async (event) => {
     const internetSummary = `Reliable internet: ${yesNoLabel(data.hasReliableInternet)} · Backup internet: ${yesNoLabel(data.hasBackupInternet)} · Emergency backup workspace: ${yesNoLabel(data.hasEmergencyWorkspace)}`;
     const submissionFields = {
       full_name: applicantDisplayName(data),
+      preferred_name: validation.preferredName || null,
+      gender_identity: validation.genderIdentity || null,
+      gender_identity_self_description: validation.genderIdentitySelfDescription || null,
+      pronouns: validation.pronouns,
+      pronouns_self_description: validation.pronounsSelfDescription || null,
       email: email(data.email),
       phone: cleanText(data.phone, 80),
       location: [cleanText(data.city, 100), cleanText(data.provinceRegion || data.province, 100), cleanText(data.country, 100)].filter(Boolean).join(', '),
@@ -551,8 +606,11 @@ exports.handler = async (event) => {
           status: 'submitted', resume_url: null, legacy_application_data: {
             source: 'native_application', form_version: FORM_VERSION, work_background: cleanText(data.workBackground, 4000),
             work_interests: cleanText(data.workInterests, 1500), skills: selfReportedSkills.join(', '), desired_hours: cleanText(data.desiredHours, 80),
-            birth_date: cleanText(data.birthDate, 30), first_name: cleanText(data.firstName, 80),
-            middle_name: cleanText(data.middleName, 120), last_name: cleanText(data.lastName, 100),
+            first_name: cleanText(data.firstName, 80), middle_name: cleanText(data.middleName, 120),
+            last_name: cleanText(data.lastName, 100),
+            preferred_name: validation.preferredName, gender_identity: validation.genderIdentity,
+            gender_identity_self_description: validation.genderIdentitySelfDescription, pronouns: validation.pronouns,
+            pronouns_self_description: validation.pronounsSelfDescription,
             uploaded_from_native_application: true
           }
         })
@@ -567,7 +625,7 @@ exports.handler = async (event) => {
 
     await supabase('/rest/v1/talent_applications', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ organization_id: orgId, applicant_id: applicant.id, form_version: FORM_VERSION, raw_submission: data })
+      body: JSON.stringify({ organization_id: orgId, applicant_id: applicant.id, form_version: FORM_VERSION, raw_submission: sanitizeRawSubmission(data) })
     });
     const documents = uploads.map((item) => ({ organization_id: orgId, applicant_id: applicant.id, file_name: item.fileName, storage_path: item.storagePath, document_type: documentKind(item.documentType), status: 'uploaded' }));
     if (!uploadTypes.has('introduction_video') && cleanText(data.loomVideoUrl)) documents.push({ organization_id: orgId, applicant_id: applicant.id, file_name: 'Loom introduction video', external_url: cleanText(data.loomVideoUrl), document_type: 'introduction_video', status: 'uploaded' });
@@ -594,3 +652,5 @@ exports.handler = async (event) => {
     return json(500, { error: error.message || 'Soro could not save this application. Please try again.' });
   }
 };
+
+exports._test = Object.freeze({ isBirthDateAlias, sanitizeRawSubmission });

@@ -184,7 +184,12 @@
 
         var rows = profiles.length ? profiles.map(function (profile) {
             var profileSkills = skillsFor(profile);
-            var location = [profile.location, profile.timezone].filter(Boolean).join(' · ') || 'Not recorded';
+            var recordedTimeZone = typeof window.recordedTalentTimeZone === 'function'
+                ? window.recordedTalentTimeZone(profile)
+                : profile.timezone;
+            var location = typeof window.formatTalentLocationTimeZone === 'function'
+                ? window.formatTalentLocationTimeZone(profile.location, recordedTimeZone)
+                : [profile.location, profile.timezone].filter(Boolean).join(' · ') || 'Not recorded';
             var initialsValue = typeof window.initials === 'function' ? window.initials(profile.full_name) : text(profile.full_name).slice(0, 2);
             var readiness = typeof window.readinessSummary === 'function' ? window.readinessSummary(profile) : 'Profile review';
             return '<tr class="talent-row" data-talent-id="' + escape(profile.id) + '" tabindex="0" role="link" aria-label="Open ' + escape(profile.full_name) + ' profile">' +

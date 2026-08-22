@@ -4,10 +4,11 @@
   const isExternalLink = value => /^https?:\/\//i.test(String(value || '').trim());
   const resultValue = (value, empty = 'Result not yet recorded') => escapeHtml(!value || isExternalLink(value) ? empty : value);
   const resultInputValue = value => escapeHtml(!value || isExternalLink(value) ? '' : value);
+  const screeningPresentation = window.soroScreeningPresentation;
+  const profileDetailsTools = window.soroProfileDetails;
 
   function canManageScreeningResults() {
-    const actualRole = String(typeof authorizedRole === 'undefined' ? '' : authorizedRole).toLowerCase();
-    return ['admin', 'talent_management'].includes(actualRole);
+    return ['admin', 'talent_management'].includes(currentAccessRole());
   }
 
   function talentInitials(fullName) {
@@ -22,7 +23,247 @@
   }
 
   function talentPlaceholder(fullName) {
-    return `<span class="talent-placeholder" aria-label="No headshot uploaded"><svg viewBox="0 0 160 190" aria-hidden="true"><defs><linearGradient id="portraitGradient" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#315f89"/><stop offset="1" stop-color="#83abc7"/></linearGradient></defs><rect width="160" height="190" rx="2" fill="url(#portraitGradient)"/><circle cx="80" cy="65" r="29" fill="#d8e5ef" fill-opacity=".58"/><path d="M29 190c3-52 20-83 51-83s48 31 51 83" fill="#d8e5ef" fill-opacity=".46"/><path d="M51 120c8 11 18 16 29 16s21-5 29-16" fill="none" stroke="#edf4f8" stroke-opacity=".44" stroke-width="4" stroke-linecap="round"/></svg><b>${escapeHtml(talentInitials(fullName))}</b></span>`;
+    return `<span class="talent-placeholder" aria-label="No headshot uploaded"><svg viewBox="0 0 160 190" aria-hidden="true"><defs><linearGradient id="portraitBackdrop" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2f5e88"/><stop offset="1" stop-color="#7fa7c3"/></linearGradient></defs><rect width="160" height="190" fill="url(#portraitBackdrop)"/><circle cx="80" cy="64" r="29" fill="#e3edf4" fill-opacity=".68"/><path d="M22 190c4-52 25-82 58-82s54 30 58 82z" fill="#dbe8f1" fill-opacity=".56"/></svg><b>${escapeHtml(talentInitials(fullName))}</b></span>`;
+  }
+
+  const pronounLabels = {
+    she_her: 'she/her',
+    he_him: 'he/him',
+    they_them: 'they/them',
+    use_name: 'use my name'
+  };
+
+  const genderLabels = {
+    female: 'Female',
+    male: 'Male',
+    nonbinary: 'Non-binary',
+    self_describe: 'Self-described',
+    prefer_not_to_disclose: 'Prefer not to disclose'
+  };
+
+  function currentAccessRole() {
+    return String(window.soroCurrentAccess?.role || '').toLowerCase();
+  }
+
+  function canEditOwnIdentityPreferences(applicant) {
+    const access = window.soroCurrentAccess;
+    return currentAccessRole() === 'virtual_assistant'
+      && Boolean(applicant?.auth_user_id)
+      && String(applicant.auth_user_id) === String(access?.user_id || '');
+  }
+
+  function displayedPronouns(applicant) {
+    const values = Array.isArray(applicant.pronouns) ? applicant.pronouns : [];
+    if (values.includes('prefer_not_to_disclose')) return '';
+    return values.map(value => value === 'self_describe'
+      ? String(applicant.pronouns_self_description || '').trim()
+      : pronounLabels[value] || String(value).replaceAll('_', '/'))
+      .filter(Boolean)
+      .join(' · ');
+  }
+
+  function displayedGender(applicant) {
+    const value = String(applicant.gender_identity || '').trim();
+    if (!value) return 'Not shared';
+    if (value === 'self_describe') return String(applicant.gender_identity_self_description || '').trim() || 'Self-described';
+    return genderLabels[value] || titleCase(value);
+  }
+
+  function communicationPreferences(applicant) {
+    const preferredName = String(applicant.preferred_name || '').trim();
+    const pronouns = displayedPronouns(applicant);
+    const editButton = canEditOwnIdentityPreferences(applicant)
+      ? '<button class="profile-identity-edit" id="edit-own-identity-preferences" type="button">Edit my identity preferences</button>'
+      : '';
+    if (!preferredName && !pronouns && !editButton) return '';
+    return `<div class="profile-communication-preferences">${preferredName ? `<strong>Goes by ${escapeHtml(preferredName)}</strong>` : ''}${pronouns ? `<span>${escapeHtml(pronouns)}</span>` : ''}${editButton}</div>`;
+  }
+
+  function identityOption(value, label, current) {
+    return `<option value="${value}" ${value === current ? 'selected' : ''}>${label}</option>`;
+  }
+
+  function identityChoice(value, label, selectedValues) {
+    return `<label class="identity-choice"><input type="checkbox" name="pronouns" value="${value}" ${selectedValues.includes(value) ? 'checked' : ''}><span>${label}</span></label>`;
+  }
+
+  function identityPreferencesForm(applicant) {
+    const gender = String(applicant.gender_identity || '');
+    const selectedPronouns = Array.isArray(applicant.pronouns) ? applicant.pronouns : [];
+    return `<form id="own-identity-preferences-form"><header class="dialog-heading"><div><p class="eyebrow">My Talent profile</p><h2>How should Soro address you?</h2></div><button class="modal-close" type="button" data-close-identity-preferences aria-label="Close">×</button></header><p class="dialog-copy">These optional details help the team communicate with you respectfully. Your legal name remains the title of your secure file.</p><label>What name would you like us to use? <span>Leave blank if it is the same as your legal first name.</span><input name="preferred_name" maxlength="100" value="${escapeHtml(applicant.preferred_name || '')}" autocomplete="nickname"></label><label>How do you describe your gender? <span>This is optional and is kept in the private Profile details section.</span><select name="gender_identity"><option value="">Select an option</option>${identityOption('female', 'Female', gender)}${identityOption('male', 'Male', gender)}${identityOption('nonbinary', 'Non-binary', gender)}${identityOption('self_describe', 'Prefer to self-describe', gender)}${identityOption('prefer_not_to_disclose', 'Prefer not to disclose', gender)}</select></label><label data-gender-self-description ${gender === 'self_describe' ? '' : 'hidden'}>Describe your gender <input name="gender_identity_self_description" maxlength="120" value="${escapeHtml(applicant.gender_identity_self_description || '')}"></label><fieldset class="identity-fieldset"><legend>What pronouns should we use?</legend><p>Select all that apply.</p><div class="identity-choice-grid">${identityChoice('she_her', 'She/her', selectedPronouns)}${identityChoice('he_him', 'He/him', selectedPronouns)}${identityChoice('they_them', 'They/them', selectedPronouns)}${identityChoice('use_name', 'Use my name', selectedPronouns)}${identityChoice('self_describe', 'Let me describe them', selectedPronouns)}${identityChoice('prefer_not_to_disclose', 'Prefer not to disclose', selectedPronouns)}</div></fieldset><label data-pronouns-self-description ${selectedPronouns.includes('self_describe') ? '' : 'hidden'}>My pronouns <input name="pronouns_self_description" maxlength="120" value="${escapeHtml(applicant.pronouns_self_description || '')}" placeholder="Example: ze/hir"></label><p class="identity-dialog-status" aria-live="polite"></p><footer class="modal-actions"><button class="button secondary" type="button" data-close-identity-preferences>Cancel</button><button class="button primary" type="submit">Save preferences</button></footer></form>`;
+  }
+
+  function bindIdentityPreferenceControls(dialog) {
+    const form = dialog.querySelector('form');
+    const gender = form.elements.gender_identity;
+    const genderOther = form.querySelector('[data-gender-self-description]');
+    const pronounOther = form.querySelector('[data-pronouns-self-description]');
+    const syncGender = () => {
+      const visible = gender.value === 'self_describe';
+      genderOther.hidden = !visible;
+      genderOther.querySelector('input').required = visible;
+    };
+    const syncPronouns = changed => {
+      const boxes = [...form.querySelectorAll('input[name="pronouns"]')];
+      const privateChoice = boxes.find(box => box.value === 'prefer_not_to_disclose');
+      if (changed?.value === 'prefer_not_to_disclose' && changed.checked) boxes.forEach(box => { if (box !== changed) box.checked = false; });
+      else if (changed?.checked && privateChoice) privateChoice.checked = false;
+      else if (!changed && privateChoice?.checked) boxes.forEach(box => { if (box !== privateChoice) box.checked = false; });
+      const visible = boxes.some(box => box.value === 'self_describe' && box.checked);
+      pronounOther.hidden = !visible;
+      pronounOther.querySelector('input').required = visible;
+    };
+    gender.addEventListener('change', syncGender);
+    form.querySelectorAll('input[name="pronouns"]').forEach(box => box.addEventListener('change', () => syncPronouns(box)));
+    syncGender();
+    syncPronouns();
+  }
+
+  async function openOwnIdentityPreferences() {
+    const applicant = liveApplicants.find(item => item.id === selectedTalentId);
+    if (!applicant || !canEditOwnIdentityPreferences(applicant) || !window.soroSupabase) return;
+    let dialog = document.getElementById('own-identity-preferences-dialog');
+    if (!dialog) {
+      dialog = document.createElement('dialog');
+      dialog.id = 'own-identity-preferences-dialog';
+      dialog.className = 'soro-dialog profile-details-dialog identity-preferences-dialog';
+      document.body.appendChild(dialog);
+    }
+    dialog.innerHTML = identityPreferencesForm(applicant);
+    bindIdentityPreferenceControls(dialog);
+    dialog.querySelectorAll('[data-close-identity-preferences]').forEach(button => button.addEventListener('click', () => dialog.close()));
+    dialog.querySelector('form').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const formData = new FormData(form);
+      const pronouns = formData.getAll('pronouns').map(String);
+      const gender = String(formData.get('gender_identity') || '');
+      const updates = {
+        preferred_name: String(formData.get('preferred_name') || '').trim() || null,
+        gender_identity: gender || null,
+        gender_identity_self_description: gender === 'self_describe' ? String(formData.get('gender_identity_self_description') || '').trim() || null : null,
+        pronouns,
+        pronouns_self_description: pronouns.includes('self_describe') ? String(formData.get('pronouns_self_description') || '').trim() || null : null
+      };
+      const submit = form.querySelector('[type="submit"]');
+      const status = form.querySelector('.identity-dialog-status');
+      submit.disabled = true;
+      submit.textContent = 'Saving…';
+      const { error } = await window.soroSupabase.rpc('update_own_identity_preferences', {
+        p_preferred_name: updates.preferred_name,
+        p_gender_identity: updates.gender_identity,
+        p_gender_identity_self_description: updates.gender_identity_self_description,
+        p_pronouns: updates.pronouns,
+        p_pronouns_self_description: updates.pronouns_self_description
+      });
+      if (error) {
+        submit.disabled = false;
+        submit.textContent = 'Save preferences';
+        status.textContent = 'Your preferences could not be saved. Refresh your secure session and try again.';
+        return;
+      }
+      Object.assign(applicant, updates);
+      dialog.close();
+      toast('Your identity preferences were updated.');
+      render();
+    });
+    dialog.showModal();
+  }
+
+  function canManagePrivateProfileDetails() {
+    return profileDetailsTools.canManageProfileDetails(currentAccessRole());
+  }
+
+  function canViewPrivateProfileDetails(applicant) {
+    const access = window.soroCurrentAccess || {};
+    return profileDetailsTools.canViewPrivateProfileDetails({
+      role: access.role,
+      userId: access.user_id,
+      applicantAuthUserId: applicant?.auth_user_id
+    });
+  }
+
+  function profileDetailsTimeZone(applicant) {
+    return typeof window.recordedTalentTimeZone === 'function'
+      ? window.recordedTalentTimeZone(applicant)
+      : applicant?.timezone || 'UTC';
+  }
+
+  function privateProfileDetailRows(applicant) {
+    if (!canViewPrivateProfileDetails(applicant)) return '';
+    const age = profileDetailsTools.ageFromBirthDate(applicant.birth_date, profileDetailsTimeZone(applicant));
+    return `<div class="private-identity-detail"><dt>Date of birth <span>Private</span></dt><dd>${escapeHtml(profileDetailsTools.formatBirthDate(applicant.birth_date))}</dd></div><div class="private-identity-detail"><dt>Age <span>Calculated</span></dt><dd>${age === null ? 'Not available' : escapeHtml(age)}</dd></div><div class="private-identity-detail"><dt>Gender identity <span>Private</span></dt><dd>${escapeHtml(displayedGender(applicant))}</dd></div>`;
+  }
+
+  function privateProfileDetailsDialog(applicant) {
+    if (!canManagePrivateProfileDetails()) return '';
+    const gender = String(applicant.gender_identity || '');
+    const today = profileDetailsTools.calendarDateForInstant(new Date(), profileDetailsTimeZone(applicant));
+    return `<dialog id="private-profile-details-dialog" class="soro-dialog profile-details-dialog private-profile-details-dialog"><form id="private-profile-details-form"><header class="dialog-heading"><div><p class="eyebrow">Private Talent information</p><h2>Edit Profile details</h2></div><button class="modal-close" type="button" data-close-private-profile-details aria-label="Close">×</button></header><p class="dialog-copy">Only date of birth and gender identity can be changed here. Age is calculated from the date of birth and is never stored separately.</p><label>Date of birth <span>Private · YYYY-MM-DD</span><input name="birth_date" type="date" min="${profileDetailsTools.EARLIEST_BIRTH_DATE}" max="${today.iso}" value="${escapeHtml(applicant.birth_date || '')}"></label><label>Gender identity <span>Private and optional</span><select name="gender_identity"><option value="">Select an option</option>${identityOption('female', 'Female', gender)}${identityOption('male', 'Male', gender)}${identityOption('nonbinary', 'Non-binary', gender)}${identityOption('self_describe', 'Prefer to self-describe', gender)}${identityOption('prefer_not_to_disclose', 'Prefer not to disclose', gender)}</select></label><label data-private-gender-self-description ${gender === 'self_describe' ? '' : 'hidden'}>Self-described gender <input name="gender_identity_self_description" maxlength="120" value="${escapeHtml(applicant.gender_identity_self_description || '')}"></label><p class="private-profile-details-status" aria-live="polite"></p><footer class="modal-actions"><button class="button secondary" type="button" data-close-private-profile-details>Cancel</button><button class="button primary" type="submit">Save private details</button></footer></form></dialog>`;
+  }
+
+  function bindPrivateProfileDetailsEditor() {
+    const applicant = liveApplicants.find(item => item.id === selectedTalentId);
+    const dialog = document.getElementById('private-profile-details-dialog');
+    const openButton = document.getElementById('edit-private-profile-details');
+    if (!applicant || !dialog || !openButton || !canManagePrivateProfileDetails()) return;
+    const form = dialog.querySelector('form');
+    const gender = form.elements.gender_identity;
+    const selfDescription = form.querySelector('[data-private-gender-self-description]');
+    const syncGender = () => {
+      const visible = gender.value === 'self_describe';
+      selfDescription.hidden = !visible;
+      selfDescription.querySelector('input').required = visible;
+    };
+    openButton.addEventListener('click', () => { syncGender(); dialog.showModal(); });
+    dialog.addEventListener('cancel', event => event.preventDefault());
+    dialog.addEventListener('click', event => {
+      if (event.target !== dialog) return;
+      event.preventDefault();
+      event.stopPropagation();
+    });
+    dialog.querySelectorAll('[data-close-private-profile-details]').forEach(button => button.addEventListener('click', () => dialog.close()));
+    gender.addEventListener('change', syncGender);
+    form.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!canManagePrivateProfileDetails() || !window.soroSupabase) return;
+      const formData = new FormData(form);
+      const status = form.querySelector('.private-profile-details-status');
+      const submit = form.querySelector('[type="submit"]');
+      const birthDate = profileDetailsTools.validateBirthDate(formData.get('birth_date'), profileDetailsTimeZone(applicant));
+      if (!birthDate.valid) { status.textContent = birthDate.error; return; }
+      let updates;
+      try {
+        updates = profileDetailsTools.buildPrivateProfileUpdate({
+          birthDate: birthDate.value,
+          genderIdentity: formData.get('gender_identity'),
+          genderSelfDescription: formData.get('gender_identity_self_description'),
+          timeZone: profileDetailsTimeZone(applicant)
+        });
+      } catch (error) {
+        status.textContent = error.message;
+        return;
+      }
+      submit.disabled = true;
+      submit.textContent = 'Saving…';
+      const { data, error } = await window.soroSupabase
+        .from('applicants')
+        .update(updates)
+        .eq('id', applicant.id)
+        .select('birth_date,gender_identity,gender_identity_self_description')
+        .single();
+      if (error) {
+        submit.disabled = false;
+        submit.textContent = 'Save private details';
+        status.textContent = 'Soro Ops could not save these private details. Refresh your secure session and try again.';
+        return;
+      }
+      Object.assign(applicant, data || updates);
+      dialog.close();
+      toast('Private Profile details updated.');
+      render();
+    });
+    syncGender();
   }
 
   const screeningSourceMap = {
@@ -36,6 +277,16 @@
     return (String(value || '').match(/\d+(?:\.\d+)?/g) || []).map(Number).filter(Number.isFinite);
   }
 
+  function percentageValue(value) {
+    const text = String(value || '');
+    const scored = text.match(/(\d+(?:\.\d+)?)\s*\/\s*100\b/i)
+      || text.match(/(\d+(?:\.\d+)?)\s*%/)
+      || text.match(/(?:score|result)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i);
+    if (scored) return Math.max(0, Math.min(100, Number(scored[1])));
+    const numericOnly = text.trim().match(/^\d+(?:\.\d+)?$/);
+    return numericOnly ? Math.max(0, Math.min(100, Number(numericOnly[0]))) : null;
+  }
+
   function screeningState(applicant, key, value) {
     if (value && !isExternalLink(value)) return '<span class="screening-state screening-state--ready">Recorded</span>';
     return '<span class="screening-state">Not entered</span>';
@@ -43,31 +294,52 @@
 
   function englishCard(applicant) {
     const value = applicant.english_test_result;
-    const score = Math.max(0, Math.min(100, numericValues(value)[0] || 0));
-    return `<article class="screening-card screening-card--english" data-screening-card="english"><header><div><span>English assessment</span><h4>English proficiency</h4></div>${screeningState(applicant, 'english', value)}</header><div class="screening-ring" style="--score:${score}" aria-label="${score ? `${score} percent` : 'Score not recorded'}"><strong>${score || '—'}</strong><small>${score ? '/ 100' : 'Pending'}</small></div><p>${resultValue(value)}</p><div class="screening-source-links" data-screening-sources="english"></div></article>`;
+    const score = percentageValue(value);
+    const hasScore = score !== null;
+    const tier = screeningPresentation.semanticTier('english', score);
+    const ariaLabel = hasScore ? `${score} percent practice score, ${tier.label}. Visual context only, not a hiring recommendation.` : 'English practice score not recorded';
+    const rangeLabel = (key, label) => tier.key === key ? `<strong>${label}</strong>` : `<span>${label}</span>`;
+    const track = `<div class="proficiency-track ${tier.className}"><div class="semantic-scale" role="img" aria-label="${escapeHtml(hasScore ? `Practice score ${score} out of 100, in the ${tier.label.toLowerCase()} practice-score range` : 'Practice score not recorded')}">${hasScore ? `<i style="--score-position:${score}%" aria-hidden="true"></i>` : ''}</div><div class="scale-labels">${rangeLabel('low', '0–59 · Lower')}${rangeLabel('middle', '60–79 · Middle')}${rangeLabel('high', '80–100 · Higher')}</div></div>`;
+    return `<article class="screening-card screening-card--english" data-screening-card="english"><header><div><span>English assessment</span><h4>English proficiency</h4></div>${screeningState(applicant, 'english', value)}</header><div class="screening-card__layout"><div class="screening-card__visual screening-score-visual ${tier.className}"><div class="screening-ring" style="--score:${hasScore ? score : 0}" role="img" aria-label="${escapeHtml(ariaLabel)}"><strong>${hasScore ? score : '—'}</strong><small>${hasScore ? 'practice' : 'Pending'}</small></div><span class="screening-tier-label">${escapeHtml(tier.label)}</span></div><div class="screening-card__details"><span class="screening-detail-label">EF SET Quick Check · practice score</span>${track}<p>${resultValue(value)}</p><small>Not a certified CEFR level. The recorded practice result remains linked to the applicant’s English assessment file.</small></div></div><p class="screening-tier-note">Visual practice-score context only · Not a certified CEFR level · Not a hiring recommendation</p><div class="screening-source-links" data-screening-sources="english"></div></article>`;
   }
 
   function personalityCard(applicant) {
     const value = applicant.personality_profile_score;
-    const parts = String(value || '').split(/[|;\n]+/).map(part => part.trim()).filter(Boolean).slice(0, 3);
-    const labels = ['DISC', 'Enneagram', 'MBTI-style'];
-    const rows = labels.map((label, index) => `<div><span>${label}</span><strong>${escapeHtml(parts[index] || 'Pending')}</strong></div>`).join('');
-    return `<article class="screening-card screening-card--personality" data-screening-card="personality"><header><div><span>Three assessments</span><h4>Personality profile</h4></div>${screeningState(applicant, 'personality', value)}</header><div class="personality-score-grid">${rows}</div><div class="screening-source-links" data-screening-sources="personality"></div></article>`;
+    const results = screeningPresentation.parsePersonalityResults(value);
+    const mbti = results.mbtiDescription;
+    const mbtiExplanation = mbti ? `<details class="personality-type-explanation"><summary>What ${escapeHtml(mbti.displayedCode)} means</summary><div><strong>${escapeHtml(mbti.dimensions)}</strong><p>${escapeHtml(mbti.summary)}</p>${mbti.modifier ? `<p><b>${escapeHtml(`-${mbti.modifier}`)}</b> is the ${escapeHtml(mbti.modifierLabel.toLowerCase())} used by 16Personalities; it is not part of the core four-letter code.</p>` : ''}</div></details>` : '';
+    const rows = `<div><span>DISC</span><strong>${escapeHtml(results.disc || 'Pending')}</strong></div><div><span>Enneagram</span><strong>${escapeHtml(results.enneagram || 'Pending')}</strong></div><div class="personality-mbti-result"><span>MBTI-style</span><div><strong>${escapeHtml(mbti?.displayedCode || results.mbti || 'Pending')}</strong>${mbtiExplanation}</div></div>`;
+    return `<article class="screening-card screening-card--personality" data-screening-card="personality"><header><div><span>Three linked assessments</span><h4>Personality profile</h4></div>${screeningState(applicant, 'personality', value)}</header><div class="personality-score-grid">${rows}</div><p class="screening-result-note">DISC, Enneagram, and four-letter personality results remain separated so each result stays tied to its matching source. These self-report tools are descriptive, not clinical diagnoses or measures of job performance.</p><div class="screening-source-links" data-screening-sources="personality"></div></article>`;
   }
 
   function computerCard(applicant) {
     const value = applicant.computer_specs;
     const items = String(value || '').split(/[|;·\n]+/).map(item => item.trim()).filter(Boolean).slice(0, 6);
-    return `<article class="screening-card screening-card--computer" data-screening-card="computer"><header><div><span>Equipment submission</span><h4>Computer specifications</h4></div>${screeningState(applicant, 'computer', value)}</header>${items.length ? `<dl class="computer-spec-list">${items.map((item, index) => `<div><dt>${['System', 'Processor', 'Memory', 'Storage', 'Operating system', 'Other'][index]}</dt><dd>${escapeHtml(item)}</dd></div>`).join('')}</dl>` : '<p class="screening-card-empty">Computer details have not been extracted yet.</p>'}<div class="screening-source-links" data-screening-sources="computer"></div></article>`;
+    const details = items.length ? `<dl class="computer-spec-list">${items.map((item, index) => `<div><dt>${['System', 'Processor', 'Memory', 'Storage', 'Operating system', 'Other'][index]}</dt><dd>${escapeHtml(item)}</dd></div>`).join('')}</dl>` : '<p class="screening-card-empty">Computer details have not been recorded yet.</p>';
+    const device = profileDetailsTools.computerDeviceState(applicant.has_laptop);
+    const icons = {
+      laptop: '<svg class="professional-device-icon professional-device-icon--laptop" viewBox="0 0 144 104" aria-hidden="true"><rect class="device-shell" x="20" y="8" width="104" height="70" rx="7"/><rect class="device-screen" x="28" y="17" width="88" height="52" rx="2"/><circle class="device-camera" cx="72" cy="13" r="1.6"/><path class="device-base" d="M13 81h118l9 11c1.5 2-.2 5-3 5H7c-2.8 0-4.5-3-3-5z"/><path class="device-keyboard" d="M29 85h86l5 6H24z"/><path class="device-trackpad" d="M62 91h20"/></svg>',
+      desktop: '<svg class="professional-device-icon professional-device-icon--desktop" viewBox="0 0 144 104" aria-hidden="true"><rect class="device-shell" x="17" y="8" width="91" height="65" rx="6"/><rect class="device-screen" x="25" y="16" width="75" height="48" rx="2"/><path class="device-stand" d="M62 74v11m-17 5h50"/><rect class="device-tower" x="116" y="20" width="20" height="62" rx="4"/><circle class="device-power" cx="126" cy="30" r="2"/><path class="device-keyboard" d="M27 91h77l7 7H20z"/></svg>',
+      generic: '<svg class="professional-device-icon professional-device-icon--generic" viewBox="0 0 144 104" aria-hidden="true"><rect class="device-shell" x="22" y="10" width="100" height="64" rx="7"/><rect class="device-screen" x="30" y="18" width="84" height="47" rx="2"/><path class="device-stand" d="M72 75v12m-20 5h40"/><circle class="device-unknown" cx="72" cy="42" r="13"/><path class="device-question" d="M67 37c1-5 11-5 11 1 0 5-6 4-6 9m0 6h.01"/></svg>'
+    };
+    return `<article class="screening-card screening-card--computer" data-screening-card="computer"><header><div><span>Equipment submission</span><h4>Computer specifications</h4></div>${screeningState(applicant, 'computer', value)}</header><div class="screening-card__layout screening-card__layout--device"><div class="screening-device-visual screening-device-visual--${device.kind}" role="img" aria-label="${escapeHtml(device.label)}">${icons[device.kind]}<span>${escapeHtml(device.label)}</span></div><div class="screening-card__details">${details}</div></div><div class="screening-source-links" data-screening-sources="computer"></div></article>`;
+  }
+
+  function connectionMeterTrack(label, kind, value) {
+    const hasValue = value !== null;
+    const meter = screeningPresentation.speedMeterConfiguration(kind, value);
+    const marker = hasValue ? `<span class="connection-meter__marker" style="--meter-position:${meter.position}%" aria-hidden="true"></span>` : '';
+    const ariaLabel = hasValue
+      ? `${label} ${value} megabits per second, ${meter.label}. Soro operational reference; displayed reference tier only, not eligibility.`
+      : `${label} speed not recorded. Soro operational reference.`;
+    return `<div class="connection-meter__row ${meter.className}" role="img" aria-label="${escapeHtml(ariaLabel)}"><div class="connection-meter__row-heading"><span>${escapeHtml(label)}</span><strong>${hasValue ? value : '—'} <small>Mbps</small></strong><b>${escapeHtml(meter.label)}</b></div><div class="connection-meter__scale" style="--lower-stop:${meter.lowerStop}%;--middle-stop:${meter.middleStop}%"><span class="connection-meter__zones" aria-hidden="true"></span><span class="connection-meter__ticks" aria-hidden="true"></span>${marker}</div><div class="connection-meter__limits" aria-hidden="true"><span>0</span><span>${meter.lowerBoundary}</span><span>${meter.middleBoundary}</span><span>${meter.maximum}+ Mbps</span></div></div>`;
   }
 
   function internetCard(applicant) {
     const value = applicant.internet_speed;
-    const numbers = numericValues(value);
-    const download = numbers[0] || 0;
-    const upload = numbers[1] || 0;
-    const gauge = Math.max(0, Math.min(100, download / 2));
-    return `<article class="screening-card screening-card--internet" data-screening-card="internet"><header><div><span>Speed-test submission</span><h4>Internet speed</h4></div>${screeningState(applicant, 'internet', value)}</header><div class="speed-gauge" style="--speed:${gauge}"><div><strong>${download || '—'}</strong><small>Mbps download</small></div></div><div class="speed-stats"><span><strong>${upload || '—'}</strong> Mbps upload</span></div><div class="screening-source-links" data-screening-sources="internet"></div></article>`;
+    const readings = screeningPresentation.parseInternetSpeed(value);
+    const latency = readings.latency !== null ? `<p class="connection-meter__latency"><span>Recorded ping / latency</span><strong>${readings.latency} ms</strong></p>` : '';
+    return `<article class="screening-card screening-card--internet" data-screening-card="internet"><header><div><span>Speed-test submission</span><h4>Internet speed</h4></div>${screeningState(applicant, 'internet', value)}</header><div class="connection-meter" role="group" aria-label="Soro operational reference for recorded download and upload speeds"><div class="connection-meter__heading"><strong>Soro operational reference</strong><span>Recorded connection speeds</span></div>${connectionMeterTrack('Download', 'internetDownload', readings.download)}${connectionMeterTrack('Upload', 'internetUpload', readings.upload)}${latency}</div><p class="screening-result-note">The displayed readings remain linked to the submitted speed-test evidence.</p><p class="screening-tier-note">Color bands and text tiers provide visual context only, not a hiring recommendation, eligibility requirement, or connection-quality standard.</p><div class="screening-source-links" data-screening-sources="internet"></div></article>`;
   }
 
   function screeningResults(applicant) {
@@ -78,14 +350,14 @@
   profilePage = function (a) {
     if (!a) return `<main class="page"><button class="text-button back-to-directory">← Back to Talent Directory</button><section class="panel profile-missing"><h1>Talent profile not found</h1><p>This profile may have been removed or you may no longer have access.</p></section></main>`;
     const contact = [a.email, a.phone].filter(Boolean).join(' · ') || 'Contact information not recorded';
-    return `<main class="page talent-profile-page"><button class="text-button back-to-directory">← Back to Talent Directory</button><section class="talent-profile-hero"><div class="headshot-wrap"><div class="talent-headshot" id="talent-headshot">${talentPlaceholder(a.full_name)}</div><label class="button headshot-upload">Upload headshot<input type="file" id="headshot-input" accept="image/jpeg,image/png,image/webp" hidden /></label><small>JPG, PNG, or WebP · up to 5 MB</small></div><div class="profile-identity"><p class="eyebrow">Talent profile</p><h1>${escapeHtml(a.full_name)}</h1><p>${escapeHtml(contact)}</p><div class="profile-tags"><span class="tag">${escapeHtml(titleCase(a.status))}</span><span class="tag neutral">${escapeHtml(titleCase(a.work_status))}</span></div></div><div class="profile-actions"><button class="button" id="profile-add-task">+ Add task</button></div></section><section class="profile-stat-grid"><article><p>Location & time zone</p><strong>${escapeHtml([a.location, a.timezone].filter(Boolean).join(' · ') || 'Not recorded')}</strong></article><article><p>Availability</p><strong>${escapeHtml(a.availability_note || a.dedicated_workspace || 'Availability to review')}</strong></article><article><p>Application received</p><strong>${a.application_received_at ? escapeHtml(new Date(a.application_received_at).toLocaleDateString()) : 'Not recorded'}</strong></article><article><p>Profile owner</p><strong>${a.talent_review_owner_id ? 'Assigned' : 'Unassigned'}</strong></article></section><div class="profile-layout"><section class="panel profile-section profile-details-section"><div class="panel-head"><div><p class="eyebrow">At a glance</p><h2>Profile details</h2></div></div><dl class="profile-details"><div><dt>Work status</dt><dd>${escapeHtml(titleCase(a.work_status))}</dd></div><div><dt>Expected rate</dt><dd>${escapeHtml(a.expected_hourly_rate_text || a.expected_hourly_rate || 'Not recorded')}</dd></div><div><dt>Dream / goal</dt><dd>${escapeHtml(a.greatest_dream || 'To be discussed in the Talent interview')}</dd></div></dl></section><section class="panel profile-section profile-documents-section"><div class="panel-head"><div><p class="eyebrow">Private files</p><h2>Documents & assessments</h2></div><span class="tag">Secure</span></div><p class="eyebrow">Select a file to open its protected preview. Screening sources stay linked to their matching result card.</p><div id="profile-documents"><p class="eyebrow">Loading documents…</p></div></section></div>${screeningResults(a)}<dialog id="screening-results-dialog"><form id="screening-results-form" class="modal screening-results-modal"><div class="modal-title"><div><p class="eyebrow">Talent screening</p><h2>Edit screening results</h2></div><button type="button" class="modal-close" aria-label="Close screening results">×</button></div><p class="eyebrow">Correct any result that could not be read cleanly from an uploaded assessment.</p><label>English test result<input name="english_test_result" maxlength="240" value="${resultInputValue(a.english_test_result)}" placeholder="Example: CEFR B2 · 86%" /></label><label>Personality profile / score<input name="personality_profile_score" maxlength="500" value="${resultInputValue(a.personality_profile_score)}" placeholder="DISC: D 42, I 30, S 18, C 10 | Enneagram: Type 3 | MBTI: ENFJ" /></label><label>Computer specs<input name="computer_specs" maxlength="500" value="${resultInputValue(a.computer_specs)}" placeholder="Windows 11 · Intel i5 · 16 GB RAM · 512 GB SSD" /></label><label>Internet speed<input name="internet_speed" maxlength="240" value="${resultInputValue(a.internet_speed)}" placeholder="95 Mbps download · 48 Mbps upload" /></label><div class="modal-actions"><button class="button modal-cancel" type="button">Cancel</button><button class="button primary" type="submit">Save results</button></div><div id="screening-results-confirmation" aria-live="polite"></div></form></dialog></main>`;
+    const editPrivateDetails = canManagePrivateProfileDetails() ? '<button class="text-button profile-details-private-edit" id="edit-private-profile-details" type="button">Edit</button>' : '';
+    return `<main class="page talent-profile-page"><button class="text-button back-to-directory">← Back to Talent Directory</button><section class="talent-profile-hero"><div class="headshot-wrap"><div class="talent-headshot" id="talent-headshot">${talentPlaceholder(a.full_name)}</div><label class="button headshot-upload">Upload headshot<input type="file" id="headshot-input" accept="image/jpeg,image/png,image/webp" hidden /></label><small>JPG, PNG, or WebP · up to 5 MB</small></div><div class="profile-identity"><p class="eyebrow">Talent profile</p><h1>${escapeHtml(a.full_name)}</h1>${communicationPreferences(a)}<p class="profile-contact">${escapeHtml(contact)}</p><div class="profile-tags"><span class="tag">${escapeHtml(titleCase(a.status))}</span><span class="tag neutral">${escapeHtml(titleCase(a.work_status))}</span></div></div><div class="profile-actions"><button class="button" id="profile-add-task">+ Add task</button></div></section><section class="profile-stat-grid"><article><p>Location & time zone</p><strong>${escapeHtml(formatTalentLocationTimeZone(a.location, recordedTalentTimeZone(a)))}</strong></article><article><p>Availability</p><strong>${escapeHtml(a.availability_note || a.dedicated_workspace || 'Availability to review')}</strong></article><article><p>Application received</p><strong>${a.application_received_at ? escapeHtml(new Date(a.application_received_at).toLocaleDateString()) : 'Not recorded'}</strong></article><article><p>Profile owner</p><strong>${a.talent_review_owner_id ? 'Assigned' : 'Unassigned'}</strong></article></section><div class="profile-layout"><section class="panel profile-section profile-details-section"><div class="panel-head"><div><p class="eyebrow">At a glance</p><h2>Profile details</h2></div>${editPrivateDetails}</div><dl class="profile-details"><div><dt>Work status</dt><dd>${escapeHtml(titleCase(a.work_status))}</dd></div>${privateProfileDetailRows(a)}<div><dt>Expected rate</dt><dd>${escapeHtml(a.expected_hourly_rate_text || a.expected_hourly_rate || 'Not recorded')}</dd></div><div><dt>Dream / goal</dt><dd>${escapeHtml(a.greatest_dream || 'To be discussed in the Talent interview')}</dd></div></dl></section><section class="panel profile-section profile-documents-section"><div class="panel-head"><div><p class="eyebrow">Private files</p><h2>Documents & assessments</h2></div><span class="tag">Secure</span></div><p class="eyebrow">Select a file to open its protected preview. Screening sources stay linked to their matching result card.</p><div id="profile-documents"><p class="eyebrow">Loading documents…</p></div></section></div>${screeningResults(a)}${privateProfileDetailsDialog(a)}<dialog id="screening-results-dialog"><form id="screening-results-form" class="modal screening-results-modal"><div class="modal-title"><div><p class="eyebrow">Talent screening</p><h2>Edit screening results</h2></div><button type="button" class="modal-close" aria-label="Close screening results">×</button></div><p class="eyebrow">Correct any result that could not be read cleanly from an uploaded assessment.</p><label>English test result<input name="english_test_result" maxlength="240" value="${resultInputValue(a.english_test_result)}" placeholder="Example: CEFR B2 · 86%" /></label><label>Personality profile / score<input name="personality_profile_score" maxlength="500" value="${resultInputValue(a.personality_profile_score)}" placeholder="DISC: D 42, I 30, S 18, C 10 | Enneagram: Type 3 | MBTI: ENFJ" /></label><label>Computer specs<input name="computer_specs" maxlength="500" value="${resultInputValue(a.computer_specs)}" placeholder="Windows 11 · Intel i5 · 16 GB RAM · 512 GB SSD" /></label><label>Internet speed<input name="internet_speed" maxlength="240" value="${resultInputValue(a.internet_speed)}" placeholder="95 Mbps download · 48 Mbps upload" /></label><div class="modal-actions"><button class="button modal-cancel" type="button">Cancel</button><button class="button primary" type="submit">Save results</button></div><div id="screening-results-confirmation" aria-live="polite"></div></form></dialog></main>`;
   };
 
   const profilePageWithScreening = profilePage;
 
   function canVerifyTalentSkills() {
-    const actualRole = String(typeof authorizedRole === 'undefined' ? '' : authorizedRole).toLowerCase();
-    return ['admin', 'talent_management'].includes(actualRole);
+    return ['admin', 'talent_management'].includes(currentAccessRole());
   }
 
   function skillExperienceMap(applicant) {
@@ -157,7 +429,10 @@
       if (!target) return;
       const sources = documents.filter(document => types.includes(classifyDocument(document)) && document.storage_path);
       target.innerHTML = sources.length
-        ? `<span>Source ${sources.length === 1 ? 'file' : 'files'}</span>${sources.map(document => `<button class="screening-source-button open-private-document" type="button" data-storage-path="${escapeHtml(document.storage_path)}">${escapeHtml(documentLabels[classifyDocument(document)] || document.file_name)}</button>`).join('')}`
+        ? `<span>Source ${sources.length === 1 ? 'file' : 'files'}</span><div class="screening-source-file-list">${sources.map(source => {
+          const category = documentLabels[classifyDocument(source)] || titleCase(classifyDocument(source));
+          return `<button class="screening-source-button open-private-document" type="button" data-storage-path="${escapeHtml(source.storage_path)}"><span class="screening-source-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h6m-6 4h4"/></svg></span><span class="screening-source-file-copy"><small>${escapeHtml(category)}</small><strong>${escapeHtml(source.file_name || category)}</strong></span><span class="screening-source-open">Open securely</span></button>`;
+        }).join('')}</div>`
         : '<span class="screening-source-missing">Source file not available</span>';
     });
   }
@@ -225,6 +500,7 @@
     if (current === 'talent-profile') {
       root.innerHTML = profilePage(liveApplicants.find(a => a.id === selectedTalentId));
       bindView();
+      bindPrivateProfileDetailsEditor();
       bindScreeningResultsEditor();
       loadTalentProfileDocuments();
       return;
@@ -238,6 +514,7 @@
 
   document.addEventListener('click', event => {
     if (event.target.closest('#review-talent-skills')) openTalentSkillReview();
+    if (event.target.closest('#edit-own-identity-preferences')) openOwnIdentityPreferences();
   });
 
   loadTalentProfileDocuments = async function () {

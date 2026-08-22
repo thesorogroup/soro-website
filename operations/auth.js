@@ -31,7 +31,7 @@
   }
 
   function showAuthorizedApp(session, access) {
-    window.soroCurrentAccess = access;
+    window.soroCurrentAccess = { ...access, user_id: session.user.id };
     if (typeof role !== 'undefined') role = workspaceRole[access.role] || 'admin';
     if (typeof setActive === 'function') setActive();
     if (typeof render === 'function') render();

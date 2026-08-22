@@ -96,6 +96,56 @@
 }
 
 .profile-edit-details { white-space: nowrap; }
+.profile-communication-preferences {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 9px;
+  margin: 8px 0 6px;
+  color: #345672;
+  font-size: 13px;
+}
+.profile-communication-preferences strong {
+  color: #0b4a78;
+  font-weight: 750;
+}
+.profile-communication-preferences span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 2px 9px;
+  border: 1px solid rgba(91, 126, 154, .22);
+  border-radius: 999px;
+  background: rgba(255,255,255,.58);
+  font-size: 12px;
+  font-weight: 700;
+}
+.profile-identity-edit {
+  appearance: none;
+  padding: 3px 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: #c54a1a;
+  font: 700 12px/1.25 Arial, sans-serif;
+  cursor: pointer;
+}
+.profile-identity-edit:hover { color: #9f3710; }
+.private-identity-detail dt {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.private-identity-detail dt span {
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: #edf3f8;
+  color: #49657e;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
 .profile-details-dialog { width:min(620px,calc(100vw - 32px)); padding:0; border:0; border-radius:16px; box-shadow:0 24px 70px rgba(8,31,60,.24); color:#112944; }
 .profile-details-dialog form { padding:26px; }
 .dialog-heading { display:flex; justify-content:space-between; gap:18px; align-items:flex-start; }
@@ -103,8 +153,73 @@
 .dialog-copy { margin:12px 0 20px; color:#53657b; line-height:1.5; }
 .profile-details-dialog label { display:grid; gap:7px; margin-top:16px; font-size:14px; font-weight:800; color:#183d68; }
 .profile-details-dialog label span { font-size:12px; font-weight:500; color:#667085; }
-.profile-details-dialog textarea { width:100%; box-sizing:border-box; resize:vertical; border:1px solid #ccd8e6; border-radius:10px; padding:11px 12px; font:inherit; font-weight:400; line-height:1.45; color:#172033; background:#fff; }
-.profile-details-dialog textarea:focus { outline:3px solid rgba(48,122,196,.2); border-color:#3a78b8; }
+.profile-details-dialog textarea,
+.profile-details-dialog input,
+.profile-details-dialog select { width:100%; box-sizing:border-box; border:1px solid #ccd8e6; border-radius:10px; padding:11px 12px; font:inherit; font-weight:400; line-height:1.45; color:#172033; background:#fff; }
+.profile-details-dialog textarea { resize:vertical; }
+.profile-details-dialog textarea:focus,
+.profile-details-dialog input:focus,
+.profile-details-dialog select:focus { outline:3px solid rgba(48,122,196,.2); border-color:#3a78b8; }
+.identity-fieldset {
+  min-width: 0;
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+}
+.identity-fieldset legend {
+  color: #183d68;
+  font-size: 14px;
+  font-weight: 800;
+}
+.identity-fieldset > p {
+  margin: 5px 0 10px;
+  color: #667085;
+  font-size: 12px;
+}
+.identity-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.profile-details-dialog .identity-choice,
+.record-manager-dialog .identity-choice {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 11px;
+  border: 1px solid #d6e0e9;
+  border-radius: 10px;
+  background: #fbfdff;
+  color: #284764;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.profile-details-dialog .identity-choice input,
+.record-manager-dialog .identity-choice input {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  margin: 0;
+  accent-color: #e95b2b;
+}
+.profile-details-dialog .identity-choice span,
+.record-manager-dialog .identity-choice span {
+  min-width: 0;
+  color: inherit;
+  font: inherit;
+}
+.identity-dialog-status {
+  min-height: 20px;
+  margin: 14px 0 0;
+  color: #9f3426;
+  font-size: 13px;
+  line-height: 1.4;
+}
+[data-gender-self-description][hidden],
+[data-pronouns-self-description][hidden] { display: none !important; }
 .profile-video-error { margin:0; border-left:3px solid #c53d39; border-radius:6px; background:#fff3f1; color:#8e2f2b; padding:9px 11px; font-size:12px; line-height:1.45; }
 
 @media (max-width: 900px) {
@@ -114,4 +229,5 @@
 
 @media (max-width: 620px) {
   .profile-hero-media { width: 100%; max-width: none; justify-items: stretch; }
+  .identity-choice-grid { grid-template-columns: 1fr; }
 }

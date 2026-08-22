@@ -39,7 +39,7 @@
   }
   const localDraftKey = 'soro-talent-application-preview-draft-v2';
   const phoneUploadWatchKey = 'soro-talent-phone-upload-watch-v1';
-  const arrayFieldNames = new Set(['experienceAreas', 'skillsByCategory']);
+  const arrayFieldNames = new Set(['experienceAreas', 'skillsByCategory', 'pronouns']);
   const pendingUploads = new Set();
   let uploadQueue = Promise.resolve();
   let phonePollTimer = null;
@@ -177,9 +177,45 @@ const message = (text, kind = 'error', options = {}) => {
     if (!show) field.setCustomValidity('');
   };
 
+  const updateIdentityPreferenceFields = (changedInput) => {
+    const genderSelfDescription = form.elements.genderIdentitySelfDescription;
+    const genderSelfDescriptionWrapper = form.querySelector('#gender-self-description-field');
+    const selectedGender = namedControls('genderIdentity').find(input => input.checked)?.value || '';
+    const showGenderSelfDescription = selectedGender === 'self_describe';
+    if (genderSelfDescription && genderSelfDescriptionWrapper) {
+      genderSelfDescriptionWrapper.hidden = !showGenderSelfDescription;
+      genderSelfDescription.disabled = !showGenderSelfDescription;
+      genderSelfDescription.required = showGenderSelfDescription;
+      if (!showGenderSelfDescription) genderSelfDescription.setCustomValidity('');
+    }
+
+    const pronounInputs = namedControls('pronouns');
+    const preferNotToSay = pronounInputs.find(input => input.value === 'prefer_not_to_disclose');
+    if (changedInput?.name === 'pronouns' && changedInput.checked) {
+      if (changedInput === preferNotToSay) {
+        pronounInputs.forEach(input => { if (input !== preferNotToSay) input.checked = false; });
+      } else if (preferNotToSay) {
+        preferNotToSay.checked = false;
+      }
+    } else if (!changedInput && preferNotToSay?.checked) {
+      pronounInputs.forEach(input => { if (input !== preferNotToSay) input.checked = false; });
+    }
+
+    const pronounsSelfDescription = form.elements.pronounsSelfDescription;
+    const pronounsSelfDescriptionWrapper = form.querySelector('#pronouns-self-description-field');
+    const showPronounsSelfDescription = pronounInputs.some(input => input.checked && input.value === 'self_describe');
+    if (pronounsSelfDescription && pronounsSelfDescriptionWrapper) {
+      pronounsSelfDescriptionWrapper.hidden = !showPronounsSelfDescription;
+      pronounsSelfDescription.disabled = !showPronounsSelfDescription;
+      pronounsSelfDescription.required = showPronounsSelfDescription;
+      if (!showPronounsSelfDescription) pronounsSelfDescription.setCustomValidity('');
+    }
+  };
+
   const updateConditionalFields = () => {
     setConditionalField('timezone', 'timezoneOther', '#timezone-other-field');
     setConditionalField('currentWorkStatus', 'currentWorkStatusOther', '#work-status-other-field');
+    updateIdentityPreferenceFields();
   };
 
   const updateExperienceUI = changedInput => {
@@ -506,6 +542,8 @@ namedControls('skillsByCategory').forEach(input => input.addEventListener('chang
 }));
 form.elements.timezone?.addEventListener('change', updateConditionalFields);
 form.elements.currentWorkStatus?.addEventListener('change', updateConditionalFields);
+namedControls('genderIdentity').forEach(input => input.addEventListener('change', () => updateIdentityPreferenceFields(input)));
+namedControls('pronouns').forEach(input => input.addEventListener('change', () => updateIdentityPreferenceFields(input)));
 [form.elements.expectedRateMin, form.elements.expectedRateMax].filter(Boolean).forEach(input => input.addEventListener('input', () => {
   input.setCustomValidity('');
   updateExpectedRatePreview();

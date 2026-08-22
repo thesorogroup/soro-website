@@ -148,6 +148,24 @@
   letter-spacing: .03em;
 }
 
+.record-manager-field.identity-fieldset {
+  display: block;
+  margin: 0;
+  padding: 3px 0 0;
+}
+
+.record-manager-field.identity-fieldset legend {
+  color: #163f70;
+  font: 700 12px/1.2 Arial, sans-serif;
+  letter-spacing: .03em;
+}
+
+.record-manager-field.identity-fieldset > p {
+  margin: 5px 0 10px;
+  color: #647991;
+  font: 400 12px/1.4 Arial, sans-serif;
+}
+
 .record-manager-field input,
 .record-manager-field textarea,
 .record-manager-field select {

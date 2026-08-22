@@ -298,6 +298,60 @@ Zimbabwe`.split('\n');
     return { lastName: familyName, firstName: givenParts.shift() || '', middleName: givenParts.join(' ') };
   }
 
+  const genderIdentityOptions = [
+    ['', 'Select an option'],
+    ['female', 'Female'],
+    ['male', 'Male'],
+    ['nonbinary', 'Non-binary'],
+    ['self_describe', 'Prefer to self-describe'],
+    ['prefer_not_to_disclose', 'Prefer not to disclose']
+  ];
+
+  const pronounOptions = [
+    ['she_her', 'She/her'],
+    ['he_him', 'He/him'],
+    ['they_them', 'They/them'],
+    ['use_name', 'Use my name'],
+    ['self_describe', 'Let them describe their pronouns'],
+    ['prefer_not_to_disclose', 'Prefer not to disclose']
+  ];
+
+  function genderIdentitySelect(current) {
+    return genderIdentityOptions.map(([value, label]) => `<option value="${value}" ${value === String(current || '') ? 'selected' : ''}>${label}</option>`).join('');
+  }
+
+  function pronounChoices(record) {
+    const selected = Array.isArray(record.pronouns) ? record.pronouns : [];
+    return pronounOptions.map(([value, label]) => `<label class="identity-choice"><input type="checkbox" name="pronouns" value="${value}" ${selected.includes(value) ? 'checked' : ''}><span>${escapeHtml(label)}</span></label>`).join('');
+  }
+
+  function bindIdentityPreferenceControls(dialog) {
+    const form = $('#talent-editor-form', dialog);
+    const gender = form?.elements.genderIdentity;
+    const genderOther = $('[data-gender-self-description]', form);
+    const pronounOther = $('[data-pronouns-self-description]', form);
+    if (!form || !gender || !genderOther || !pronounOther) return;
+    const syncGender = () => {
+      const visible = gender.value === 'self_describe';
+      genderOther.hidden = !visible;
+      $('input', genderOther).required = visible;
+    };
+    const syncPronouns = changed => {
+      const boxes = [...form.querySelectorAll('input[name="pronouns"]')];
+      const privateChoice = boxes.find(box => box.value === 'prefer_not_to_disclose');
+      if (changed?.value === 'prefer_not_to_disclose' && changed.checked) boxes.forEach(box => { if (box !== changed) box.checked = false; });
+      else if (changed?.checked && privateChoice) privateChoice.checked = false;
+      else if (!changed && privateChoice?.checked) boxes.forEach(box => { if (box !== privateChoice) box.checked = false; });
+      const visible = boxes.some(box => box.value === 'self_describe' && box.checked);
+      pronounOther.hidden = !visible;
+      $('input', pronounOther).required = visible;
+    };
+    gender.addEventListener('change', syncGender);
+    form.querySelectorAll('input[name="pronouns"]').forEach(box => box.addEventListener('change', () => syncPronouns(box)));
+    syncGender();
+    syncPronouns();
+  }
+
   async function loadAccess() {
     const client = database();
     if (!client) return;
@@ -324,6 +378,11 @@ Zimbabwe`.split('\n');
         <div class="record-manager-field"><label for="talent-last-name">Last name</label><input id="talent-last-name" name="lastName" required value="${escapeHtml(names.lastName)}"></div>
         <div class="record-manager-field"><label for="talent-first-name">First name</label><input id="talent-first-name" name="firstName" required value="${escapeHtml(names.firstName)}"></div>
         <div class="record-manager-field"><label for="talent-middle-name">Middle name <span aria-label="optional">(optional)</span></label><input id="talent-middle-name" name="middleName" value="${escapeHtml(names.middleName)}"></div>
+        <div class="record-manager-field"><label for="talent-preferred-name">Preferred name <span aria-label="optional">(optional)</span></label><input id="talent-preferred-name" name="preferredName" maxlength="100" autocomplete="nickname" value="${value(record, 'preferred_name')}"></div>
+        <div class="record-manager-field"><label for="talent-gender-identity">Gender identity <span aria-label="optional">(optional)</span></label><select id="talent-gender-identity" name="genderIdentity">${genderIdentitySelect(record.gender_identity)}</select></div>
+        <div class="record-manager-field" data-gender-self-description ${record.gender_identity === 'self_describe' ? '' : 'hidden'}><label for="talent-gender-self-description">Self-described gender</label><input id="talent-gender-self-description" name="genderIdentitySelfDescription" maxlength="120" value="${value(record, 'gender_identity_self_description')}"></div>
+        <fieldset class="record-manager-field record-manager-field--wide identity-fieldset"><legend>Pronouns <span aria-label="optional">(optional)</span></legend><p>Select all that apply.</p><div class="identity-choice-grid">${pronounChoices(record)}</div></fieldset>
+        <div class="record-manager-field record-manager-field--wide" data-pronouns-self-description ${Array.isArray(record.pronouns) && record.pronouns.includes('self_describe') ? '' : 'hidden'}><label for="talent-pronouns-self-description">Self-described pronouns</label><input id="talent-pronouns-self-description" name="pronounsSelfDescription" maxlength="120" value="${value(record, 'pronouns_self_description')}" placeholder="Example: ze/hir"></div>
         <div class="record-manager-field"><label for="talent-email">Email</label><input id="talent-email" type="email" name="email" required value="${value(record, 'email')}"></div>
         <div class="record-manager-field"><label for="talent-phone">Phone</label><input id="talent-phone" name="phone" value="${value(record, 'phone')}"></div>
         <div class="record-manager-field"><label for="talent-country">Country</label><select id="talent-country" name="country">${locationOptions(countryNames, record.country, 'Philippines', true)}</select></div>
@@ -345,8 +404,15 @@ Zimbabwe`.split('\n');
     const lastName = formData.get('lastName').trim();
     const firstName = formData.get('firstName').trim();
     const middleName = formData.get('middleName').trim();
+    const genderIdentity = formData.get('genderIdentity').trim();
+    const pronouns = formData.getAll('pronouns').map(String);
     const payload = {
       full_name: `${lastName}, ${firstName}${middleName ? ` ${middleName}` : ''}`,
+      preferred_name: formData.get('preferredName').trim() || null,
+      gender_identity: genderIdentity || null,
+      gender_identity_self_description: genderIdentity === 'self_describe' ? formData.get('genderIdentitySelfDescription').trim() || null : null,
+      pronouns,
+      pronouns_self_description: pronouns.includes('self_describe') ? formData.get('pronounsSelfDescription').trim() || null : null,
       email: formData.get('email').trim(), phone: formData.get('phone').trim() || null,
       country: formData.get('country').trim() || null, timezone: formData.get('timezone').trim() || null,
       address_line_1: formData.get('address').trim() || null, work_status: formData.get('workStatus'),
@@ -379,6 +445,7 @@ Zimbabwe`.split('\n');
   function editTalent(record) {
     openModal({ eyebrow: record?.id ? 'Edit Talent profile' : 'New Talent', title: record?.id ? `Edit ${record.full_name}` : 'Add Talent', note: 'Only Soro staff can see private contact and address information.', content: talentForm(record), onOpen(dialog) {
       $('[data-close]', dialog).addEventListener('click', closeModal);
+      bindIdentityPreferenceControls(dialog);
       $('#talent-editor-form', dialog).addEventListener('submit', async event => {
         event.preventDefault();
         const submit = $('button[type=submit]', dialog); submit.disabled = true; submit.textContent = 'Saving…';

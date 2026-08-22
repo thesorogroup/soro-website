@@ -34,7 +34,13 @@
     if (!canViewPrivateLocation()) return '';
     const lines = addressLines(applicant);
     const hasStreetAddress = Boolean(applicant.address_line_1 || applicant.address_line_2 || applicant.city || applicant.province_region);
-    return `<aside class="profile-private-address" aria-label="Private address and location"><div class="private-address-heading"><span class="private-address-lock" aria-hidden="true">⌖</span><span>Private — Soro &amp; Talent only</span></div><strong>Address &amp; location</strong>${hasStreetAddress ? `<p>${lines.map(escapeHtml).join('<br />')}</p>` : '<p class="muted">Address not recorded yet</p>'}<small>${escapeHtml(applicant.country || 'Philippines')} · ${escapeHtml(applicant.timezone || 'Asia/Manila')}</small></aside>`;
+    const recordedTimeZone = typeof window.recordedTalentTimeZone === 'function'
+      ? window.recordedTalentTimeZone(applicant)
+      : applicant.timezone || 'Asia/Manila';
+    const timeZone = typeof window.formatTalentTimeZone === 'function'
+      ? window.formatTalentTimeZone(recordedTimeZone || 'Asia/Manila')
+      : recordedTimeZone || 'Asia/Manila';
+    return `<aside class="profile-private-address" aria-label="Private address and location"><div class="private-address-heading"><span class="private-address-lock" aria-hidden="true">⌖</span><span>Private — Soro &amp; Talent only</span></div><strong>Address &amp; location</strong>${hasStreetAddress ? `<p>${lines.map(escapeHtml).join('<br />')}</p>` : '<p class="muted">Address not recorded yet</p>'}<small>${escapeHtml(applicant.country || 'Philippines')} · ${escapeHtml(timeZone)}</small></aside>`;
   }
 
   function enableWritingAssistance(scope) {

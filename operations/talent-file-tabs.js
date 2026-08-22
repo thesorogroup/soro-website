@@ -85,8 +85,9 @@
     const stats = main?.querySelector('.profile-stat-grid');
     const layout = main?.querySelector('.profile-layout');
     const screening = main?.querySelector('.profile-screening');
+    const details = layout?.querySelector('.profile-details-section');
     const documents = layout?.querySelector('.profile-documents-section');
-    if (!main || !hero || !stats || !layout || !documents) return markup;
+    if (!main || !hero || !stats || !layout || !details || !documents) return markup;
 
     const identity = hero.querySelector('.profile-identity');
     const address = hero.querySelector('.profile-private-address');
@@ -95,6 +96,11 @@
 
     documents.remove();
     layout.classList.add('talent-profile-home-layout');
+    const summaryColumn = document.createElement('div');
+    summaryColumn.className = 'profile-summary-column';
+    details.insertAdjacentElement('beforebegin', summaryColumn);
+    summaryColumn.append(details);
+    if (screening) summaryColumn.append(screening);
     const benefitsAvailable = canViewBenefits();
     if (!benefitsAvailable && activeTab === 'benefits') activeTab = 'profile';
 
@@ -109,7 +115,6 @@
     body.append(hero);
     const profilePanel = shell.querySelector('[data-talent-file-panel="profile"]');
     profilePanel.append(stats, layout);
-    if (screening) profilePanel.append(screening);
     const dangerZone = document.createElement('section');
     dangerZone.className = 'talent-profile-danger-zone';
     dangerZone.hidden = true;

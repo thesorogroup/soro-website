@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../assets/styles.css">
-  <link rel="stylesheet" href="application.css?v=20260822-application-polish1">
+  <link rel="stylesheet" href="application.css?v=20260822-identity-preferences1">
 </head>
 <body class="soro-application-page">
   <header class="application-header">
@@ -44,9 +44,52 @@
           <div class="field-grid">
             <div class="name-fields field-wide">
               <label class="field"><span class="field-label">First legal name</span><input name="firstName" autocomplete="given-name" required spellcheck="true" placeholder="First name"></label>
-            <label class="field"><span class="field-label">Middle legal name(s) <small>(Optional)</small></span><input name="middleName" autocomplete="additional-name" spellcheck="true" placeholder="Middle name(s)"></label>
+              <label class="field"><span class="field-label">Middle legal name(s) <small>(Optional)</small></span><input name="middleName" autocomplete="additional-name" spellcheck="true" placeholder="Middle name(s)"></label>
               <label class="field"><span class="field-label">Last / family name</span><input name="lastName" autocomplete="family-name" required spellcheck="true" placeholder="Last name"></label>
             </div>
+            <section class="identity-preferences field-wide" aria-labelledby="identity-preferences-heading" aria-describedby="identity-preferences-note">
+              <div class="identity-preferences__intro">
+                <div>
+                  <h3 id="identity-preferences-heading">How should we address you?</h3>
+                  <p id="identity-preferences-note">These details are optional. They help us address you respectfully and are not used to evaluate your application.</p>
+                </div>
+                <span class="identity-preferences__privacy">Optional &amp; private</span>
+              </div>
+
+              <label class="field identity-preferences__name"><span class="field-label">What name would you like us to use? <small>(Optional)</small></span>
+                <input name="preferredName" autocomplete="nickname" spellcheck="true" maxlength="100" placeholder="Preferred name">
+                <small>Leave this blank if you use your legal first name.</small>
+              </label>
+
+              <fieldset class="identity-question">
+                <legend>How do you describe your gender? <small>(Optional)</small></legend>
+                <div class="identity-choice-grid identity-choice-grid--gender">
+                  <label class="identity-choice"><input name="genderIdentity" type="radio" value="female"><span>Female</span></label>
+                  <label class="identity-choice"><input name="genderIdentity" type="radio" value="male"><span>Male</span></label>
+                  <label class="identity-choice"><input name="genderIdentity" type="radio" value="nonbinary"><span>Non-binary</span></label>
+                  <label class="identity-choice"><input name="genderIdentity" type="radio" value="self_describe"><span>Prefer to self-describe</span></label>
+                  <label class="identity-choice"><input name="genderIdentity" type="radio" value="prefer_not_to_disclose"><span>Prefer not to disclose</span></label>
+                </div>
+                <label class="field conditional-field identity-self-description" id="gender-self-description-field" hidden>How would you describe your gender?
+                  <input name="genderIdentitySelfDescription" autocomplete="off" spellcheck="true" maxlength="120" placeholder="Your words" disabled>
+                </label>
+              </fieldset>
+
+              <fieldset class="identity-question">
+                <legend>Which pronouns should we use for you? <small>(Optional; select all that apply)</small></legend>
+                <div class="identity-choice-grid identity-choice-grid--pronouns">
+                  <label class="identity-choice"><input name="pronouns" type="checkbox" value="she_her"><span>She / her</span></label>
+                  <label class="identity-choice"><input name="pronouns" type="checkbox" value="he_him"><span>He / him</span></label>
+                  <label class="identity-choice"><input name="pronouns" type="checkbox" value="they_them"><span>They / them</span></label>
+                  <label class="identity-choice"><input name="pronouns" type="checkbox" value="use_name"><span>Use my name</span></label>
+                  <label class="identity-choice"><input name="pronouns" type="checkbox" value="self_describe"><span>Prefer to self-describe</span></label>
+                  <label class="identity-choice"><input name="pronouns" type="checkbox" value="prefer_not_to_disclose"><span>Prefer not to disclose</span></label>
+                </div>
+                <label class="field conditional-field identity-self-description" id="pronouns-self-description-field" hidden>What pronouns should we use?
+                  <input name="pronounsSelfDescription" autocomplete="off" spellcheck="true" maxlength="120" placeholder="Your pronouns" disabled>
+                </label>
+              </fieldset>
+            </section>
             <label class="field">Email address<input name="email" type="email" autocomplete="email" required placeholder="you@example.com"></label>
             <label class="field">Phone / WhatsApp number<input name="phone" type="tel" autocomplete="tel" required placeholder="Include country code if possible"></label>
             <label class="field">Country<select name="country" required>
@@ -266,6 +309,6 @@
   </main>
   <footer class="application-footer">© <span id="current-year"></span> Soro Group. Your application details are private.</footer>
   <script src="vendor/qrcode-generator.js?v=2.0.4-soro-20260822"></script>
-  <script src="application.js?v=20260822-application-polish2"></script>
+  <script src="application.js?v=20260822-identity-preferences1"></script>
 </body>
 </html>
