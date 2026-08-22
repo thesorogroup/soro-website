@@ -7,6 +7,8 @@ const screeningPresentation = require('../operations/screening-presentation.js')
 
 const enhancementsPath = path.join(__dirname, '..', 'operations', 'operations-enhancements.js');
 const enhancementsSource = fs.readFileSync(enhancementsPath, 'utf8');
+const tabsSource = fs.readFileSync(path.join(__dirname, '..', 'operations', 'talent-file-tabs.js'), 'utf8');
+const tabsStyles = fs.readFileSync(path.join(__dirname, '..', 'operations', 'talent-file-tabs.css'), 'utf8');
 const initialsStart = enhancementsSource.indexOf('function talentInitials');
 const initialsEnd = enhancementsSource.indexOf('const pronounLabels', initialsStart);
 const screeningStart = enhancementsSource.indexOf('function percentageValue');
@@ -35,6 +37,14 @@ test('The no-headshot placeholder uses a minimal head and bust without facial fe
   assert.equal((placeholder.match(/<path\b/g) || []).length, 1);
   assert.doesNotMatch(placeholder, /eye|nose|mouth|hair/i);
   assert.match(placeholder, />MJ<\/b>/);
+});
+
+test('The approved folder geometry and full-width screening row remain locked', () => {
+  assert.match(tabsStyles, /max-width:\s*1170px/);
+  assert.match(tabsStyles, /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(tabsStyles, /grid-template-columns:\s*228px\s+minmax\(0,\s*1fr\)\s+392px/);
+  assert.doesNotMatch(tabsSource, /summaryColumn\.append\(screening\)/);
+  assert.match(tabsSource, /profilePanel\.append\(screening\)/);
 });
 
 test('English score extraction prefers the numerator in an x/100 result', () => {

@@ -780,3 +780,73 @@
   .talent-skill-review-row { grid-template-columns: auto minmax(0,1fr); }
   .skill-years { grid-column: 2; }
 }
+
+/* Final approval geometry: keep the interactive page measured to the locked preview. */
+@media (min-width: 1101px) {
+  .page.talent-profile-page {
+    width: min(1170px, calc(100% - 48px));
+    max-width: 1170px;
+    padding-top: 27px;
+  }
+
+  .talent-profile-page .talent-file-shell { left: 0; }
+
+  .talent-file-tabs {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0;
+    padding: 0;
+  }
+
+  .talent-file-tab {
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    min-height: 50px;
+    padding: 15px 24px 11px;
+  }
+
+  .talent-file-tab[aria-selected="true"] { min-height: 50px; }
+
+  .talent-file-body .talent-profile-hero {
+    grid-template-columns: 228px minmax(0, 1fr) 392px;
+    gap: 34px;
+    min-height: 374px;
+    padding: 27px 28px 20px;
+  }
+
+  .talent-file-body .talent-headshot {
+    width: 210px;
+    height: 250px;
+    padding: 10px 10px 39px;
+    transform: rotate(3deg);
+    transform-origin: 50% 42%;
+  }
+
+  .talent-file-body .talent-headshot::after {
+    top: -45px;
+    left: 14px;
+    width: 44px;
+    height: 110px;
+    transform: rotate(-3deg);
+  }
+
+  .talent-file-body .profile-identity { padding-top: 46px; }
+  .talent-file-body .profile-hero-media { max-width: 392px; padding-top: 40px; }
+}
+
+/* Screening is a third, full-width row beneath Details and Skills. */
+.talent-file-profile-panel > .profile-screening {
+  width: 100%;
+  margin-top: 16px;
+}
+
+@media (min-width: 900px) {
+  .talent-file-profile-panel > .profile-screening .screening-card__layout {
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+
+  .talent-file-profile-panel > .profile-screening .screening-card__layout--device {
+    grid-template-columns: 180px minmax(0, 1fr);
+  }
+}
