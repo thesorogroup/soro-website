@@ -73,10 +73,8 @@
   profilePage = function (applicant) {
     const markup = originalProfilePage(applicant);
     if (!applicant) return markup;
-    if (lastTalentId !== applicant.id) {
-      lastTalentId = applicant.id;
-      activeTab = 'profile';
-    }
+    lastTalentId = applicant.id;
+    activeTab = 'profile';
 
     const template = document.createElement('template');
     template.innerHTML = markup.trim();
@@ -84,8 +82,14 @@
     const hero = main?.querySelector('.talent-profile-hero');
     const stats = main?.querySelector('.profile-stat-grid');
     const layout = main?.querySelector('.profile-layout');
+    const screening = main?.querySelector('.profile-screening');
     const documents = layout?.querySelector('.profile-documents-section');
     if (!main || !hero || !stats || !layout || !documents) return markup;
+
+    const identity = hero.querySelector('.profile-identity');
+    const address = hero.querySelector('.profile-private-address');
+    const contact = identity?.querySelector(':scope > p:not(.eyebrow)');
+    if (identity && address) contact ? contact.insertAdjacentElement('afterend', address) : identity.append(address);
 
     documents.remove();
     layout.classList.add('talent-profile-home-layout');
@@ -103,6 +107,7 @@
     body.append(hero);
     const profilePanel = shell.querySelector('[data-talent-file-panel="profile"]');
     profilePanel.append(stats, layout);
+    if (screening) profilePanel.append(screening);
     const dangerZone = document.createElement('section');
     dangerZone.className = 'talent-profile-danger-zone';
     dangerZone.hidden = true;
