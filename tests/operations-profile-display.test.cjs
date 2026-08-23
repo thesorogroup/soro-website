@@ -39,10 +39,21 @@ test('The no-headshot placeholder uses a minimal head and bust without facial fe
   assert.match(placeholder, />MJ<\/b>/);
 });
 
-test('The approved folder geometry and independent screening column remain locked', () => {
+test('The approved folder is one continuous vector and the screening column remains independent', () => {
   assert.match(tabsStyles, /max-width:\s*1170px/);
-  assert.match(tabsStyles, /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
+  assert.match(tabsStyles, /grid-template-columns:\s*repeat\(var\(--folder-tab-count\),\s*minmax\(0,\s*1fr\)\)/);
   assert.match(tabsStyles, /grid-template-columns:\s*228px\s+minmax\(0,\s*1fr\)\s+392px/);
+  assert.match(tabsStyles, /min-height:\s*374px/);
+  assert.match(tabsStyles, /white-space:\s*nowrap/);
+  assert.doesNotMatch(tabsStyles, /folder-tabs-rail\.svg/);
+  assert.match(tabsSource, /class="talent-folder-art"/);
+  assert.match(tabsSource, /class="talent-folder-front-seam" d="M0 85H1240"/);
+  assert.match(tabsSource, /class="talent-folder-outer-edge" d="M0 58V415/);
+  assert.match(tabsSource, /M31 13\.5C31 2\.5 8 2\.5 8 22v70/);
+  assert.doesNotMatch(tabsSource, /talent-paperclip-pocket/);
+  assert.match(tabsSource, /function syncFolderArt\(shell\)/);
+  assert.match(tabsSource, /const width = 1240 \/ count/);
+  assert.match(tabsSource, /syncFolderArt\(shell\);\s*activateTab\(activeTab, shell\)/);
   assert.match(tabsSource, /summaryColumn\.append\(screening\)/);
   assert.doesNotMatch(tabsSource, /profilePanel\.append\(screening\)/);
 });

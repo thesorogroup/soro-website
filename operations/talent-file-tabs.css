@@ -434,10 +434,14 @@
   --folder-edge: #c9a66b;
 }
 
+.talent-folder-art,
+.talent-paperclip { display: none; }
+
 .talent-file-body {
   overflow: visible;
   border-width: 1.5px;
   border-radius: 17px;
+  border-color: rgba(42, 75, 103, .45);
   background: linear-gradient(112deg, rgba(255,255,255,.74), rgba(255,249,235,.5)), #fff5df;
   box-shadow: 0 15px 34px rgba(36, 48, 62, .07);
 }
@@ -452,6 +456,7 @@
   height: 1px;
   background: linear-gradient(90deg, rgba(73,103,130,.58), rgba(126,121,105,.35) 72%, rgba(126,121,105,.16));
   box-shadow: 0 1px 0 rgba(255,255,255,.72);
+  box-shadow: none;
   pointer-events: none;
 }
 
@@ -781,7 +786,7 @@
   .skill-years { grid-column: 2; }
 }
 
-/* Final approval geometry: keep the interactive page measured to the locked preview. */
+/* Final approval geometry: one measured vector supplies every folder edge. */
 @media (min-width: 1101px) {
   .page.talent-profile-page {
     width: min(1170px, calc(100% - 48px));
@@ -789,24 +794,103 @@
     padding-top: 27px;
   }
 
-  .talent-profile-page .talent-file-shell { left: 0; }
-
-  .talent-file-tabs {
-    display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 0;
-    padding: 0;
+  .talent-profile-page .talent-file-shell {
+    --folder-tab-count: 4;
+    left: 0;
   }
 
-  .talent-file-tab {
+  .talent-folder-art {
+    position: absolute;
+    z-index: 1;
+    inset: 0 auto auto 0;
+    display: block;
+    width: 100%;
+    height: 442px;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .talent-folder-inactive-tabs path {
+    fill: url(#talent-tab-paper);
+    stroke: #b8aa8b;
+    stroke-width: 1.15;
+  }
+
+  .talent-folder-shadow {
+    fill: #fef6e8;
+    filter: url(#talent-folder-shadow);
+  }
+
+  .talent-folder-paper { fill: url(#talent-folder-paper); }
+  .talent-folder-front-lip,
+  .talent-folder-active-fill { fill: #fcf3e3; }
+
+  .talent-folder-outer-edge {
+    fill: none;
+    stroke: rgba(42, 75, 103, .45);
+    stroke-width: 1.15;
+  }
+
+  .talent-folder-top-transition {
+    fill: none;
+    stroke: rgba(151, 135, 106, .18);
+    stroke-width: .8;
+  }
+
+  .talent-folder-front-seam {
+    fill: none;
+    stroke: rgba(144, 125, 91, .24);
+    stroke-width: .8;
+  }
+
+  .talent-folder-active-edge {
+    fill: none;
+    stroke: #b8aa8b;
+    stroke-width: 1.15;
+  }
+
+  .talent-file-tabs {
+    position: relative;
+    z-index: 4;
+    display: grid;
+    grid-template-columns: repeat(var(--folder-tab-count), minmax(0, 1fr));
+    align-items: start;
+    width: 100%;
+    height: 58px;
+    gap: 0;
+    padding: 0;
+    overflow: visible;
+    background: none;
+  }
+
+  .talent-file-tabs::after { content: none; }
+
+  .talent-file-tab,
+  .talent-file-tab[aria-selected="true"] {
     width: auto;
     min-width: 0;
     max-width: none;
+    height: 50px;
     min-height: 50px;
-    padding: 15px 24px 11px;
+    margin: 10px 0 0;
+    padding: 14px 24px 11px;
+    background: none;
   }
 
-  .talent-file-tab[aria-selected="true"] { min-height: 50px; }
+  .talent-file-body {
+    position: relative;
+    z-index: 2;
+    overflow: visible;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .talent-file-body::before,
+  .talent-file-body::after,
+  .talent-file-body .talent-headshot::before,
+  .talent-file-body .talent-headshot::after { content: none; }
 
   .talent-file-body .talent-profile-hero {
     grid-template-columns: 228px minmax(0, 1fr) 392px;
@@ -815,24 +899,64 @@
     padding: 27px 28px 20px;
   }
 
+  .talent-file-body .headshot-wrap {
+    z-index: 3;
+    gap: 0;
+  }
+
   .talent-file-body .talent-headshot {
     width: 210px;
     height: 250px;
+    margin-top: 20px;
     padding: 10px 10px 39px;
     transform: rotate(3deg);
     transform-origin: 50% 42%;
   }
 
-  .talent-file-body .talent-headshot::after {
-    top: -45px;
-    left: 14px;
+  .talent-paperclip {
+    position: absolute;
+    z-index: 6;
+    left: 24px;
+    top: -15px;
+    display: block;
     width: 44px;
     height: 110px;
-    transform: rotate(-3deg);
+    overflow: visible;
+    transform: rotate(-5deg);
+    pointer-events: none;
   }
 
+  .talent-paperclip-wire {
+    fill: none;
+    stroke: #969da4;
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    filter: drop-shadow(1px 1px 1px rgba(38, 56, 74, .2));
+  }
+
+  .talent-paperclip-divider {
+    fill: none;
+    stroke: rgba(144, 125, 91, .24);
+    stroke-width: .8;
+  }
+
+  .talent-file-body .headshot-upload { margin-top: 20px; }
+  .talent-file-body .headshot-wrap small { margin-top: 8px; }
   .talent-file-body .profile-identity { padding-top: 46px; }
   .talent-file-body .profile-hero-media { max-width: 392px; padding-top: 40px; }
+  .talent-file-body .profile-actions { gap: 8px; }
+  .talent-file-body .profile-actions > .button,
+  .talent-file-body .profile-actions .admin-record-button {
+    padding: 8px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .talent-file-panels {
+    position: relative;
+    z-index: 2;
+  }
 }
 
 .screening-editor-group {
