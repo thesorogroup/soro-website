@@ -5,6 +5,7 @@ const test = require('node:test');
 const vm = require('node:vm');
 
 const helpers = require('../operations/profile-details.js');
+const screeningPresentation = require('../operations/screening-presentation.js');
 const operationsSource = fs.readFileSync(path.join(__dirname, '..', 'operations', 'operations-enhancements.js'), 'utf8');
 const migrationSource = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', '20260822_017_applicant_birth_date_bounds.sql'), 'utf8');
 
@@ -14,7 +15,8 @@ if (computerStart < 0 || computerEnd < 0) throw new Error('Computer presentation
 const computerContext = {
   escapeHtml: value => String(value ?? ''),
   screeningState: () => '<span>Recorded</span>',
-  profileDetailsTools: helpers
+  profileDetailsTools: helpers,
+  screeningPresentation
 };
 vm.createContext(computerContext);
 vm.runInContext(operationsSource.slice(computerStart, computerEnd), computerContext);
@@ -107,7 +109,7 @@ test('real profile source keeps Dream, binds the restricted editor, and updates 
   assert.match(operationsSource, /Dream \/ goal/);
   assert.match(operationsSource, /bindPrivateProfileDetailsEditor\(\);/);
   assert.match(operationsSource, /select\('birth_date,gender_identity,gender_identity_self_description'\)/);
-  assert.doesNotMatch(operationsSource, /age\s*:/);
+  assert.doesNotMatch(operationsSource, /(?:^|[{,]\s*)age\s*:/m);
 });
 
 test('private Profile details remain open for Escape and backdrop clicks', () => {

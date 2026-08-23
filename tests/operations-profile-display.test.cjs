@@ -39,12 +39,12 @@ test('The no-headshot placeholder uses a minimal head and bust without facial fe
   assert.match(placeholder, />MJ<\/b>/);
 });
 
-test('The approved folder geometry and full-width screening row remain locked', () => {
+test('The approved folder geometry and independent screening column remain locked', () => {
   assert.match(tabsStyles, /max-width:\s*1170px/);
   assert.match(tabsStyles, /grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
   assert.match(tabsStyles, /grid-template-columns:\s*228px\s+minmax\(0,\s*1fr\)\s+392px/);
-  assert.doesNotMatch(tabsSource, /summaryColumn\.append\(screening\)/);
-  assert.match(tabsSource, /profilePanel\.append\(screening\)/);
+  assert.match(tabsSource, /summaryColumn\.append\(screening\)/);
+  assert.doesNotMatch(tabsSource, /profilePanel\.append\(screening\)/);
 });
 
 test('English score extraction prefers the numerator in an x/100 result', () => {

@@ -125,6 +125,67 @@
     return results;
   }
 
+  const COMPUTER_SPEC_FIELDS = Object.freeze([
+    Object.freeze({ key: 'system', label: 'System' }),
+    Object.freeze({ key: 'processor', label: 'Processor' }),
+    Object.freeze({ key: 'memory', label: 'Memory' }),
+    Object.freeze({ key: 'storage', label: 'Storage' }),
+    Object.freeze({ key: 'operatingSystem', label: 'Operating system' }),
+    Object.freeze({ key: 'other', label: 'Other' })
+  ]);
+
+  function computerSpecKeyFromLabel(label) {
+    const normalized = String(label || '').trim().toLowerCase().replace(/[\s_-]+/g, ' ');
+    if (/^(?:system|device|device type|computer type)$/.test(normalized)) return 'system';
+    if (/^(?:processor|cpu)$/.test(normalized)) return 'processor';
+    if (/^(?:memory|ram)$/.test(normalized)) return 'memory';
+    if (/^(?:storage|drive|disk)$/.test(normalized)) return 'storage';
+    if (/^(?:operating system|os)$/.test(normalized)) return 'operatingSystem';
+    if (/^(?:other|notes?)$/.test(normalized)) return 'other';
+    return '';
+  }
+
+  function parseComputerSpecs(value) {
+    const result = Object.fromEntries(COMPUTER_SPEC_FIELDS.map(field => [field.key, '']));
+    const parts = String(value || '').split(/[|;·\n]+/).map(part => part.trim()).filter(Boolean);
+    let positionalIndex = 0;
+
+    parts.forEach(part => {
+      const labeled = part.match(/^([^:]+)\s*:\s*(.*)$/);
+      const labeledKey = labeled ? computerSpecKeyFromLabel(labeled[1]) : '';
+      if (labeledKey) {
+        result[labeledKey] = labeled[2].trim();
+        return;
+      }
+
+      while (positionalIndex < COMPUTER_SPEC_FIELDS.length && result[COMPUTER_SPEC_FIELDS[positionalIndex].key]) positionalIndex += 1;
+      if (positionalIndex < COMPUTER_SPEC_FIELDS.length) {
+        result[COMPUTER_SPEC_FIELDS[positionalIndex].key] = part;
+        positionalIndex += 1;
+      }
+    });
+
+    return Object.freeze(result);
+  }
+
+  function serializeComputerSpecs(values = {}) {
+    return COMPUTER_SPEC_FIELDS.map(field => {
+      const value = String(values[field.key] || '').trim();
+      return value ? `${field.label}: ${value}` : '';
+    }).filter(Boolean).join(' | ');
+  }
+
+  function serializePersonalityResults(values = {}) {
+    return [
+      ['DISC', values.disc],
+      ['Enneagram', values.enneagram],
+      ['MBTI-style', values.mbti]
+    ].map(([label, rawValue]) => {
+      const value = String(rawValue || '').trim();
+      return value ? `${label}: ${value}` : '';
+    }).filter(Boolean).join(' | ');
+  }
+
   function firstLabeledNumber(text, label) {
     const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const after = text.match(new RegExp(`\\b${escaped}\\b\\s*(?:speed\\s*)?[:=\\-]?\\s*(\\d+(?:\\.\\d+)?)`, 'i'));
@@ -149,6 +210,10 @@
     speedMeterConfiguration,
     mbtiDescriptionFromValue,
     parsePersonalityResults,
+    COMPUTER_SPEC_FIELDS,
+    parseComputerSpecs,
+    serializeComputerSpecs,
+    serializePersonalityResults,
     parseInternetSpeed
   });
 }));

@@ -100,6 +100,7 @@
     summaryColumn.className = 'profile-summary-column';
     details.insertAdjacentElement('beforebegin', summaryColumn);
     summaryColumn.append(details);
+    if (screening) summaryColumn.append(screening);
     const benefitsAvailable = canViewBenefits();
     if (!benefitsAvailable && activeTab === 'benefits') activeTab = 'profile';
 
@@ -114,7 +115,6 @@
     body.append(hero);
     const profilePanel = shell.querySelector('[data-talent-file-panel="profile"]');
     profilePanel.append(stats, layout);
-    if (screening) profilePanel.append(screening);
     const dangerZone = document.createElement('section');
     dangerZone.className = 'talent-profile-danger-zone';
     dangerZone.hidden = true;

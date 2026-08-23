@@ -83,6 +83,68 @@ test('Personality parsing uses explicit result labels instead of positional gues
   assert.equal(unlabeled.enneagram, '');
 });
 
+test('Separate personality editor values serialize back into the legacy combined column', () => {
+  const serialized = helpers.serializePersonalityResults({
+    disc: 'I 42, S 31',
+    enneagram: '',
+    mbti: 'ENFJ-T'
+  });
+  assert.equal(serialized, 'DISC: I 42, S 31 | MBTI-style: ENFJ-T');
+  const parsed = helpers.parsePersonalityResults(serialized);
+  assert.equal(parsed.disc, 'I 42, S 31');
+  assert.equal(parsed.enneagram, '');
+  assert.equal(parsed.mbti, 'ENFJ-T');
+});
+
+test('Separate computer fields support labeled records and legacy positional records', () => {
+  const legacy = helpers.parseComputerSpecs('Windows 11 · Intel i5 · 16 GB RAM · 512 GB SSD');
+  assert.deepEqual({ ...legacy }, {
+    system: 'Windows 11',
+    processor: 'Intel i5',
+    memory: '16 GB RAM',
+    storage: '512 GB SSD',
+    operatingSystem: '',
+    other: ''
+  });
+
+  const serialized = helpers.serializeComputerSpecs({
+    system: 'Laptop',
+    processor: 'Ryzen 7',
+    memory: '',
+    operatingSystem: 'Windows 11 Pro'
+  });
+  assert.equal(serialized, 'System: Laptop | Processor: Ryzen 7 | Operating system: Windows 11 Pro');
+  assert.deepEqual({ ...helpers.parseComputerSpecs(serialized) }, {
+    system: 'Laptop',
+    processor: 'Ryzen 7',
+    memory: '',
+    storage: '',
+    operatingSystem: 'Windows 11 Pro',
+    other: ''
+  });
+});
+
+test('Screening editor exposes optional free-text fields for each personality and computer result', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'operations', 'operations-enhancements.js'), 'utf8');
+  const dialog = source.slice(source.indexOf('<dialog id="screening-results-dialog"'), source.indexOf('</dialog></main>'));
+  [
+    'personality_disc_result',
+    'personality_enneagram_result',
+    'personality_mbti_result',
+    'computer_system',
+    'computer_processor',
+    'computer_memory',
+    'computer_storage',
+    'computer_operating_system',
+    'computer_other'
+  ].forEach(name => assert.match(dialog, new RegExp(`name="${name}"`)));
+  assert.doesNotMatch(dialog, /\brequired\b/);
+  assert.doesNotMatch(dialog, /<select\b/);
+  assert.doesNotMatch(dialog, /name="(?:personality_profile_score|computer_specs)"/);
+  assert.match(source, /serializePersonalityResults\(/);
+  assert.match(source, /serializeComputerSpecs\(/);
+});
+
 test('Production cards retain required practice-score and reference-tier wording', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'operations', 'operations-enhancements.js'), 'utf8');
   assert.match(source, /EF SET Quick Check · practice score/);
