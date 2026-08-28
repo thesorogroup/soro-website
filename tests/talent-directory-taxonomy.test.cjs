@@ -227,6 +227,9 @@ test('the three featured skills represent distinct VA types before repeating a t
   assert.equal((markup.match(/directory-skill-chip directory-area--healthcare/g) || []).length, 1);
   assert.equal((markup.match(/directory-skill-chip directory-area--general-admin/g) || []).length, 1);
   assert.equal((markup.match(/directory-skill-chip directory-area--social-media/g) || []).length, 1);
+  assert.match(markup, /class="directory-va-type-count"[^>]*aria-label="View all 3 VA types and their skills for Multi Area">\+1<\/button>/);
+  assert.doesNotMatch(markup, />3 VA types<\/button>/);
+  assert.match(directoryCss, /\.directory-va-type-count[\s\S]*?color:\s*#244f7a/);
 
   const twoAreas = helpers.featuredSkills(records.filter(skill => skill.areaId !== 'social_media'), 3);
   assert.deepEqual(Array.from(twoAreas, skill => skill.areaId), ['healthcare', 'general_admin', 'healthcare']);

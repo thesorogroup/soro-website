@@ -147,6 +147,25 @@
     line-height: 1.25;
 }
 
+.directory-va-type-count {
+    width: fit-content;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #244f7a;
+    font: inherit;
+    font-size: 0.7rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.directory-va-type-count:hover,
+.directory-va-type-count:focus-visible {
+    color: #0f355c;
+    text-decoration: underline;
+    outline: none;
+}
+
 .directory-area--healthcare {
     --directory-area-bg: #e8f5f2;
     --directory-area-border: #abd8ce;
@@ -360,6 +379,13 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 0.48rem;
     padding: 0.65rem;
+}
+
+.directory-skill-group-empty {
+    margin: 0;
+    padding: 0.72rem;
+    color: #6d7f91;
+    font-size: 0.76rem;
 }
 
 .directory-stage {

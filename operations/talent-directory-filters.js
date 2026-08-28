@@ -520,10 +520,14 @@
         return 'directory-area--uncategorized';
     }
 
-    function vaTypeMarkup(areas) {
+    function vaTypeMarkup(areas, profile) {
+        var profileName = text(profile && profile.full_name) || 'this Talent';
+        var summary = areas.length > 2
+            ? '<button class="directory-va-type-count" type="button" data-directory-skills-id="' + escape(profile && profile.id) + '" aria-label="View all ' + areas.length + ' VA types and their skills for ' + escape(profileName) + '">+' + (areas.length - 2) + '</button>'
+            : '';
         return '<span class="directory-va-type-list">' + areas.slice(0, 2).map(function (areaId) {
             return '<span class="directory-va-type ' + areaColorClass(areaId) + '">' + escape(vaTypeLabel(areaId)) + '</span>';
-        }).join('') + (areas.length > 2 ? '<span class="directory-more-chip">+' + (areas.length - 2) + '</span>' : '') + '</span>';
+        }).join('') + summary + '</span>';
     }
 
     function stageMarkup(stage) {
@@ -539,11 +543,17 @@
             if (!groups.has(areaId)) groups.set(areaId, []);
             groups.get(areaId).push(skill);
         });
-        var groupOrder = WORK_AREAS.map(function (area) { return area.id; }).concat(['uncategorized']);
+        areaIdsFor(profile, skills).forEach(function (areaId) {
+            if (!groups.has(areaId)) groups.set(areaId, []);
+        });
+        var groupOrder = WORK_AREAS.map(function (area) { return area.id; }).concat(['other', 'uncategorized']);
         var counts = skillCounts(skills);
         var groupsMarkup = groupOrder.filter(function (areaId) { return groups.has(areaId); }).map(function (areaId) {
             var groupSkills = groups.get(areaId);
-            return '<section class="directory-skill-group"><div class="directory-skill-group-heading ' + areaColorClass(areaId) + '"><h3>' + escape(vaTypeLabel(areaId)) + '</h3><span>' + groupSkills.length + '</span></div><div class="directory-skill-dialog-grid">' + groupSkills.map(skillChipMarkup).join('') + '</div></section>';
+            var skillsMarkup = groupSkills.length
+                ? '<div class="directory-skill-dialog-grid">' + groupSkills.map(skillChipMarkup).join('') + '</div>'
+                : '<p class="directory-skill-group-empty">No recorded skills under this VA type.</p>';
+            return '<section class="directory-skill-group"><div class="directory-skill-group-heading ' + areaColorClass(areaId) + '"><h3>' + escape(vaTypeLabel(areaId)) + '</h3><span>' + groupSkills.length + '</span></div>' + skillsMarkup + '</section>';
         }).join('');
         return '<div class="directory-skill-dialog-summary"><strong>' + counts.total + ' skills</strong><span>' + counts.verified + ' verified · ' + counts.reported + ' applicant reported' + (counts.legacy ? ' · ' + counts.legacy + ' legacy' : '') + '</span></div>' + groupsMarkup;
     }
@@ -659,7 +669,7 @@
             var initialsValue = typeof window.initials === 'function' ? window.initials(profile.full_name) : text(profile.full_name).slice(0, 2);
             return '<tr class="talent-row" data-talent-id="' + escape(profile.id) + '" tabindex="0" role="link" aria-label="Open ' + escape(profile.full_name) + ' profile">' +
                 '<td><div class="talent-cell"><span class="mini-avatar">' + escape(initialsValue) + '</span><span><strong>' + escape(profile.full_name) + '</strong><small>' + escape(profile.email || 'No email recorded') + '</small></span></div></td>' +
-                '<td>' + vaTypeMarkup(areas) + '</td>' +
+                '<td>' + vaTypeMarkup(areas, profile) + '</td>' +
                 '<td>' + skillMarkup(skills, profile) + '</td>' +
                 '<td>' + yearLabel(yearsFor(profile)) + '</td>' +
                 '<td>' + stageMarkup(stage) + '</td>' +
