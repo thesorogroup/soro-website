@@ -60,7 +60,7 @@ async function requireAdministrator(event) {
   if (!userResponse.ok) return null;
   const user = await userResponse.json();
   if (!user?.id) return null;
-  const accessResponse = await serviceRequest(`/rest/v1/platform_users?id=eq.${encodeURIComponent(user.id)}&active=is.true&role=eq.admin&select=id,organization_id,role&limit=1`);
+  const accessResponse = await serviceRequest(`/rest/v1/platform_users?id=eq.${encodeURIComponent(user.id)}&active=is.true&must_change_password=is.false&role=eq.admin&select=id,organization_id,role&limit=1`);
   const access = (await accessResponse.json())[0];
   return access ? { user, access, tokenFresh: tokenIssuedRecently(token) } : null;
 }

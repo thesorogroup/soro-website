@@ -6,8 +6,9 @@
   const talentStatuses = ['draft', 'submitted', 'in_review', 'needs_more_info', 'pending_on_hold', 'interviewing', 'training', 'bench_ready', 'shortlisted', 'client_review', 'placement_confirmed', 'onboarding', 'active', 'withdrawn', 'not_selected', 'inactive', 'not_eligible'];
   let authorizedRole = null;
   let organizationId = null;
-  const canManageTalent = () => ['admin', 'talent_management'].includes(authorizedRole) && ['admin', 'talent'].includes(role);
-  const canManageClients = () => authorizedRole === 'admin' && role === 'admin';
+  const currentAccessRole = () => String(window.soroCurrentAccess?.role || authorizedRole || '').toLowerCase();
+  const canManageTalent = () => ['admin', 'talent_management'].includes(currentAccessRole());
+  const canManageClients = () => currentAccessRole() === 'admin';
   const database = () => window.soroSupabase;
   const $ = (selector, parent = document) => parent.querySelector(selector);
   const escapeHtml = (value = '') => String(value).replace(/[&<>"]/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[char]));

@@ -2,18 +2,18 @@
 (function () {
   const originalProfilePage = profilePage;
   const originalLoadTalentProfileDocuments = loadTalentProfileDocuments;
-  const benefitsRoles = new Set(['admin', 'talent', 'talent_management']);
-  const payRoles = new Set(['admin', 'billing', 'talent', 'talent_management']);
+  const benefitsRoles = new Set(['admin', 'talent_management']);
+  const payRoles = new Set(['admin', 'billing', 'talent_management']);
   let activeTab = 'profile';
   let lastTalentId = null;
   let contextRequest = 0;
 
   function canViewBenefits() {
-    return benefitsRoles.has(String(typeof role === 'undefined' ? '' : role).toLowerCase());
+    return benefitsRoles.has(String(window.soroCurrentAccess?.role || '').toLowerCase());
   }
 
   function canViewPay() {
-    return payRoles.has(String(typeof role === 'undefined' ? '' : role).toLowerCase());
+    return payRoles.has(String(window.soroCurrentAccess?.role || '').toLowerCase());
   }
 
   function tabButton(name, label, extra = '') {

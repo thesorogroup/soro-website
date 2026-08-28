@@ -5,23 +5,16 @@
   const originalLoadLiveApplicants = loadLiveApplicants;
   const originalClassifyDocument = classifyDocument;
 
-  const privateProfileRoles = new Set([
-    'admin',
-    'sales',
-    'sales_management',
-    'talent',
-    'talent_management',
-    'billing',
-    'va',
-    'virtual_assistant'
-  ]);
-
-  function currentPreviewRole() {
-    return String(typeof role === 'undefined' ? '' : role).toLowerCase();
+  function authenticatedRole() {
+    return String(window.soroCurrentAccess?.role || '').toLowerCase();
   }
 
-  function canViewPrivateLocation() {
-    return privateProfileRoles.has(currentPreviewRole());
+  function canViewPrivateLocation(applicant) {
+    const accessRole = authenticatedRole();
+    if (accessRole === 'admin' || accessRole === 'talent_management') return true;
+    return accessRole === 'virtual_assistant'
+      && Boolean(applicant?.auth_user_id)
+      && applicant.auth_user_id === window.soroCurrentAccess?.user_id;
   }
 
   function addressLines(applicant) {
@@ -31,7 +24,7 @@
   }
 
   function privateAddressMarkup(applicant) {
-    if (!canViewPrivateLocation()) return '';
+    if (!canViewPrivateLocation(applicant)) return '';
     const lines = addressLines(applicant);
     const hasStreetAddress = Boolean(applicant.address_line_1 || applicant.address_line_2 || applicant.city || applicant.province_region);
     const recordedTimeZone = typeof window.recordedTalentTimeZone === 'function'
@@ -87,6 +80,10 @@
   // Selecting all columns keeps this preview compatible before and after the
   // private-address migration is applied to Supabase.
   loadLiveApplicants = async function () {
+    if (typeof viewAllowedForAuthenticatedRole === 'function' && !viewAllowedForAuthenticatedRole('vas')) {
+      liveApplicants = [];
+      return;
+    }
     if (!window.soroSupabase) return originalLoadLiveApplicants();
     const { data: applicants, error } = await window.soroSupabase
       .from('applicants')

@@ -14,7 +14,12 @@
     function saveLocal() { window.localStorage.setItem(storageKey, JSON.stringify(skills)); }
     function activeNames() { return skills.filter(function (skill) { return skill.is_active !== false; }).map(function (skill) { return skill.name; }).sort(function (a, b) { return a.localeCompare(b); }); }
     function setStatus(message, error) { var node = dialog && dialog.querySelector('.skill-library-status'); if (node) { node.textContent = message || ''; node.classList.toggle('is-error', !!error); } }
-    function isAdminPanel() { var heading = document.querySelector('.page-heading h1'); return !!heading && heading.textContent.trim() === 'Admin Panel'; }
+    function isAdminPanel() {
+        var heading = document.querySelector('.page-heading h1');
+        return window.soroCurrentAccess?.role === 'admin'
+            && !!heading
+            && heading.textContent.trim() === 'Admin Panel';
+    }
     function profileUsage() {
         var usage = {};
         (window.liveApplicants || []).forEach(function (profile) {

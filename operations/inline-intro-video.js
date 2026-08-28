@@ -19,7 +19,7 @@
   };
 
 function canEditProfileDetails() {
-  return ['admin', 'talent', 'talent_management'].includes(String(typeof role === 'undefined' ? '' : role).toLowerCase());
+  return ['admin', 'talent_management'].includes(String(window.soroCurrentAccess?.role || '').toLowerCase());
 }
 
   profilePage = function (applicant) {

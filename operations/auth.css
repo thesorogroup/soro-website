@@ -10,3 +10,4 @@
 .auth-card label{display:grid;gap:7px;margin-top:19px;font-weight:700;color:var(--navy)}
 .auth-card input{padding:12px 13px;border:1px solid #cfc2af;border-radius:9px;font:inherit;background:#fff}
 .auth-submit{width:100%;margin-top:24px}.auth-reset{display:block;margin:16px auto 0}.auth-message{min-height:20px;margin:16px 0 0;color:#4d5e6d}.auth-message.error{color:#a8302c}.auth-message.success{color:#14724c}
+.auth-password-hint{margin:11px 0 0;color:#64748b;font-size:12px;line-height:1.45}

@@ -506,6 +506,12 @@
   }
 
   render = function () {
+    if (typeof viewAllowedForAuthenticatedRole === 'function' && !viewAllowedForAuthenticatedRole(current)) {
+      current = 'overview';
+      selectedTalentId = null;
+      history.replaceState({}, '', `${location.pathname}#overview`);
+      setActive();
+    }
     if (current === 'help') {
       root.innerHTML = supportPage();
       return;
@@ -518,7 +524,9 @@
       loadTalentProfileDocuments();
       return;
     }
-    const d = current === 'overview' ? (role === 'admin' ? data.overview : roleDashboards[role]) : data[current];
+    const d = typeof dataAllowedForAuthenticatedRole === 'function'
+      ? dataAllowedForAuthenticatedRole(current, current === 'overview' ? (role === 'admin' ? data.overview : roleDashboards[role]) : data[current])
+      : (current === 'overview' ? (role === 'admin' ? data.overview : roleDashboards[role]) : data[current]);
     const newAction = role === 'talent' ? 'New Talent' : role === 'client' ? 'Request Talent' : role === 'va' ? 'Start Day' : 'New Client';
     const primaryAction = role === 'va' ? 'Start Day' : role === 'client' ? 'Request another Talent' : '+ Add Task';
     root.innerHTML = `<main class="page"><div class="page-heading"><div><p class="eyebrow">Soro Ops</p><h1>${d.title}</h1><p class="eyebrow" style="margin-top:9px">${d.caption}</p></div><div class="heading-actions"><button class="button primary" id="add-task">${primaryAction}</button>${current === 'overview' || current === 'clients' ? `<button class="button" id="new-record">+ ${newAction}</button>` : ''}<button class="button">Customize</button></div></div>${current === 'overview' ? overview(d) : current === 'vas' ? talentDirectory() : table(d)}</main>`;
@@ -564,6 +572,7 @@
   document.getElementById('notifications-dialog').addEventListener('click', event => {
     const action = event.target.closest('[data-notification-view]');
     if (!action) return;
+    if (typeof viewAllowedForAuthenticatedRole === 'function' && !viewAllowedForAuthenticatedRole(action.dataset.notificationView)) return;
     current = action.dataset.notificationView;
     selectedTalentId = null;
     history.pushState({}, '', `${location.pathname}#${current}`);
