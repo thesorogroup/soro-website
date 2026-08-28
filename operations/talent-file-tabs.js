@@ -7,6 +7,8 @@
   let activeTab = 'profile';
   let lastTalentId = null;
   let contextRequest = 0;
+  let folderHeightObserver = null;
+  let folderHeightFallback = null;
 
   function canViewBenefits() {
     return benefitsRoles.has(String(window.soroCurrentAccess?.role || '').toLowerCase());
@@ -47,7 +49,7 @@
 
   function folderArtwork(tabCount = 4) {
     const first = tabGeometry(0, tabCount);
-    return `<svg class="talent-folder-art" viewBox="0 0 1240 434" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="talent-tab-paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf0da"/><stop offset="1" stop-color="#f6e9ce"/></linearGradient><linearGradient id="talent-folder-paper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffdf8"/><stop offset=".48" stop-color="#fffaf0"/><stop offset="1" stop-color="#fff8ec"/></linearGradient><pattern id="talent-paper-grain" width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="2" cy="3" r=".45" fill="#9a7d50" opacity=".09"/><circle cx="8" cy="7" r=".35" fill="#9a7d50" opacity=".07"/></pattern><filter id="talent-folder-shadow" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="13" stdDeviation="15" flood-color="#273746" flood-opacity=".08"/></filter></defs><g class="talent-folder-inactive-tabs">${inactiveTabPaths(tabCount)}</g><path class="talent-folder-shadow" d="M0 58H1240V415Q1240 432 1223 432H17Q0 432 0 415Z"/><path class="talent-folder-paper" d="M0 58H1240V415Q1240 432 1223 432H17Q0 432 0 415Z"/><path d="M0 58H1240V415Q1240 432 1223 432H17Q0 432 0 415Z" fill="url(#talent-paper-grain)" opacity=".7"/><path class="talent-folder-front-lip" d="M0 58H1240V85H0Z"/><path class="talent-folder-outer-edge" d="M0 58V415Q0 432 17 432H1223Q1240 432 1240 415V58"/><path class="talent-folder-top-transition" d="M0 58H1240"/><path class="talent-folder-front-seam" d="M0 85H1240"/><g class="talent-folder-active-tab"><path class="talent-folder-active-fill" d="${first.fill}"/><path class="talent-folder-active-edge" d="${first.edge}"/></g></svg>`;
+    return `<svg class="talent-folder-art" viewBox="0 0 1240 434" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="talent-tab-paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf0da"/><stop offset="1" stop-color="#f6e9ce"/></linearGradient><linearGradient id="talent-folder-paper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffdf8"/><stop offset=".48" stop-color="#fffaf0"/><stop offset="1" stop-color="#fff8ec"/></linearGradient><pattern id="talent-paper-grain" width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="2" cy="3" r=".45" fill="#9a7d50" opacity=".09"/><circle cx="8" cy="7" r=".35" fill="#9a7d50" opacity=".07"/></pattern><filter id="talent-folder-shadow" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="13" stdDeviation="15" flood-color="#273746" flood-opacity=".08"/></filter></defs><g class="talent-folder-inactive-tabs">${inactiveTabPaths(tabCount)}</g><path class="talent-folder-shadow" d="M0 58H1240V415Q1240 432 1223 432H17Q0 432 0 415Z"/><path class="talent-folder-paper" d="M0 58H1240V415Q1240 432 1223 432H17Q0 432 0 415Z"/><path class="talent-folder-grain" d="M0 58H1240V415Q1240 432 1223 432H17Q0 432 0 415Z" fill="url(#talent-paper-grain)" opacity=".7"/><path class="talent-folder-front-lip" d="M0 58H1240V85H0Z"/><path class="talent-folder-outer-edge" d="M0 58V415Q0 432 17 432H1223Q1240 432 1240 415V58"/><path class="talent-folder-top-transition" d="M0 58H1240"/><path class="talent-folder-front-seam" d="M0 85H1240"/><g class="talent-folder-active-tab"><path class="talent-folder-active-fill" d="${first.fill}"/><path class="talent-folder-active-edge" d="${first.edge}"/></g></svg>`;
   }
 
   function paperclipArtwork() {
@@ -65,6 +67,48 @@
     shell.style.setProperty('--folder-tab-count', count);
     const inactive = shell.querySelector('.talent-folder-inactive-tabs');
     if (inactive) inactive.innerHTML = inactiveTabPaths(count);
+  }
+
+  function syncFolderHeight(shell) {
+    const body = shell?.querySelector('.talent-file-body');
+    const art = shell?.querySelector('.talent-folder-art');
+    if (!body || !art) return;
+
+    const bodyHeight = Math.max(374, Math.ceil(body.getBoundingClientRect().height));
+    const bottom = 58 + bodyHeight;
+    const curveStart = bottom - 17;
+    const viewBoxHeight = bottom + 2;
+    const bodyPath = `M0 58H1240V${curveStart}Q1240 ${bottom} 1223 ${bottom}H17Q0 ${bottom} 0 ${curveStart}Z`;
+    const edgePath = `M0 58V${curveStart}Q0 ${bottom} 17 ${bottom}H1223Q1240 ${bottom} 1240 ${curveStart}V58`;
+
+    art.setAttribute('viewBox', `0 0 1240 ${viewBoxHeight}`);
+    art.style.height = `${viewBoxHeight + 8}px`;
+    art.querySelector('.talent-folder-shadow')?.setAttribute('d', bodyPath);
+    art.querySelector('.talent-folder-paper')?.setAttribute('d', bodyPath);
+    art.querySelector('.talent-folder-grain')?.setAttribute('d', bodyPath);
+    art.querySelector('.talent-folder-outer-edge')?.setAttribute('d', edgePath);
+  }
+
+  function watchFolderHeight(shell) {
+    if (!shell) return;
+    folderHeightObserver?.disconnect();
+    if (folderHeightFallback) window.removeEventListener('resize', folderHeightFallback);
+    syncFolderHeight(shell);
+
+    if (typeof ResizeObserver === 'function') {
+      folderHeightObserver = new ResizeObserver(() => syncFolderHeight(shell));
+      folderHeightObserver.observe(shell.querySelector('.talent-file-body'));
+      return;
+    }
+
+    folderHeightFallback = () => syncFolderHeight(shell);
+    window.addEventListener('resize', folderHeightFallback);
+  }
+
+  function scheduleFolderHeightSync() {
+    const run = () => watchFolderHeight(document.querySelector('.talent-file-shell'));
+    if (typeof queueMicrotask === 'function') queueMicrotask(run);
+    else setTimeout(run, 0);
   }
 
   function benefitsPanel(applicant) {
@@ -180,6 +224,7 @@
     shell.querySelector('[data-talent-file-panel="documents"]').append(documents);
     if (firstDialog && firstDialog.parentElement !== main) main.append(firstDialog);
     activateTab(activeTab, shell);
+    scheduleFolderHeightSync();
     return template.innerHTML;
   };
 
@@ -247,6 +292,7 @@
 
   loadTalentProfileDocuments = async function () {
     await originalLoadTalentProfileDocuments();
+    watchFolderHeight(document.querySelector('.talent-file-shell'));
     const applicant = liveApplicants.find(item => item.id === selectedTalentId);
     await loadTalentFileContext(applicant);
   };

@@ -13,8 +13,10 @@ const initialsStart = enhancementsSource.indexOf('function talentInitials');
 const initialsEnd = enhancementsSource.indexOf('const pronounLabels', initialsStart);
 const screeningStart = enhancementsSource.indexOf('function percentageValue');
 const screeningEnd = enhancementsSource.indexOf('function personalityCard', screeningStart);
+const folderHeightStart = tabsSource.indexOf('function syncFolderHeight');
+const folderHeightEnd = tabsSource.indexOf('function watchFolderHeight', folderHeightStart);
 
-if (initialsStart < 0 || initialsEnd < 0 || screeningStart < 0 || screeningEnd < 0) throw new Error('Profile display helpers could not be located.');
+if (initialsStart < 0 || initialsEnd < 0 || screeningStart < 0 || screeningEnd < 0 || folderHeightStart < 0 || folderHeightEnd < 0) throw new Error('Profile display helpers could not be located.');
 
 const context = {
   escapeHtml: value => String(value ?? ''),
@@ -25,6 +27,25 @@ const context = {
 vm.createContext(context);
 vm.runInContext(enhancementsSource.slice(initialsStart, initialsEnd), context);
 vm.runInContext(enhancementsSource.slice(screeningStart, screeningEnd), context);
+vm.runInContext(tabsSource.slice(folderHeightStart, folderHeightEnd), context);
+
+function folderHeightFixture(bodyHeight) {
+  const attributes = {};
+  const paths = Object.fromEntries([
+    '.talent-folder-shadow',
+    '.talent-folder-paper',
+    '.talent-folder-grain',
+    '.talent-folder-outer-edge'
+  ].map(selector => [selector, { setAttribute(name, value) { attributes[`${selector}:${name}`] = value; } }]));
+  const body = { getBoundingClientRect: () => ({ height: bodyHeight }) };
+  const art = {
+    style: {},
+    setAttribute(name, value) { attributes[`art:${name}`] = value; },
+    querySelector: selector => paths[selector]
+  };
+  const shell = { querySelector: selector => selector === '.talent-file-body' ? body : selector === '.talent-folder-art' ? art : null };
+  return { shell, art, attributes };
+}
 
 test('Talent initials use first-name then last-name order', () => {
   assert.equal(context.talentInitials('Johnson, Matthew Alan'), 'MJ');
@@ -52,10 +73,29 @@ test('The approved folder is one continuous vector and the screening column rema
   assert.match(tabsSource, /M31 13\.5C31 2\.5 8 2\.5 8 22v70/);
   assert.doesNotMatch(tabsSource, /talent-paperclip-pocket/);
   assert.match(tabsSource, /function syncFolderArt\(shell\)/);
+  assert.match(tabsSource, /function syncFolderHeight\(shell\)/);
+  assert.match(tabsSource, /Math\.max\(374, Math\.ceil\(body\.getBoundingClientRect\(\)\.height\)\)/);
+  assert.match(tabsSource, /folderHeightObserver = new ResizeObserver/);
+  assert.match(tabsSource, /art\.querySelector\('\.talent-folder-outer-edge'\)\?\.setAttribute\('d', edgePath\)/);
+  assert.match(tabsSource, /scheduleFolderHeightSync\(\);/);
   assert.match(tabsSource, /const width = 1240 \/ count/);
   assert.match(tabsSource, /syncFolderArt\(shell\);\s*activateTab\(activeTab, shell\)/);
   assert.match(tabsSource, /summaryColumn\.append\(screening\)/);
   assert.doesNotMatch(tabsSource, /profilePanel\.append\(screening\)/);
+});
+
+test('The folder lower edge expands with long header content without changing its approved minimum', () => {
+  const baseline = folderHeightFixture(360);
+  context.syncFolderHeight(baseline.shell);
+  assert.equal(baseline.attributes['art:viewBox'], '0 0 1240 434');
+  assert.equal(baseline.art.style.height, '442px');
+  assert.equal(baseline.attributes['.talent-folder-outer-edge:d'], 'M0 58V415Q0 432 17 432H1223Q1240 432 1240 415V58');
+
+  const expanded = folderHeightFixture(510.4);
+  context.syncFolderHeight(expanded.shell);
+  assert.equal(expanded.attributes['art:viewBox'], '0 0 1240 571');
+  assert.equal(expanded.art.style.height, '579px');
+  assert.equal(expanded.attributes['.talent-folder-outer-edge:d'], 'M0 58V552Q0 569 17 569H1223Q1240 569 1240 552V58');
 });
 
 test('English score extraction prefers the numerator in an x/100 result', () => {

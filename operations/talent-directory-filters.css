@@ -1,8 +1,17 @@
 .directory-filters-grid {
     display: grid;
-    grid-template-columns: minmax(240px, 1.8fr) repeat(4, minmax(132px, 0.55fr));
+    grid-template-columns: repeat(4, minmax(155px, 1fr));
     gap: 12px;
     align-items: end;
+}
+
+.directory-search--wide {
+    grid-column: span 2;
+}
+
+.directory-filters-grid .directory-count {
+    grid-column: 1 / -1;
+    justify-self: end;
 }
 
 .directory-filter-control {
@@ -27,6 +36,10 @@
 
 .talent-directory-table th {
     white-space: nowrap;
+}
+
+.talent-directory-table {
+    min-width: 1180px;
 }
 
 .directory-sort-button {
@@ -67,19 +80,115 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.32rem;
-    max-width: 250px;
+    max-width: 285px;
 }
 
 .directory-skill-chip {
-    display: inline-flex;
-    align-items: center;
-    min-height: 1.45rem;
-    padding: 0.15rem 0.45rem;
-    border-radius: 999px;
+    display: grid;
+    gap: 0.08rem;
+    min-height: 1.75rem;
+    padding: 0.25rem 0.48rem;
+    border: 1px solid #d7e4ef;
+    border-radius: 8px;
     background: #edf5fb;
     color: #28557d;
     font-size: 0.72rem;
     line-height: 1.2;
+}
+
+.directory-skill-chip small {
+    color: #718399;
+    font-size: 0.58rem;
+    font-weight: 700;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+}
+
+.directory-skill-chip.is-verified {
+    border-color: #b8dfd3;
+    background: #e8f7f2;
+    color: #176453;
+}
+
+.directory-skill-chip.is-verified small {
+    color: #287565;
+}
+
+.directory-skill-chip.is-reported {
+    border-color: #d7e4ef;
+    background: #f3f7fb;
+}
+
+.directory-skill-chip.is-legacy {
+    border-color: #e5ddd0;
+    background: #faf6ef;
+    color: #685a44;
+}
+
+.directory-va-type-list {
+    display: grid;
+    gap: 0.28rem;
+    min-width: 150px;
+}
+
+.directory-va-type {
+    color: #173b65;
+    font-size: 0.78rem;
+    font-weight: 750;
+    line-height: 1.25;
+}
+
+.directory-more-chip {
+    align-self: center;
+    color: #65798f;
+    font-size: 0.7rem;
+    font-weight: 700;
+}
+
+.directory-stage {
+    display: inline-flex;
+    align-items: center;
+    min-height: 1.65rem;
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    background: #eef3f8;
+    color: #244e77;
+    font-size: 0.75rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.directory-stage--bench,
+.directory-stage--active {
+    background: #e7f7f1;
+    color: #176453;
+}
+
+.directory-stage--matching,
+.directory-stage--matched,
+.directory-stage--onboarding {
+    background: #fff1df;
+    color: #8a4d16;
+}
+
+.directory-stage--closed,
+.directory-stage--inactive,
+.directory-stage--archived {
+    background: #f3f1ef;
+    color: #73675e;
+}
+
+.directory-client {
+    display: block;
+    max-width: 170px;
+    color: #173b65;
+    line-height: 1.3;
+}
+
+.directory-client-start {
+    color: #173b65;
+    font-weight: 700;
+    white-space: nowrap;
 }
 
 .directory-muted {
@@ -97,6 +206,10 @@
     .directory-filters-grid {
         grid-template-columns: minmax(260px, 1fr) repeat(2, minmax(150px, 0.5fr));
     }
+
+    .directory-search--wide {
+        grid-column: span 1;
+    }
 }
 
 @media (max-width: 760px) {
@@ -106,5 +219,18 @@
 
     .directory-skill-list {
         max-width: none;
+    }
+
+    .directory-filters-grid .directory-count {
+        justify-self: start;
+    }
+
+    /* The former directory hid columns 4 and 5 on phones. Those positions now
+       contain Experience and Stage, so keep them available in the scrollable table. */
+    .talent-directory-table th:nth-child(4),
+    .talent-directory-table td:nth-child(4),
+    .talent-directory-table th:nth-child(5),
+    .talent-directory-table td:nth-child(5) {
+        display: table-cell;
     }
 }
