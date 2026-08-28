@@ -98,6 +98,7 @@
     var supplementalLoadingKey = '';
     var placementKey = '';
     var placementLoadingKey = '';
+    var lastSkillsDialogTrigger = null;
 
     var filterState = {
         vaType: 'all',
@@ -469,24 +470,117 @@
         return (text(a).localeCompare(text(b), undefined, { sensitivity: 'base', numeric: true }) * direction) || text(left.full_name).localeCompare(text(right.full_name));
     }
 
-    function skillMarkup(skills) {
+    function skillChipMarkup(skill) {
+        var evidenceClass = skill.verified ? ' is-verified' : skill.reported ? ' is-reported' : ' is-legacy';
+        var evidence = skill.verified ? '<small>Verified</small>' : skill.reported ? '<small>Applicant reported</small>' : '<small>Legacy</small>';
+        return '<span class="directory-skill-chip ' + areaColorClass(skill.areaId) + evidenceClass + '"><span>' + escape(skill.label) + '</span>' + evidence + '</span>';
+    }
+
+    function skillCounts(skills) {
+        return {
+            total: skills.length,
+            verified: skills.filter(function (skill) { return skill.verified; }).length,
+            reported: skills.filter(function (skill) { return !skill.verified && skill.reported; }).length,
+            legacy: skills.filter(function (skill) { return !skill.verified && !skill.reported; }).length
+        };
+    }
+
+    function featuredSkills(skills, limit) {
+        var maximum = Math.max(0, Number(limit) || 0);
+        var featured = [];
+        var representedAreas = new Set();
+        skills.forEach(function (skill) {
+            if (!AREA_BY_ID.has(skill.areaId)) return;
+            var areaId = skill.areaId;
+            if (featured.length >= maximum || representedAreas.has(areaId)) return;
+            featured.push(skill);
+            representedAreas.add(areaId);
+        });
+        skills.forEach(function (skill) {
+            if (featured.length >= maximum || featured.includes(skill)) return;
+            featured.push(skill);
+        });
+        return featured;
+    }
+
+    function skillMarkup(skills, profile) {
         if (!skills.length) return '<span class="directory-muted">Not recorded</span>';
-        return '<span class="directory-skill-list">' + skills.slice(0, 3).map(function (skill) {
-            var evidenceClass = skill.verified ? ' is-verified' : skill.reported ? ' is-reported' : ' is-legacy';
-            var evidence = skill.verified ? '<small>Verified</small>' : skill.reported ? '<small>Applicant reported</small>' : '<small>Legacy</small>';
-            return '<span class="directory-skill-chip' + evidenceClass + '"><span>' + escape(skill.label) + '</span>' + evidence + '</span>';
-        }).join('') + (skills.length > 3 ? '<span class="directory-more-chip">+' + (skills.length - 3) + '</span>' : '') + '</span>';
+        var counts = skillCounts(skills);
+        var evidenceSummary = counts.verified + ' verified · ' + counts.reported + ' reported' + (counts.legacy ? ' · ' + counts.legacy + ' legacy' : '');
+        var profileName = text(profile && profile.full_name) || 'this Talent';
+        var summary = counts.total > 3
+            ? '<span class="directory-skill-summary"><button type="button" data-directory-skills-id="' + escape(profile && profile.id) + '" aria-label="View all ' + counts.total + ' skills for ' + escape(profileName) + '">' + counts.total + ' skills</button><small>' + evidenceSummary + '</small></span>'
+            : '';
+        return '<span class="directory-skill-list">' + featuredSkills(skills, 3).map(skillChipMarkup).join('') + summary + '</span>';
+    }
+
+    function areaColorClass(areaId) {
+        if (AREA_BY_ID.has(areaId)) return 'directory-area--' + areaId.replace(/_/g, '-');
+        if (areaId === 'other') return 'directory-area--other';
+        return 'directory-area--uncategorized';
     }
 
     function vaTypeMarkup(areas) {
         return '<span class="directory-va-type-list">' + areas.slice(0, 2).map(function (areaId) {
-            return '<span class="directory-va-type">' + escape(vaTypeLabel(areaId)) + '</span>';
+            return '<span class="directory-va-type ' + areaColorClass(areaId) + '">' + escape(vaTypeLabel(areaId)) + '</span>';
         }).join('') + (areas.length > 2 ? '<span class="directory-more-chip">+' + (areas.length - 2) + '</span>' : '') + '</span>';
     }
 
     function stageMarkup(stage) {
         var className = normalize(stage).replace(/\s+/g, '-');
         return '<span class="directory-stage directory-stage--' + escape(className) + '">' + escape(stage) + '</span>';
+    }
+
+    function skillDialogBodyMarkup(profile) {
+        var skills = skillRecordsFor(profile);
+        var groups = new Map();
+        skills.forEach(function (skill) {
+            var areaId = AREA_BY_ID.has(skill.areaId) ? skill.areaId : 'uncategorized';
+            if (!groups.has(areaId)) groups.set(areaId, []);
+            groups.get(areaId).push(skill);
+        });
+        var groupOrder = WORK_AREAS.map(function (area) { return area.id; }).concat(['uncategorized']);
+        var counts = skillCounts(skills);
+        var groupsMarkup = groupOrder.filter(function (areaId) { return groups.has(areaId); }).map(function (areaId) {
+            var groupSkills = groups.get(areaId);
+            return '<section class="directory-skill-group"><div class="directory-skill-group-heading ' + areaColorClass(areaId) + '"><h3>' + escape(vaTypeLabel(areaId)) + '</h3><span>' + groupSkills.length + '</span></div><div class="directory-skill-dialog-grid">' + groupSkills.map(skillChipMarkup).join('') + '</div></section>';
+        }).join('');
+        return '<div class="directory-skill-dialog-summary"><strong>' + counts.total + ' skills</strong><span>' + counts.verified + ' verified · ' + counts.reported + ' applicant reported' + (counts.legacy ? ' · ' + counts.legacy + ' legacy' : '') + '</span></div>' + groupsMarkup;
+    }
+
+    function skillsDialogMarkup() {
+        return '<dialog id="talent-skills-dialog" class="directory-skill-dialog" aria-labelledby="talent-skills-dialog-title"><div class="directory-skill-dialog-frame"><header><div><p>Matching profile</p><h2 id="talent-skills-dialog-title">Skills &amp; experience</h2><span id="talent-skills-dialog-subtitle">Grouped by VA type</span></div><button type="button" data-directory-skills-close aria-label="Close skills">×</button></header><div class="directory-skill-dialog-body" data-directory-skills-body></div></div></dialog>';
+    }
+
+    function ensureSkillsDialog() {
+        var dialog = document.getElementById('talent-skills-dialog');
+        if (dialog) return dialog;
+        var template = document.createElement('template');
+        template.innerHTML = skillsDialogMarkup();
+        dialog = template.content.firstElementChild;
+        document.body.appendChild(dialog);
+        dialog.addEventListener('close', function () {
+            if (lastSkillsDialogTrigger && lastSkillsDialogTrigger.isConnected) lastSkillsDialogTrigger.focus();
+            lastSkillsDialogTrigger = null;
+        });
+        return dialog;
+    }
+
+    function openSkillsDialog(profileId, trigger) {
+        var profile = (Array.isArray(liveApplicants) ? liveApplicants : []).find(function (candidate) { return text(candidate.id) === text(profileId); });
+        var dialog = ensureSkillsDialog();
+        if (!profile || !dialog) return;
+        lastSkillsDialogTrigger = trigger || null;
+        var title = dialog.querySelector('#talent-skills-dialog-title');
+        var subtitle = dialog.querySelector('#talent-skills-dialog-subtitle');
+        var body = dialog.querySelector('[data-directory-skills-body]');
+        if (title) title.textContent = profile.full_name || 'Talent skills';
+        if (subtitle) subtitle.textContent = 'Skills grouped by VA type';
+        if (body) body.innerHTML = skillDialogBodyMarkup(profile);
+        if (typeof dialog.showModal === 'function') dialog.showModal();
+        else dialog.setAttribute('open', '');
+        var closeButton = dialog.querySelector('[data-directory-skills-close]');
+        if (closeButton) closeButton.focus();
     }
 
     function applicantIdsKey() {
@@ -566,7 +660,7 @@
             return '<tr class="talent-row" data-talent-id="' + escape(profile.id) + '" tabindex="0" role="link" aria-label="Open ' + escape(profile.full_name) + ' profile">' +
                 '<td><div class="talent-cell"><span class="mini-avatar">' + escape(initialsValue) + '</span><span><strong>' + escape(profile.full_name) + '</strong><small>' + escape(profile.email || 'No email recorded') + '</small></span></div></td>' +
                 '<td>' + vaTypeMarkup(areas) + '</td>' +
-                '<td>' + skillMarkup(skills) + '</td>' +
+                '<td>' + skillMarkup(skills, profile) + '</td>' +
                 '<td>' + yearLabel(yearsFor(profile)) + '</td>' +
                 '<td>' + stageMarkup(stage) + '</td>' +
                 '<td>' + (clientName ? '<strong class="directory-client">' + escape(clientName) + '</strong>' : '<span class="directory-muted">Not matched</span>') + '</td>' +
@@ -635,15 +729,39 @@
     }, true);
 
     document.addEventListener('click', function (event) {
-        var button = event.target && event.target.closest('[data-talent-sort]');
-        if (!button) return;
+        var skillButton = event.target && event.target.closest('[data-directory-skills-id]');
+        var closeButton = event.target && event.target.closest('[data-directory-skills-close]');
+        var dialog = event.target && event.target.closest('#talent-skills-dialog');
+        if (skillButton) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            openSkillsDialog(skillButton.getAttribute('data-directory-skills-id'), skillButton);
+            return;
+        }
+        if (closeButton || (dialog && event.target === dialog)) {
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            if (dialog && typeof dialog.close === 'function') dialog.close();
+            else if (dialog) dialog.removeAttribute('open');
+            return;
+        }
+        var sortButtonElement = event.target && event.target.closest('[data-talent-sort]');
+        if (!sortButtonElement) return;
         event.preventDefault();
         event.stopImmediatePropagation();
-        var column = button.getAttribute('data-talent-sort');
+        var column = sortButtonElement.getAttribute('data-talent-sort');
         var activeColumn = sortColumnFor(filterState.sort);
         var activeDirection = sortDirectionFor(filterState.sort);
         filterState.sort = column + '-' + (activeColumn === column && activeDirection === 'asc' ? 'desc' : 'asc');
         render();
+    }, true);
+
+    document.addEventListener('keydown', function (event) {
+        var skillButton = event.target && event.target.closest('[data-directory-skills-id]');
+        if (!skillButton || (event.key !== 'Enter' && event.key !== ' ')) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        openSkillsDialog(skillButton.getAttribute('data-directory-skills-id'), skillButton);
     }, true);
 
     window.addEventListener('soro:skill-library-updated', function () {

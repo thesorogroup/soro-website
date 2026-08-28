@@ -80,18 +80,22 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.32rem;
-    max-width: 285px;
+    width: 270px;
+    max-width: 270px;
 }
 
 .directory-skill-chip {
+    --directory-area-bg: #f1f4f7;
+    --directory-area-border: #d5dde5;
+    --directory-area-text: #485b6e;
     display: grid;
     gap: 0.08rem;
     min-height: 1.75rem;
     padding: 0.25rem 0.48rem;
-    border: 1px solid #d7e4ef;
+    border: 1px solid var(--directory-area-border);
     border-radius: 8px;
-    background: #edf5fb;
-    color: #28557d;
+    background: var(--directory-area-bg);
+    color: var(--directory-area-text);
     font-size: 0.72rem;
     line-height: 1.2;
 }
@@ -105,24 +109,19 @@
 }
 
 .directory-skill-chip.is-verified {
-    border-color: #b8dfd3;
-    background: #e8f7f2;
-    color: #176453;
+    box-shadow: inset 3px 0 0 #26806f;
 }
 
 .directory-skill-chip.is-verified small {
-    color: #287565;
+    color: #176453;
 }
 
-.directory-skill-chip.is-reported {
-    border-color: #d7e4ef;
-    background: #f3f7fb;
+.directory-skill-chip.is-reported small {
+    color: #65778a;
 }
 
 .directory-skill-chip.is-legacy {
-    border-color: #e5ddd0;
-    background: #faf6ef;
-    color: #685a44;
+    border-style: dashed;
 }
 
 .directory-va-type-list {
@@ -132,10 +131,57 @@
 }
 
 .directory-va-type {
-    color: #173b65;
+    --directory-area-bg: #f1f4f7;
+    --directory-area-border: #d5dde5;
+    --directory-area-text: #485b6e;
+    display: inline-flex;
+    width: fit-content;
+    max-width: 180px;
+    padding: 0.28rem 0.5rem;
+    border: 1px solid var(--directory-area-border);
+    border-radius: 7px;
+    background: var(--directory-area-bg);
+    color: var(--directory-area-text);
     font-size: 0.78rem;
     font-weight: 750;
     line-height: 1.25;
+}
+
+.directory-area--healthcare {
+    --directory-area-bg: #e8f5f2;
+    --directory-area-border: #abd8ce;
+    --directory-area-text: #155f54;
+}
+
+.directory-area--general-admin {
+    --directory-area-bg: #eaf2fb;
+    --directory-area-border: #b8cfe8;
+    --directory-area-text: #214f7b;
+}
+
+.directory-area--social-media {
+    --directory-area-bg: #f1ecfa;
+    --directory-area-border: #d0c0eb;
+    --directory-area-text: #59457e;
+}
+
+.directory-area--customer-support {
+    --directory-area-bg: #fff4df;
+    --directory-area-border: #eacb8d;
+    --directory-area-text: #77531b;
+}
+
+.directory-area--ecommerce {
+    --directory-area-bg: #fcedea;
+    --directory-area-border: #e8b8ac;
+    --directory-area-text: #7a3f36;
+}
+
+.directory-area--other,
+.directory-area--uncategorized {
+    --directory-area-bg: #f1f3f5;
+    --directory-area-border: #d6dce2;
+    --directory-area-text: #4e5b68;
 }
 
 .directory-more-chip {
@@ -143,6 +189,177 @@
     color: #65798f;
     font-size: 0.7rem;
     font-weight: 700;
+}
+
+.directory-skill-summary {
+    display: grid;
+    justify-items: start;
+    gap: 0.08rem;
+    width: 100%;
+    margin-top: 0.2rem;
+    color: #64778b;
+    font-size: 0.68rem;
+    font-weight: 700;
+}
+
+.directory-skill-summary small {
+    color: #718399;
+    font-size: 0.6rem;
+}
+
+.directory-skill-summary button {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #244f7a;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.directory-skill-summary button:hover,
+.directory-skill-summary button:focus-visible {
+    color: #0f355c;
+    text-decoration: underline;
+    outline: none;
+}
+
+.directory-skill-dialog {
+    width: min(650px, calc(100vw - 32px));
+    max-height: min(780px, calc(100vh - 40px));
+    padding: 0;
+    border: 1px solid #cad8e5;
+    border-radius: 18px;
+    background: #fffdf9;
+    color: #12355d;
+    box-shadow: 0 24px 65px rgb(19 44 73 / 0.2);
+}
+
+.directory-skill-dialog::backdrop {
+    background: rgb(12 32 57 / 0.4);
+    backdrop-filter: blur(2px);
+}
+
+.directory-skill-dialog-frame {
+    display: grid;
+    max-height: inherit;
+}
+
+.directory-skill-dialog header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.15rem 1.25rem;
+    border-bottom: 1px solid #dbe4ed;
+    background: #fffaf1;
+}
+
+.directory-skill-dialog header p,
+.directory-skill-dialog header h2,
+.directory-skill-dialog header span {
+    margin: 0;
+}
+
+.directory-skill-dialog header p {
+    color: #6c7f93;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+}
+
+.directory-skill-dialog header h2 {
+    margin-top: 0.12rem;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.55rem;
+}
+
+.directory-skill-dialog header span {
+    display: block;
+    margin-top: 0.15rem;
+    color: #61758a;
+    font-size: 0.78rem;
+}
+
+.directory-skill-dialog header button {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border: 1px solid #cbd8e5;
+    border-radius: 9px;
+    background: #fff;
+    color: #173b65;
+    font-size: 1.3rem;
+    cursor: pointer;
+}
+
+.directory-skill-dialog-body {
+    display: grid;
+    gap: 0.9rem;
+    padding: 1rem 1.25rem 1.3rem;
+    overflow-y: auto;
+}
+
+.directory-skill-dialog-summary {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-bottom: 0.1rem;
+}
+
+.directory-skill-dialog-summary strong {
+    color: #12355d;
+    font-size: 0.95rem;
+}
+
+.directory-skill-dialog-summary span {
+    color: #60758a;
+    font-size: 0.74rem;
+}
+
+.directory-skill-group {
+    overflow: hidden;
+    border: 1px solid #d8e2eb;
+    border-radius: 12px;
+    background: #fff;
+}
+
+.directory-skill-group-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.58rem 0.72rem;
+    border-bottom: 1px solid var(--directory-area-border);
+    background: var(--directory-area-bg);
+    color: var(--directory-area-text);
+}
+
+.directory-skill-group-heading h3 {
+    margin: 0;
+    font-size: 0.82rem;
+}
+
+.directory-skill-group-heading > span {
+    display: grid;
+    place-items: center;
+    min-width: 1.6rem;
+    height: 1.6rem;
+    border-radius: 999px;
+    background: rgb(255 255 255 / 0.72);
+    font-size: 0.7rem;
+    font-weight: 800;
+}
+
+.directory-skill-dialog-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.48rem;
+    padding: 0.65rem;
 }
 
 .directory-stage {
@@ -218,7 +435,30 @@
     }
 
     .directory-skill-list {
+        width: 250px;
+        max-width: 250px;
+    }
+
+    .directory-skill-dialog-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .directory-skill-dialog {
+        width: 100%;
         max-width: none;
+        max-height: 85dvh;
+        margin: auto 0 0;
+        border-radius: 18px 18px 0 0;
+    }
+
+    .directory-skill-dialog-frame {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+
+    .directory-skill-dialog-summary {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 0.2rem;
     }
 
     .directory-filters-grid .directory-count {

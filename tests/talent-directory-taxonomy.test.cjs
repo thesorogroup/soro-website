@@ -52,6 +52,7 @@ function loadDirectory(profiles = [], librarySkills = []) {
       skillRecordsFor,
       areaIdsFor,
       vaTypeLabel,
+      featuredSkills,
       groupedStage,
       currentPlacementFromList,
       placementClientName,
@@ -123,6 +124,119 @@ test('applicant-reported and verified skill evidence remain separate while dedup
   const markup = window.talentDirectory();
   assert.match(markup, /Medical coding support[\s\S]*?<small>Verified<\/small>/);
   assert.match(markup, /Patient intake and demographic updates[\s\S]*?<small>Applicant reported<\/small>/);
+});
+
+test('VA types and their canonical skills share an accessible field color class', () => {
+  const { window } = loadDirectory([{
+    id: 'colored',
+    full_name: 'Colored Applicant',
+    status: 'submitted',
+    self_reported_experience_areas: ['healthcare', 'social_media'],
+    self_reported_skills: [
+      'Medical coding support (ICD-10, CPT, or HCPCS)',
+      'Content-calendar planning'
+    ],
+    verified_skills: ['Medical coding support (ICD-10, CPT, or HCPCS)']
+  }]);
+  const markup = window.talentDirectory();
+
+  assert.match(markup, /directory-va-type directory-area--healthcare[^>]*>Medical &amp; Healthcare VA/);
+  assert.match(markup, /directory-va-type directory-area--social-media[^>]*>Social Media &amp; Digital Marketing VA/);
+  assert.match(markup, /directory-skill-chip directory-area--healthcare is-verified/);
+  assert.match(markup, /directory-skill-chip directory-area--social-media is-reported/);
+  assert.match(directoryCss, /\.directory-area--healthcare[\s\S]*?--directory-area-bg:\s*#e8f5f2/);
+  assert.match(directoryCss, /\.directory-area--general-admin[\s\S]*?--directory-area-bg:\s*#eaf2fb/);
+  assert.match(directoryCss, /\.directory-area--social-media[\s\S]*?--directory-area-bg:\s*#f1ecfa/);
+  assert.match(directoryCss, /\.directory-area--customer-support[\s\S]*?--directory-area-bg:\s*#fff4df/);
+  assert.match(directoryCss, /\.directory-area--ecommerce[\s\S]*?--directory-area-bg:\s*#fcedea/);
+
+  const neutralMarkup = loadDirectory([{
+    id: 'neutral',
+    full_name: 'Neutral Applicant',
+    status: 'submitted',
+    self_reported_experience_areas: ['other'],
+    self_reported_skills: ['Custom specialty <script>alert(1)</script>']
+  }]).window.talentDirectory();
+  assert.match(neutralMarkup, /directory-va-type directory-area--other[^>]*>Other specialty/);
+  assert.match(neutralMarkup, /directory-skill-chip directory-area--uncategorized is-reported/);
+  assert.doesNotMatch(neutralMarkup, /directory-area--custom-specialty|directory-area--script/);
+});
+
+test('large skill sets stay compact and open a grouped one-click skills dialog', () => {
+  const healthcareSkills = [
+    'Patient appointment scheduling and confirmation',
+    'Patient intake and demographic updates',
+    'Patient reminder calls and non-clinical follow-up',
+    'Insurance eligibility and benefits verification',
+    'Prior authorization and referral coordination',
+    'Medical billing and payment-posting support',
+    'Claims preparation and follow-up',
+    'Medical coding support (ICD-10, CPT, or HCPCS)',
+    'EHR/EMR data entry and chart maintenance',
+    'Medical-record requests and document routing'
+  ];
+  const { window } = loadDirectory([{
+    id: 'many-skills',
+    full_name: 'Many Skills',
+    status: 'submitted',
+    self_reported_experience_areas: ['healthcare'],
+    self_reported_skills: healthcareSkills,
+    verified_skills: healthcareSkills.slice(0, 2)
+  }]);
+  const markup = window.talentDirectory();
+
+  assert.equal((markup.match(/<span class="directory-skill-chip/g) || []).length, 3);
+  assert.match(markup, /data-directory-skills-id="many-skills" aria-label="View all 10 skills for Many Skills">10 skills<\/button><small>2 verified · 8 reported<\/small>/);
+  assert.doesNotMatch(markup, />View all<\/button>/);
+  assert.doesNotMatch(markup, /<dialog id="talent-skills-dialog"/);
+  assert.match(directorySource, /<dialog id="talent-skills-dialog"/);
+  assert.match(directorySource, /function ensureSkillsDialog\(\)/);
+  assert.match(directorySource, /lastSkillsDialogTrigger\.focus\(\)/);
+  assert.match(directorySource, /event\.key !== 'Enter' && event\.key !== ' '/);
+  assert.match(directorySource, /function skillDialogBodyMarkup\(profile\)/);
+  assert.match(directorySource, /Skills grouped by VA type/);
+  assert.match(directoryCss, /\.directory-skill-list[\s\S]*?width:\s*270px/);
+  assert.match(directoryCss, /\.directory-skill-dialog-grid[\s\S]*?repeat\(2, minmax\(0, 1fr\)\)/);
+});
+
+test('the three featured skills represent distinct VA types before repeating a type', () => {
+  const profile = {
+    id: 'multi-area',
+    full_name: 'Multi Area',
+    status: 'submitted',
+    self_reported_experience_areas: ['healthcare', 'general_admin', 'social_media'],
+    self_reported_skills: [
+      'Medical coding support (ICD-10, CPT, or HCPCS)',
+      'Insurance eligibility and benefits verification',
+      'Email and inbox management',
+      'Content-calendar planning'
+    ],
+    verified_skills: [
+      'Medical coding support (ICD-10, CPT, or HCPCS)',
+      'Insurance eligibility and benefits verification'
+    ]
+  };
+  const { helpers, window } = loadDirectory([profile]);
+  const records = helpers.skillRecordsFor(profile);
+  const featured = helpers.featuredSkills(records, 3);
+
+  assert.deepEqual(Array.from(featured, skill => skill.areaId).sort(), ['general_admin', 'healthcare', 'social_media']);
+  assert.equal(featured[0].verified, true);
+
+  const markup = window.talentDirectory();
+  assert.equal((markup.match(/directory-skill-chip directory-area--healthcare/g) || []).length, 1);
+  assert.equal((markup.match(/directory-skill-chip directory-area--general-admin/g) || []).length, 1);
+  assert.equal((markup.match(/directory-skill-chip directory-area--social-media/g) || []).length, 1);
+
+  const twoAreas = helpers.featuredSkills(records.filter(skill => skill.areaId !== 'social_media'), 3);
+  assert.deepEqual(Array.from(twoAreas, skill => skill.areaId), ['healthcare', 'general_admin', 'healthcare']);
+
+  const customVerified = helpers.skillRecordsFor({
+    verified_skills: ['Custom executive workflow'],
+    self_reported_skills: profile.self_reported_skills
+  });
+  const customSafe = helpers.featuredSkills(customVerified, 3);
+  assert.deepEqual(Array.from(customSafe, skill => skill.areaId).sort(), ['general_admin', 'healthcare', 'social_media']);
 });
 
 test('VA type and canonical Skill filters find unverified application selections', () => {
