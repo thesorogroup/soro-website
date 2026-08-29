@@ -261,6 +261,9 @@
   gap: 14px;
   margin: 0 0 10px;
 }
+.talent-self-profile-page .talent-file-profile-panel .profile-stat-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 
 .talent-file-profile-panel .profile-stat-grid article { background: #fff; box-shadow: 0 4px 14px rgba(25,48,74,.035); }
 .talent-file-profile-panel .profile-layout { margin: 0; }
@@ -900,6 +903,12 @@
     padding: 27px 28px 20px;
   }
 
+  /* The Talent self-view has no staff action rail, so return that space to identity details. */
+  .talent-self-profile-page .talent-file-body .talent-profile-hero {
+    grid-template-columns: 228px minmax(0, 1fr) 270px;
+    gap: 28px;
+  }
+
   .talent-file-body .headshot-wrap {
     z-index: 3;
     gap: 0;
@@ -957,6 +966,19 @@
   .talent-file-panels {
     position: relative;
     z-index: 2;
+  }
+}
+
+@media (min-width: 1101px) and (max-width: 1219px) {
+  .talent-self-profile-page .talent-file-body .talent-profile-hero {
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 28px;
+  }
+
+  .talent-self-profile-page .talent-file-body .profile-hero-media {
+    grid-column: 2;
+    max-width: none;
+    padding-top: 0;
   }
 }
 

@@ -19,8 +19,15 @@
   };
 
 function canEditProfileDetails() {
-  return ['admin', 'talent_management'].includes(String(window.soroCurrentAccess?.role || '').toLowerCase());
+  return !(typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView())
+    && ['admin', 'talent_management'].includes(String(window.soroCurrentAccess?.role || '').toLowerCase());
 }
+
+  function selectedProfileApplicant() {
+    return typeof currentTalentProfileApplicant === 'function'
+      ? currentTalentProfileApplicant()
+      : liveApplicants.find(item => item.id === selectedTalentId);
+  }
 
   profilePage = function (applicant) {
     const editButton = canEditProfileDetails()
@@ -39,7 +46,7 @@ function canEditProfileDetails() {
   const originalLoadTalentProfileDocuments = loadTalentProfileDocuments;
   loadTalentProfileDocuments = async function () {
     await originalLoadTalentProfileDocuments();
-    const applicant = liveApplicants.find(item => item.id === selectedTalentId);
+    const applicant = selectedProfileApplicant();
     const target = document.getElementById('profile-introduction-video');
     if (!applicant || !target || !window.soroSupabase) return;
 
@@ -132,7 +139,7 @@ function canEditProfileDetails() {
   }
 
   async function openSkillsDialog() {
-    const applicant = liveApplicants.find(item => item.id === selectedTalentId);
+    const applicant = selectedProfileApplicant();
     if (!applicant || !window.soroSupabase || !canEditProfileDetails()) return;
     const { data, error } = await window.soroSupabase
       .from('applicants')

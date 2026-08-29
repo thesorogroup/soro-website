@@ -58,6 +58,7 @@
   }
 
   function showSignedOut(message = '') {
+    if (typeof window.soroClearOwnIdentityPreferencesDialog === 'function') window.soroClearOwnIdentityPreferencesDialog();
     checking.hidden = true;
     authGate.hidden = false;
     if (passwordRecoveryGate) passwordRecoveryGate.hidden = true;
@@ -107,7 +108,10 @@
 
   function showAuthorizedApp(session, access) {
     window.soroCurrentAccess = { ...access, user_id: session.user.id };
-    if (typeof role !== 'undefined') role = workspaceRole[access.role] || 'admin';
+    if (typeof role !== 'undefined') {
+      role = workspaceRole[access.role] || 'admin';
+      if (typeof roleConfig !== 'undefined' && roleConfig[role]?.className) document.body.className = roleConfig[role].className;
+    }
     updateSignedInIdentity(session, access);
     if (typeof window.soroSyncAuthorizedNavigation === 'function') window.soroSyncAuthorizedNavigation(access);
     if (typeof setActive === 'function') setActive();

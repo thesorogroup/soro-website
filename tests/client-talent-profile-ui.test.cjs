@@ -55,7 +55,7 @@ test('Client Portal navigation contains only Dashboard, Talent Profile, Account 
   assert.doesNotMatch(operations, /client_billing:new Set\([^\n]*client-talent-profile/);
   assert.match(html, /id="client-talent-profile-nav"[^>]*data-view="client-talent-profile"[^>]*hidden>Talent Profile</);
   assert.match(html, /id="client-account-settings-nav"[^>]*data-view="my-profile"[^>]*hidden>Account Settings</);
-  assert.match(operations, /overviewNav\.textContent=clientPortal\?'Dashboard':'Overview'/);
+  assert.match(operations, /overviewNav\.textContent=clientPortal\|\|accessRole==='virtual_assistant'\?'Dashboard':'Overview'/);
 });
 
 test('Client Talent Profile mounts only through the authenticated, fail-closed route', () => {
@@ -150,7 +150,7 @@ test('Client Talent assets load before routing and include desktop/mobile safegu
   assert.match(html, /talent-profile-visuals\.js\?v=20260829-production-visuals/);
   assert.match(html, /client-talent-profile\.js\?v=20260829-production-visuals/);
   assert.ok(html.indexOf('talent-profile-visuals.js?v=20260829-production-visuals') < html.indexOf('client-talent-profile.js?v=20260829-production-visuals'));
-  assert.ok(html.indexOf('client-talent-profile.js?v=20260829-production-visuals') < html.indexOf('operations.js?v=20260829-client-talent-profile'));
+  assert.ok(html.indexOf('client-talent-profile.js?v=20260829-production-visuals') < html.indexOf('operations.js?v=20260829-talent-self-profile'));
   assert.match(css, /grid-template-columns:\s*230px minmax\(0, 1fr\) minmax\(280px, 350px\)/);
   assert.match(css, /@media \(min-width: 1101px\)[\s\S]*\.client-talent-folder-art/);
   assert.match(css, /\.client-talent-folder-front-seam[\s\S]*stroke:\s*rgba\(144, 125, 91, \.24\)/);

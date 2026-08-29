@@ -1,14 +1,26 @@
 /* Soro Ops interaction and profile detail improvements. */
 (function () {
 
+  const baseRender = render;
+
   const isExternalLink = value => /^https?:\/\//i.test(String(value || '').trim());
   const resultValue = (value, empty = 'Result not yet recorded') => escapeHtml(!value || isExternalLink(value) ? empty : value);
   const resultInputValue = value => escapeHtml(!value || isExternalLink(value) ? '' : value);
   const screeningPresentation = window.soroScreeningPresentation;
   const profileDetailsTools = window.soroProfileDetails;
 
+  function selectedProfileApplicant() {
+    return typeof currentTalentProfileApplicant === 'function'
+      ? currentTalentProfileApplicant()
+      : liveApplicants.find(item => item.id === selectedTalentId);
+  }
+
+  function isOwnTalentProfileView() {
+    return typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView();
+  }
+
   function canManageScreeningResults() {
-    return ['admin', 'talent_management'].includes(currentAccessRole());
+    return !isOwnTalentProfileView() && ['admin', 'talent_management'].includes(currentAccessRole());
   }
 
   function talentInitials(fullName) {
@@ -126,7 +138,7 @@
   }
 
   async function openOwnIdentityPreferences() {
-    const applicant = liveApplicants.find(item => item.id === selectedTalentId);
+    const applicant = selectedProfileApplicant();
     if (!applicant || !canEditOwnIdentityPreferences(applicant) || !window.soroSupabase) return;
     let dialog = document.getElementById('own-identity-preferences-dialog');
     if (!dialog) {
@@ -176,8 +188,17 @@
     dialog.showModal();
   }
 
+  function clearOwnIdentityPreferencesDialog() {
+    const dialog = document.getElementById('own-identity-preferences-dialog');
+    if (!dialog) return;
+    if (dialog.open) dialog.close();
+    dialog.replaceChildren();
+    dialog.remove();
+  }
+  window.soroClearOwnIdentityPreferencesDialog = clearOwnIdentityPreferencesDialog;
+
   function canManagePrivateProfileDetails() {
-    return profileDetailsTools.canManageProfileDetails(currentAccessRole());
+    return !isOwnTalentProfileView() && profileDetailsTools.canManageProfileDetails(currentAccessRole());
   }
 
   function canViewPrivateProfileDetails(applicant) {
@@ -209,7 +230,7 @@
   }
 
   function bindPrivateProfileDetailsEditor() {
-    const applicant = liveApplicants.find(item => item.id === selectedTalentId);
+    const applicant = selectedProfileApplicant();
     const dialog = document.getElementById('private-profile-details-dialog');
     const openButton = document.getElementById('edit-private-profile-details');
     if (!applicant || !dialog || !openButton || !canManagePrivateProfileDetails()) return;
@@ -370,7 +391,7 @@
   const profilePageWithScreening = profilePage;
 
   function canVerifyTalentSkills() {
-    return ['admin', 'talent_management'].includes(currentAccessRole());
+    return !isOwnTalentProfileView() && ['admin', 'talent_management'].includes(currentAccessRole());
   }
 
   function skillExperienceMap(applicant) {
@@ -451,7 +472,7 @@
   }
 
   function openTalentSkillReview() {
-    const applicant = liveApplicants.find(item => item.id === selectedTalentId);
+    const applicant = selectedProfileApplicant();
     if (!applicant || !canVerifyTalentSkills() || !window.soroSupabase) return;
     const reported = Array.isArray(applicant.self_reported_skills) ? applicant.self_reported_skills : [];
     const verified = Array.isArray(applicant.verified_skills) ? applicant.verified_skills : [];
@@ -505,6 +526,57 @@
     dialog.showModal();
   }
 
+  function removeOwnProfileManagementActions(scope = root) {
+    const headshotUpload = scope.querySelector('.headshot-upload');
+    if (headshotUpload) {
+      const uploadNote = headshotUpload.nextElementSibling;
+      if (uploadNote?.tagName === 'SMALL') uploadNote.remove();
+      headshotUpload.remove();
+    }
+    [
+      '.back-to-directory', '#profile-add-task', '#edit-private-profile-details',
+      '#private-profile-details-dialog', '#edit-screening-results', '#screening-results-dialog',
+      '#review-talent-skills', '#edit-skills-experience', '.admin-profile-controls',
+      '.talent-portal-access-card', '.talent-profile-danger-zone'
+    ].forEach(selector => scope.querySelectorAll(selector).forEach(element => element.remove()));
+    scope.querySelectorAll('.profile-stat-grid article').forEach(article => {
+      if (article.querySelector('p')?.textContent.trim() === 'Profile owner') article.remove();
+    });
+    scope.querySelectorAll('.profile-actions').forEach(actions => {
+      if (!actions.children.length && !actions.textContent.trim()) actions.remove();
+    });
+  }
+
+  function renderOwnTalentProfile(applicant) {
+    if (!applicant) {
+      root.innerHTML = typeof talentSelfProfileStatusMarkup === 'function'
+        ? talentSelfProfileStatusMarkup()
+        : '<main class="page"><section class="panel profile-missing"><h1>My Profile</h1><p>Your Talent profile is not available yet.</p></section></main>';
+      setActive();
+      return;
+    }
+    selectedTalentId = applicant.id;
+    root.innerHTML = profilePage(applicant);
+    root.querySelector('.talent-profile-page')?.classList.add('talent-self-profile-page');
+    removeOwnProfileManagementActions(root);
+    bindView();
+    bindPrivateProfileDetailsEditor();
+    bindScreeningResultsEditor();
+    loadTalentProfileDocuments();
+    if (typeof isAdminWorkspacePreview === 'function' && isAdminWorkspacePreview('va')) {
+      const documents = root.querySelector('#profile-documents');
+      if (documents) documents.innerHTML = '<div class="documents-empty"><strong>Your secure files</strong><p>Files linked to the signed-in Talent profile appear here.</p></div>';
+      const video = root.querySelector('#profile-introduction-video');
+      if (video) video.innerHTML = '<section class="profile-introduction-video profile-video-empty"><p class="eyebrow">Video interviews</p><strong>No private video attached yet</strong><small>Any Talent-visible recording will appear here securely.</small></section>';
+      root.querySelectorAll('[data-screening-sources]').forEach(source => {
+        source.innerHTML = '<span class="screening-source-missing">Secure source file available in the signed-in Talent Portal</span>';
+      });
+    }
+    setActive();
+  }
+
+  window.soroRemoveOwnProfileManagementActions = removeOwnProfileManagementActions;
+
   render = function () {
     if (typeof viewAllowedForAuthenticatedRole === 'function' && !viewAllowedForAuthenticatedRole(current)) {
       current = 'overview';
@@ -516,21 +588,19 @@
       root.innerHTML = supportPage();
       return;
     }
+    if (current === 'talent-my-profile') {
+      renderOwnTalentProfile(selectedProfileApplicant());
+      return;
+    }
     if (current === 'talent-profile') {
-      root.innerHTML = profilePage(liveApplicants.find(a => a.id === selectedTalentId));
+      root.innerHTML = profilePage(selectedProfileApplicant());
       bindView();
       bindPrivateProfileDetailsEditor();
       bindScreeningResultsEditor();
       loadTalentProfileDocuments();
       return;
     }
-    const d = typeof dataAllowedForAuthenticatedRole === 'function'
-      ? dataAllowedForAuthenticatedRole(current, current === 'overview' ? (role === 'admin' ? data.overview : roleDashboards[role]) : data[current])
-      : (current === 'overview' ? (role === 'admin' ? data.overview : roleDashboards[role]) : data[current]);
-    const newAction = role === 'talent' ? 'New Talent' : role === 'client' ? 'Request Talent' : role === 'va' ? 'Start Day' : 'New Client';
-    const primaryAction = role === 'va' ? 'Start Day' : role === 'client' ? 'Request another Talent' : '+ Add Task';
-    root.innerHTML = `<main class="page"><div class="page-heading"><div><p class="eyebrow">Soro Ops</p><h1>${d.title}</h1><p class="eyebrow" style="margin-top:9px">${d.caption}</p></div><div class="heading-actions"><button class="button primary" id="add-task">${primaryAction}</button>${current === 'overview' || current === 'clients' ? `<button class="button" id="new-record">+ ${newAction}</button>` : ''}<button class="button">Customize</button></div></div>${current === 'overview' ? overview(d) : current === 'vas' ? talentDirectory() : table(d)}</main>`;
-    bindView();
+    return baseRender();
   };
 
   document.addEventListener('click', event => {
@@ -539,7 +609,7 @@
   });
 
   loadTalentProfileDocuments = async function () {
-    const applicant = liveApplicants.find(a => a.id === selectedTalentId);
+    const applicant = selectedProfileApplicant();
     const target = document.getElementById('profile-documents');
     if (!applicant || !target || !window.soroSupabase) return;
     const { data: documents, error } = await window.soroSupabase.from('documents').select('id,file_name,document_type,status,created_at,storage_path').eq('applicant_id', applicant.id).order('created_at', { ascending: false });
@@ -580,11 +650,12 @@
     setActive();
     render();
   });
+  window.addEventListener('soro-auth-changed', clearOwnIdentityPreferencesDialog);
   root.addEventListener('submit', async event => {
     if (event.target.id === 'screening-results-form') {
       event.preventDefault();
       if (!canManageScreeningResults()) return;
-      const applicant = liveApplicants.find(a => a.id === selectedTalentId);
+      const applicant = selectedProfileApplicant();
       const form = new FormData(event.target);
       const confirmation = document.getElementById('screening-results-confirmation');
       const submitButton = event.target.querySelector('[type="submit"]');

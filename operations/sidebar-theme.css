@@ -1,0 +1,49 @@
+:root {
+  --sidebar-navy: #082550;
+  --sidebar-hover: #123b6d;
+  --sidebar-active: #1e578e;
+  --sidebar-focus: #ffb37a;
+  --sidebar-badge: #c53d19;
+}
+
+#app [hidden] {
+  display: none !important;
+}
+
+.sidebar {
+  background: var(--sidebar-navy);
+}
+
+.nav-link:hover {
+  background: var(--sidebar-hover);
+  color: #fff;
+}
+
+.nav-link.active {
+  background: var(--sidebar-active);
+  color: #fff;
+}
+
+.nav-link:focus-visible,
+.profile:focus-visible {
+  outline: 3px solid var(--sidebar-focus);
+  outline-offset: 2px;
+}
+
+.nav-link b {
+  background: var(--sidebar-badge);
+}
+
+.profile {
+  border-radius: 9px;
+  transition: background-color 150ms ease;
+}
+
+.profile:not(:disabled):hover {
+  background: var(--sidebar-hover);
+}
+
+.profile.active,
+.profile[aria-expanded="true"] {
+  background: var(--sidebar-active);
+}

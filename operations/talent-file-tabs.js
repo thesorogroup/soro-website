@@ -11,11 +11,13 @@
   let folderHeightFallback = null;
 
   function canViewBenefits() {
-    return benefitsRoles.has(String(window.soroCurrentAccess?.role || '').toLowerCase());
+    return !(typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView())
+      && benefitsRoles.has(String(window.soroCurrentAccess?.role || '').toLowerCase());
   }
 
   function canViewPay() {
-    return payRoles.has(String(window.soroCurrentAccess?.role || '').toLowerCase());
+    return !(typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView())
+      && payRoles.has(String(window.soroCurrentAccess?.role || '').toLowerCase());
   }
 
   function tabButton(name, label, extra = '') {
@@ -297,7 +299,9 @@
   loadTalentProfileDocuments = async function () {
     await originalLoadTalentProfileDocuments();
     watchFolderHeight(document.querySelector('.talent-file-shell'));
-    const applicant = liveApplicants.find(item => item.id === selectedTalentId);
+    const applicant = typeof currentTalentProfileApplicant === 'function'
+      ? currentTalentProfileApplicant()
+      : liveApplicants.find(item => item.id === selectedTalentId);
     await loadTalentFileContext(applicant);
   };
 

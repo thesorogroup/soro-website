@@ -41,7 +41,7 @@ test('Account Settings is fail-closed to the three authenticated client roles', 
   ['admin', 'talent_management', 'sales', 'sales_management', 'billing', 'virtual_assistant'].forEach(role => {
     assert.equal(roleViews(operations, role).includes('my-profile'), false, `${role} must not receive the client profile view.`);
   });
-  assert.match(operations, /current==='my-profile'[\s\S]*authenticatedClientRoles\.has\(currentAuthenticatedRole\(\)\)[\s\S]*SoroClientProfile\?\.canOpenProfile\(\)/);
+  assert.match(operations, /current==='my-profile'[\s\S]*isAdminWorkspacePreview\('client'\)[\s\S]*authenticatedClientRoles\.has\(actualAuthenticatedRole\(\)\)[\s\S]*SoroClientProfile\?\.canOpenProfile\(\)/);
 });
 
 test('the client identity controls open Account Settings while Admin preview stays unchanged', () => {
@@ -60,8 +60,8 @@ test('the page loads cache-busted profile assets before routing and authenticati
   const html = read('operations/index.html');
   assert.match(html, /client-profile\.css\?v=20260829-client-profile/);
   assert.match(html, /client-profile\.js\?v=20260829-client-profile/);
-  assert.ok(html.indexOf('client-profile.js?v=20260829-client-profile') < html.indexOf('operations.js?v=20260829-client-talent-profile'));
-  assert.match(html, /auth\.js\?v=20260829-client-talent-profile/);
+  assert.ok(html.indexOf('client-profile.js?v=20260829-client-profile') < html.indexOf('operations.js?v=20260829-talent-self-profile'));
+  assert.match(html, /auth\.js\?v=20260829-talent-self-profile/);
 });
 
 test('the pure preview renderer is network-free and preserves field authority', () => {
