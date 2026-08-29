@@ -123,7 +123,7 @@
   }
 
   function attendancePanel() {
-    return `<div class="talent-tab-heading"><div><p class="eyebrow">Workday record</p><h2>Attendance</h2><p>Scheduled work, Start Day activity, check-outs, and exceptions for this Talent.</p></div></div><div class="talent-tab-summary"><article><span>Current assignment</span><strong id="attendance-assignment">Not assigned</strong><small id="attendance-schedule">A client schedule will appear after placement.</small></article><article><span>Recorded workdays</span><strong id="attendance-workdays">0</strong><small>Current calendar month</small></article><article><span>Exceptions</span><strong id="attendance-exceptions">0</strong><small>Late or missed check-ins recorded this month</small></article></div><div id="attendance-records" class="talent-tab-empty"><span aria-hidden="true">◷</span><div><strong>No attendance records yet</strong><p>Start Day, check-out, late, and missed check-in records will be listed here when activity is recorded.</p></div></div>`;
+    return `<div class="talent-tab-heading"><div><p class="eyebrow">Workday record</p><h2>Attendance</h2><p>Manual Start Day and Check Out records for this Talent.</p></div></div><div class="talent-tab-summary"><article><span>Current assignment</span><strong id="attendance-assignment">Not assigned</strong><small id="attendance-schedule">A client schedule will appear after placement.</small></article><article><span>Recorded workdays</span><strong id="attendance-workdays">0</strong><small>Current calendar month</small></article><article><span>Open workday</span><strong id="attendance-open-workday">No</strong><small>Remains open until the Talent checks out</small></article></div><div id="attendance-records" class="talent-tab-empty"><span aria-hidden="true">◷</span><div><strong>No attendance records yet</strong><p>Manual Start Day and Check Out records will appear here after the Talent records a workday.</p></div></div>`;
   }
 
   function formatDate(value) {
@@ -133,6 +133,33 @@
       ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
       : new Date(value);
     return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString();
+  }
+
+  function attendanceMonthKey(timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-US', { timeZone, year: 'numeric', month: '2-digit' }).formatToParts(new Date());
+      const values = Object.fromEntries(parts.map(part => [part.type, part.value]));
+      return `${values.year}-${values.month}`;
+    } catch {
+      const now = new Date();
+      return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+  }
+
+  function formatAttendanceTime(value, timeZone) {
+    if (!value) return 'Not checked out';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      }).format(date);
+    } catch {
+      return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
   }
 
   function formatRate(value, rateType) {
@@ -238,35 +265,35 @@
     const recordsTarget = document.getElementById('attendance-records');
     if (!recordsTarget || !window.soroSupabase) return;
     const { data, error } = await window.soroSupabase
-      .from('audit_events')
-      .select('event_type,note,created_at')
-      .eq('entity_id', applicant.id)
-      .in('event_type', ['start_day', 'check_out', 'attendance_status', 'late_check_in', 'missed_check_in'])
-      .order('created_at', { ascending: false })
+      .from('talent_attendance_sessions')
+      .select('work_date,work_timezone,started_at,checked_out_at,placement_id')
+      .eq('applicant_id', applicant.id)
+      .order('started_at', { ascending: false })
       .limit(60);
     if (request !== contextRequest || selectedTalentId !== applicant.id) return;
 
     const assignment = document.getElementById('attendance-assignment');
     const schedule = document.getElementById('attendance-schedule');
+    const selfStatus = typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView()
+      ? window.soroTalentWorkday?.currentStatus?.()
+      : null;
     if (placement) {
       if (assignment) assignment.textContent = placement.clients?.company_name || 'Assigned client';
       if (schedule) schedule.textContent = placement.schedule_summary || 'Schedule not recorded yet.';
+    } else if (selfStatus?.eligible) {
+      if (assignment) assignment.textContent = selfStatus.clientName || 'Assigned client';
+      if (schedule) schedule.textContent = selfStatus.scheduleSummary || 'Schedule not recorded yet.';
     }
     if (error || !data?.length) return;
 
-    const now = new Date();
-    const currentMonth = data.filter(item => {
-      const date = new Date(item.created_at);
-      return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth();
-    });
-    const days = new Set(currentMonth.filter(item => item.event_type === 'start_day').map(item => new Date(item.created_at).toDateString())).size;
-    const exceptions = currentMonth.filter(item => ['late_check_in', 'missed_check_in'].includes(item.event_type)).length;
+    const monthKey = attendanceMonthKey(data[0]?.work_timezone || selfStatus?.workTimezone || applicant.timezone || 'Asia/Manila');
+    const days = new Set(data.filter(item => String(item.work_date || '').startsWith(monthKey)).map(item => item.work_date)).size;
     const workdays = document.getElementById('attendance-workdays');
-    const exceptionCount = document.getElementById('attendance-exceptions');
+    const openWorkday = document.getElementById('attendance-open-workday');
     if (workdays) workdays.textContent = String(days);
-    if (exceptionCount) exceptionCount.textContent = String(exceptions);
+    if (openWorkday) openWorkday.textContent = data.some(item => !item.checked_out_at) ? 'Yes' : 'No';
     recordsTarget.className = 'attendance-table-wrap';
-    recordsTarget.innerHTML = `<table class="attendance-table"><thead><tr><th>Date</th><th>Record</th><th>Note</th></tr></thead><tbody>${data.map(item => `<tr><td>${escapeHtml(formatDate(item.created_at))}</td><td>${escapeHtml(titleCase(item.event_type))}</td><td>${escapeHtml(item.note || 'No note')}</td></tr>`).join('')}</tbody></table>`;
+    recordsTarget.innerHTML = `<table class="attendance-table"><thead><tr><th>Date</th><th>Start Day</th><th>Check Out</th></tr></thead><tbody>${data.map(item => `<tr><td>${escapeHtml(formatDate(item.work_date))}</td><td>${escapeHtml(formatAttendanceTime(item.started_at, item.work_timezone))}</td><td>${escapeHtml(formatAttendanceTime(item.checked_out_at, item.work_timezone))}</td></tr>`).join('')}</tbody></table>`;
   }
 
   async function loadTalentFileContext(applicant) {
