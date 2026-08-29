@@ -117,9 +117,11 @@ test('operations enhancements delegates ordinary portal views back to the canoni
 
 test('every portal uses the same accessible Soro navy sidebar treatment', () => {
   const html = read('operations/index.html');
+  const base = read('operations/operations.css');
   const roles = read('operations/roles.css');
   const theme = read('operations/sidebar-theme.css');
 
+  assert.match(html, /operations\.css\?v=20260829-profile-center/);
   assert.match(html, /sidebar-theme\.css\?v=20260829-portal-sidebar/);
   assert.match(theme, /--sidebar-navy:\s*#082550/);
   assert.match(theme, /--sidebar-hover:\s*#123b6d/);
@@ -128,6 +130,7 @@ test('every portal uses the same accessible Soro navy sidebar treatment', () => 
   assert.match(theme, /--sidebar-badge:\s*#c53d19/);
   assert.match(theme, /#app \[hidden\][\s\S]*display:\s*none !important/);
   assert.match(theme, /\.profile:not\(:disabled\):hover/);
+  assert.match(base, /\.profile\{[^}]*padding:10px;[^}]*align-items:center/);
   assert.match(theme, /\.nav-link:focus-visible,[\s\S]*\.profile:focus-visible/);
   assert.doesNotMatch(roles, /\.role-(?:talent|client|va)\s+\.sidebar\s*\{/);
 });
