@@ -423,6 +423,12 @@ async function verifyCurrentPassword(email, password) {
 async function changeInitialPassword(event) {
   const authenticated = await authenticatedUser(event);
   if (!authenticated?.access?.active) return json(401, { message: 'Sign in again before changing your password.' });
+  if (authenticated.access.role === 'virtual_assistant') {
+    return json(409, {
+      code: 'secure_invitation_required',
+      message: 'Open the newest secure VA Portal invitation before choosing your password.'
+    });
+  }
   if (authenticated.access.must_change_password !== true) return json(409, { message: 'This account has already completed its first sign-in.' });
   const issuedAt = Date.parse(authenticated.access.initial_password_issued_at || '');
   if (!Number.isFinite(issuedAt) || Date.now() - issuedAt > TEMPORARY_PASSWORD_TTL_MS) {

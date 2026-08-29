@@ -6,7 +6,7 @@
     <title>Soro Ops</title>
     <link rel="stylesheet" href="operations.css" />
     <link rel="stylesheet" href="roles.css" />
-    <link rel="stylesheet" href="auth.css?v=20260827-employee-onboarding" />
+    <link rel="stylesheet" href="auth.css?v=20260828-password-recovery" />
   <link rel="stylesheet" href="profile-dialog.css?v=20260817-profile-layout" />
   <link rel="stylesheet" href="inline-intro-video.css?v=20260822-identity-preferences" />
     <link rel="stylesheet" href="talent-profile-privacy.css?v=20260822-timezone-screening" />
@@ -16,6 +16,9 @@
     <link rel="stylesheet" href="talent-directory-filters.css?v=20260828-skill-disclosure" />
     <link rel="stylesheet" href="admin-skill-library.css?v=20260817-skill-library" />
     <link rel="stylesheet" href="admin-record-management.css?v=20260822-identity-preferences" />
+    <link rel="stylesheet" href="talent-portal-access.css?v=20260828-va-portal-access" />
+    <link rel="stylesheet" href="client-profile.css?v=20260829-client-profile" />
+    <link rel="stylesheet" href="client-talent-profile.css?v=20260829-production-visuals" />
     <link rel="stylesheet" href="admin-permanent-deletion.css?v=20260820-record-security" />
     <link rel="stylesheet" href="admin-employee-management.css?v=20260827-employee-onboarding" />
   </head>
@@ -41,6 +44,20 @@
         <p id="auth-message" class="auth-message" aria-live="polite"></p>
       </form>
     </section>
+    <section class="auth-gate password-recovery-gate" id="password-recovery-gate" aria-labelledby="password-recovery-title" hidden>
+      <form class="auth-card" id="password-recovery-form">
+        <img src="../assets/soro-logo-horizontal.svg" alt="Soro Group" class="auth-logo" />
+        <p class="eyebrow">Secure account recovery</p>
+        <h1 id="password-recovery-title">Create a new password</h1>
+        <p class="auth-recovery-intro">Choose a private new password for your Soro account. Your portal will remain locked until this change is complete.</p>
+        <label>New password<input name="newPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required placeholder="At least 12 characters" /></label>
+        <label>Confirm new password<input name="confirmPassword" type="password" autocomplete="new-password" minlength="12" maxlength="128" required placeholder="Enter it again" /></label>
+        <p class="auth-password-hint">Use at least 12 characters that are difficult for someone else to guess.</p>
+        <button class="button primary auth-submit" type="submit">Save new password</button>
+        <button class="text-button auth-reset" type="button" id="password-recovery-sign-out">Sign out</button>
+        <p id="password-recovery-message" class="auth-message" aria-live="polite"></p>
+      </form>
+    </section>
     <section class="auth-gate first-password-gate" id="first-password-gate" aria-labelledby="first-password-title" hidden>
       <form class="auth-card" id="first-password-form">
         <img src="../assets/soro-logo-horizontal.svg" alt="Soro Group" class="auth-logo" />
@@ -60,7 +77,9 @@
       <aside class="sidebar" aria-label="Primary navigation">
         <a class="brand" href="#overview" aria-label="Soro Ops home"><img src="../assets/soro-logo-horizontal.svg" alt="Soro Group" /><span class="brand-ops">OPS</span></a>
         <nav id="main-nav">
-          <button class="nav-link active" data-view="overview">Overview</button>
+          <button class="nav-link active" id="overview-nav" data-view="overview">Overview</button>
+          <button class="nav-link" id="client-talent-profile-nav" data-view="client-talent-profile" hidden>Talent Profile</button>
+          <button class="nav-link" id="client-account-settings-nav" data-view="my-profile" hidden>Account Settings</button>
           <button class="nav-link" data-view="tasks">My Tasks <b>5</b></button>
           <button class="nav-link" data-view="clients">Clients</button>
           <button class="nav-link" data-view="vas">Talent</button>
@@ -75,7 +94,7 @@
         <header class="topbar">
           <button class="mobile-menu" id="mobile-menu" aria-label="Open menu">☰</button>
           <label class="global-search"><span>⌕</span><input id="global-search" placeholder="Search clients, Talent, tasks…" /></label>
-          <div class="top-actions"><button class="text-button" id="sign-out" type="button">Sign out</button><button class="icon-button notification-button" id="notifications-button" aria-label="View 3 notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><em>3</em></button><button class="help" id="help-button" type="button" aria-label="Help and support">?</button></div>
+          <div class="top-actions"><button class="icon-button client-mobile-profile" id="client-mobile-profile" type="button" aria-label="Open Account Settings" title="Account Settings" hidden><span class="avatar">CP</span></button><button class="text-button" id="sign-out" type="button">Sign out</button><button class="icon-button notification-button" id="notifications-button" aria-label="View 3 notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><em>3</em></button><button class="help" id="help-button" type="button" aria-label="Help and support">?</button></div>
         </header>
         <div id="view-root"></div>
       </section>
@@ -85,7 +104,10 @@
     <dialog id="notifications-dialog"><section class="modal notifications-modal" aria-labelledby="notifications-title"><div class="modal-title"><div><p class="eyebrow">Soro Ops</p><h2 id="notifications-title">Notifications</h2></div><button type="button" class="modal-close" aria-label="Close notifications">×</button></div><div class="notification-list"><button type="button" data-notification-view="vas"><span class="notification-dot urgent"></span><span><strong>3 Talent profiles need review</strong><small>New application information is ready for Talent Management.</small></span><b>Open</b></button><button type="button" data-notification-view="tasks"><span class="notification-dot"></span><span><strong>2 time-off requests are awaiting review</strong><small>Review the requests before the next scheduled work period.</small></span><b>Open</b></button><button type="button" data-notification-view="overview"><span class="notification-dot"></span><span><strong>1 billing verification is due tomorrow</strong><small>Confirm the payout recipient details before the pay run.</small></span><b>Open</b></button></div></section></dialog>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js?v=20260817-loom"></script>
-    <script src="operations.js?v=20260827-employee-onboarding"></script>
+    <script src="talent-profile-visuals.js?v=20260829-production-visuals"></script>
+    <script src="client-profile.js?v=20260829-client-profile"></script>
+    <script src="client-talent-profile.js?v=20260829-production-visuals"></script>
+    <script src="operations.js?v=20260829-client-talent-profile"></script>
     <script src="talent-directory-filters.js?v=20260828-skill-disclosure"></script>
     <script src="admin-skill-library.js?v=20260817-skill-library"></script>
     <script src="screening-presentation.js?v=20260829-speed-meter-fix"></script>
@@ -93,11 +115,12 @@
     <script src="operations-enhancements.js?v=20260829-speed-meter-fix"></script>
     <script src="inline-intro-video.js?v=20260820-profile-fixes"></script>
     <script src="talent-profile-privacy.js?v=20260822-timezone-screening"></script>
-    <script src="talent-file-tabs.js?v=20260827-header-overflow"></script>
+    <script src="talent-file-tabs.js?v=20260829-shared-visuals"></script>
     <script src="task-modal-behavior.js?v=20260817-task-modal"></script>
     <script src="admin-employee-management.js?v=20260827-employee-onboarding"></script>
-    <script src="auth.js?v=20260827-employee-onboarding"></script>
+    <script src="auth.js?v=20260829-client-talent-profile"></script>
     <script src="admin-record-management.js?v=20260822-identity-preferences"></script>
+    <script src="talent-portal-access.js?v=20260828-va-portal-access"></script>
     <script src="admin-permanent-deletion.js?v=20260821-concept-match"></script>
   </body>
 </html>

@@ -1,0 +1,247 @@
+.talent-portal-access-card {
+  min-width: 0;
+  margin: 0;
+  padding: 17px 18px 18px;
+  border-color: #dce5ed;
+  background: linear-gradient(145deg, #fff 0%, #f8fbfd 100%);
+  box-shadow: 0 5px 17px rgba(23, 45, 70, .04);
+}
+
+.talent-portal-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.talent-portal-card-heading .eyebrow { margin: 0 0 3px; }
+.talent-portal-card-heading h2 {
+  margin: 0;
+  color: #123b69;
+  font-size: 18px;
+}
+
+.talent-portal-status {
+  display: inline-flex;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+  flex: 0 0 auto;
+  padding: 5px 9px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+.talent-portal-status--active { background: #e6f6ef; color: #12664d; }
+.talent-portal-status--pending { background: #fff0df; color: #93501e; }
+.talent-portal-status--inactive,
+.talent-portal-status--paused { background: #edf1f5; color: #5d6977; }
+.talent-portal-status--attention { background: #fceae7; color: #9a3c31; }
+.talent-portal-status--loading { background: #edf4fa; color: #416987; }
+
+.talent-portal-description {
+  margin: 10px 0 13px;
+  color: #5f7186;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.talent-portal-email-summary {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.talent-portal-email-summary > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+}
+
+.talent-portal-email-summary dt {
+  color: #6a7a8d;
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.talent-portal-email-summary dd {
+  min-width: 0;
+  margin: 0;
+  color: #173d69;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.talent-portal-card-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 15px;
+}
+
+.talent-portal-card-actions .admin-record-button {
+  min-height: 34px;
+  padding: 8px 11px;
+  font-size: 11px;
+}
+
+.talent-portal-notice {
+  margin: 13px 0 0;
+  padding: 9px 10px;
+  border: 1px solid;
+  border-radius: 9px;
+  font-size: 11px;
+  font-weight: 650;
+  line-height: 1.45;
+}
+
+.talent-portal-notice--success { border-color: #bfe1d3; background: #eef9f5; color: #17634e; }
+.talent-portal-notice--error { border-color: #ecc3ba; background: #fff3f0; color: #913f33; }
+
+.talent-portal-card-skeleton { display: grid; gap: 8px; margin-top: 14px; }
+.talent-portal-card-skeleton span {
+  display: block;
+  height: 9px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e9f0f5 20%, #f6f9fb 48%, #e9f0f5 76%);
+  background-size: 220% 100%;
+  animation: talent-portal-loading 1.35s linear infinite;
+}
+.talent-portal-card-skeleton span:last-child { width: 68%; }
+
+@keyframes talent-portal-loading {
+  to { background-position: -220% 0; }
+}
+
+.talent-portal-access-dialog { width: min(620px, calc(100vw - 28px)); }
+.talent-portal-dialog-content { padding: 24px 30px 29px; }
+
+.talent-portal-dialog-state {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 13px;
+  align-items: start;
+  padding: 14px 15px;
+  border: 1px solid #dce6ef;
+  border-radius: 12px;
+  background: #f8fbfe;
+}
+
+.talent-portal-dialog-state p {
+  margin: 1px 0 0;
+  color: #536a82;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.talent-portal-dialog-summary { margin: 18px 0 0; }
+.talent-portal-dialog-summary > div {
+  display: grid;
+  grid-template-columns: 175px minmax(0, 1fr);
+  gap: 15px;
+  padding: 11px 0;
+  border-bottom: 1px solid #e6ecf2;
+}
+
+.talent-portal-dialog-summary dt {
+  color: #68798e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.talent-portal-dialog-summary dd {
+  min-width: 0;
+  margin: 0;
+  color: #153c69;
+  font-size: 13px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.talent-portal-email-note {
+  margin: 17px 0 0;
+  padding: 12px 13px;
+  border-left: 3px solid #6c93b7;
+  border-radius: 7px;
+  background: #f4f8fc;
+  color: #5c7188;
+  font-size: 12px;
+  line-height: 1.48;
+}
+
+.talent-portal-email-note strong { display: block; margin-bottom: 2px; color: #183f6c; }
+
+.talent-portal-email-field {
+  display: grid;
+  gap: 7px;
+  margin-top: 18px;
+  color: #163f70;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.talent-portal-email-field input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 12px;
+  border: 1px solid #c9d7e6;
+  border-radius: 10px;
+  background: #fff;
+  color: #102f54;
+  font: 400 15px/1.35 Arial, sans-serif;
+  outline: none;
+}
+
+.talent-portal-email-field input:focus {
+  border-color: #e95b2b;
+  box-shadow: 0 0 0 3px rgba(233, 91, 43, .13);
+}
+
+.talent-portal-email-field small {
+  color: #6c7d90;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.talent-portal-dialog-message {
+  min-height: 17px;
+  margin: 12px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.talent-portal-dialog-message:empty { margin-top: 0; }
+.talent-portal-dialog-message--error { color: #9e3e32; }
+.talent-portal-dialog-message--working { color: #426b8c; }
+.talent-portal-dialog-message--success { color: #17634e; }
+.talent-portal-change-email { margin-right: auto; }
+.talent-portal-change-email-form[hidden],
+.talent-portal-state-actions[hidden] { display: none !important; }
+.talent-portal-access-dialog[aria-busy="true"] { cursor: wait; }
+
+@media (max-width: 640px) {
+  .talent-portal-card-heading { align-items: flex-start; }
+  .talent-portal-email-summary > div { grid-template-columns: 1fr; gap: 2px; }
+  .talent-portal-card-actions { justify-content: stretch; }
+  .talent-portal-card-actions .admin-record-button { width: 100%; }
+  .talent-portal-dialog-content { padding: 20px; }
+  .talent-portal-dialog-state { grid-template-columns: 1fr; }
+  .talent-portal-dialog-summary > div { grid-template-columns: 1fr; gap: 4px; }
+  .talent-portal-dialog-content .record-manager-footer { align-items: stretch; }
+  .talent-portal-dialog-content .record-manager-footer .admin-record-button { width: 100%; }
+  .talent-portal-change-email { margin-right: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .talent-portal-card-skeleton span { animation: none; }
+}

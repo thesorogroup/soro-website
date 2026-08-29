@@ -43,7 +43,15 @@ function bearerToken(event) {
 function tokenIssuedRecently(token, maximumAgeSeconds = 300) {
   try {
     const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
-    const issuedAt = Number(payload.iat);
+    const passwordAuthenticationTimes = Array.isArray(payload.amr)
+      ? payload.amr
+        .filter(entry => entry?.method === 'password')
+        .map(entry => Number(entry.timestamp))
+        .filter(Number.isFinite)
+      : [];
+    const issuedAt = passwordAuthenticationTimes.length
+      ? Math.max(...passwordAuthenticationTimes)
+      : Number.NaN;
     const now = Math.floor(Date.now() / 1000);
     return Number.isFinite(issuedAt) && issuedAt <= now + 30 && now - issuedAt <= maximumAgeSeconds;
   } catch {
@@ -93,6 +101,74 @@ async function removeStorageFiles(documents) {
   }
 }
 
+async function revokeTalentPortalAccess({ authUserId, organizationId }) {
+  if (!authUserId) return false;
+  if (!validUuid(authUserId)) {
+    const error = new Error('This Talent has an invalid linked portal account and needs Administrator review before deletion.');
+    error.status = 409;
+    error.code = 'linked_access_needs_review';
+    throw error;
+  }
+  const response = await serviceRequest(`/rest/v1/platform_users?id=eq.${encodeURIComponent(authUserId)}&organization_id=eq.${encodeURIComponent(organizationId)}&select=id,role,active,must_change_password&limit=1`);
+  const access = (await response.json())[0];
+  if (!access || access.role !== 'virtual_assistant') {
+    const error = new Error('The linked portal account could not be verified as a Talent account. Access was not deleted.');
+    error.status = 409;
+    error.code = 'linked_access_needs_review';
+    throw error;
+  }
+
+  // Disable the role gate first. If the Auth deletion fails, the account is
+  // still unable to read Soro data and the Talent record remains for review.
+  await serviceRequest(`/rest/v1/platform_users?id=eq.${encodeURIComponent(authUserId)}&organization_id=eq.${encodeURIComponent(organizationId)}&role=eq.virtual_assistant`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+    body: JSON.stringify({ active: false, must_change_password: true })
+  });
+  await serviceRequest(`/auth/v1/admin/users/${encodeURIComponent(authUserId)}?should_soft_delete=false`, {
+    method: 'DELETE'
+  });
+  return true;
+}
+
+async function beginPortalRevocationAudit({ organizationId, actorId, applicantId }) {
+  const response = await serviceRequest('/rest/v1/audit_events?select=id', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+    body: JSON.stringify({
+      organization_id: organizationId,
+      actor_user_id: actorId,
+      entity_type: 'talent_portal_access',
+      entity_id: applicantId,
+      event_type: 'talent_portal_access_revoked_for_deletion',
+      after_value: { outcome: 'pending' },
+      note: 'Permanent Talent deletion was authorized; portal-access revocation is pending.'
+    })
+  });
+  const record = (await response.json())[0];
+  if (!record?.id) throw new Error('The portal-access revocation could not be recorded.');
+  return record.id;
+}
+
+async function finalizePortalRevocationAudit({ auditId, outcome }) {
+  try {
+    await serviceRequest(`/rest/v1/audit_events?id=eq.${encodeURIComponent(auditId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        after_value: { outcome },
+        note: outcome === 'completed'
+          ? 'Talent portal access was revoked before permanent profile deletion continued.'
+          : 'Talent portal access could not be revoked; permanent profile deletion stopped.'
+      })
+    });
+    return true;
+  } catch (error) {
+    console.error('Talent portal revocation audit outcome remains pending.', { auditId, outcome, status: error.status });
+    return false;
+  }
+}
+
 async function auditDeletion({ organizationId, actorId, type, id }) {
   const reference = crypto.createHash('sha256').update(`${type}:${id}`).digest('hex').slice(0, 18);
   try {
@@ -123,7 +199,8 @@ async function permanentDelete({ type, id, confirmationName, administrator }) {
   const documentField = talent ? 'applicant_id' : 'client_id';
   if (!table) return json(400, { message: 'Choose a supported record type.' });
 
-  const recordResponse = await serviceRequest(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&select=id,organization_id,${nameField}&limit=1`);
+  const selectFields = `id,organization_id,${nameField}${talent ? ',auth_user_id' : ''}`;
+  const recordResponse = await serviceRequest(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}&organization_id=eq.${encodeURIComponent(administrator.access.organization_id)}&select=${selectFields}&limit=1`);
   const record = (await recordResponse.json())[0];
   if (!record) return json(404, { message: 'This record no longer exists.' });
   if (String(confirmationName || '').trim() !== String(record[nameField] || '').trim()) {
@@ -142,6 +219,27 @@ async function permanentDelete({ type, id, confirmationName, administrator }) {
 
   const documentsResponse = await serviceRequest(`/rest/v1/documents?${documentField}=eq.${encodeURIComponent(id)}&select=id,storage_path`);
   const documents = await documentsResponse.json();
+
+  let revokedPortalAccess = false;
+  let portalAccessAuditPending = false;
+  if (talent && record.auth_user_id) {
+    const revokeAuditId = await beginPortalRevocationAudit({
+      organizationId: record.organization_id,
+      actorId: administrator.user.id,
+      applicantId: record.id
+    });
+    try {
+      revokedPortalAccess = await revokeTalentPortalAccess({
+        authUserId: record.auth_user_id,
+        organizationId: record.organization_id
+      });
+      portalAccessAuditPending = !await finalizePortalRevocationAudit({ auditId: revokeAuditId, outcome: 'completed' });
+    } catch (error) {
+      await finalizePortalRevocationAudit({ auditId: revokeAuditId, outcome: 'failed' });
+      throw error;
+    }
+  }
+
   await removeStorageFiles(documents);
 
   await serviceRequest(`/rest/v1/${table}?id=eq.${encodeURIComponent(id)}`, {
@@ -153,7 +251,13 @@ async function permanentDelete({ type, id, confirmationName, administrator }) {
     type,
     id
   });
-  return json(200, { deleted: true, removedPrivateFiles: documents.filter(document => document.storage_path).length, auditLogged });
+  return json(200, {
+    deleted: true,
+    removedPrivateFiles: documents.filter(document => document.storage_path).length,
+    revokedPortalAccess,
+    portalAccessAuditPending,
+    auditLogged
+  });
 }
 
 exports.handler = async (event) => {
@@ -167,6 +271,12 @@ exports.handler = async (event) => {
     return await permanentDelete({ type: body.type, id: body.id, confirmationName: body.confirmationName, administrator });
   } catch (error) {
     console.error('Administrator record operation failed.', error);
-    return json(error.status || 500, { message: error.message || 'The record could not be deleted.' });
+    return json(error.status || 500, {
+      code: error.code || 'record_delete_failed',
+      message: error.message || 'The record could not be deleted.'
+    });
   }
 };
+
+exports.revokeTalentPortalAccess = revokeTalentPortalAccess;
+exports.tokenIssuedRecently = tokenIssuedRecently;

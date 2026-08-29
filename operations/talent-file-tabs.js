@@ -23,10 +23,12 @@
   }
 
   function cleanCoordinate(value) {
+    if (window.SoroTalentProfileVisuals) return window.SoroTalentProfileVisuals.cleanCoordinate(value);
     return Number(value.toFixed(3));
   }
 
   function tabGeometry(index, count) {
+    if (window.SoroTalentProfileVisuals) return window.SoroTalentProfileVisuals.tabGeometry(index, count);
     const width = 1240 / count;
     const x = cleanCoordinate(index * width);
     const end = cleanCoordinate((index + 1) * width);
@@ -48,11 +50,13 @@
   }
 
   function folderArtwork(tabCount = 4) {
+    if (window.SoroTalentProfileVisuals) return window.SoroTalentProfileVisuals.folderArtwork(tabCount);
     const first = tabGeometry(0, tabCount);
     return `<svg class="talent-folder-art" viewBox="0 0 1240 434" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="talent-tab-paper" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fbf0da"/><stop offset="1" stop-color="#f6e9ce"/></linearGradient><linearGradient id="talent-folder-paper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fffdf8"/><stop offset=".48" stop-color="#fffaf0"/><stop offset="1" stop-color="#fff8ec"/></linearGradient><pattern id="talent-paper-grain" width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="2" cy="3" r=".45" fill="#9a7d50" opacity=".09"/><circle cx="8" cy="7" r=".35" fill="#9a7d50" opacity=".07"/></pattern><filter id="talent-folder-shadow" x="-10%" y="-10%" width="120%" height="140%"><feDropShadow dx="0" dy="13" stdDeviation="15" flood-color="#273746" flood-opacity=".08"/></filter></defs><g class="talent-folder-inactive-tabs">${inactiveTabPaths(tabCount)}</g><path class="talent-folder-shadow" d="M0 58H1240V415Q1240 432 1223 432H17Q0 432 0 415Z"/><path class="talent-folder-paper" d="M0 58H1240V415Q1240 432 1223 432H17Q0 432 0 415Z"/><path class="talent-folder-grain" d="M0 58H1240V415Q1240 432 1223 432H17Q0 432 0 415Z" fill="url(#talent-paper-grain)" opacity=".7"/><path class="talent-folder-front-lip" d="M0 58H1240V85H0Z"/><path class="talent-folder-outer-edge" d="M0 58V415Q0 432 17 432H1223Q1240 432 1240 415V58"/><path class="talent-folder-top-transition" d="M0 58H1240"/><path class="talent-folder-front-seam" d="M0 85H1240"/><g class="talent-folder-active-tab"><path class="talent-folder-active-fill" d="${first.fill}"/><path class="talent-folder-active-edge" d="${first.edge}"/></g></svg>`;
   }
 
   function paperclipArtwork() {
+    if (window.SoroTalentProfileVisuals) return window.SoroTalentProfileVisuals.paperclipArtwork();
     return `<svg class="talent-paperclip" viewBox="0 0 48 110" aria-hidden="true"><path class="talent-paperclip-wire" d="M31 13.5C31 2.5 8 2.5 8 22v70c0 15 23 15 23 0V28c0-9-12-9-12 0v63"/><path class="talent-paperclip-divider" d="M29 15H48"/></svg>`;
   }
 
