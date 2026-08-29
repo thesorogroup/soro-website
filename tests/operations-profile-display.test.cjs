@@ -66,6 +66,7 @@ test('The approved folder is one continuous vector and the screening column rema
   assert.match(tabsStyles, /grid-template-columns:\s*228px\s+minmax\(0,\s*1fr\)\s+392px/);
   assert.match(tabsStyles, /min-height:\s*374px/);
   assert.match(tabsStyles, /white-space:\s*nowrap/);
+  assert.match(tabsStyles, /\.talent-file-panels\s*\{\s*padding:\s*16px 0 0;\s*\}/);
   assert.doesNotMatch(tabsStyles, /folder-tabs-rail\.svg/);
   assert.match(tabsSource, /class="talent-folder-art"/);
   assert.match(tabsSource, /class="talent-folder-front-seam" d="M0 85H1240"/);

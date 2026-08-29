@@ -15,6 +15,7 @@ test('English presentation tiers use the announced lower, middle, and higher ran
 
 test('Download track has its own reference tiers and 250 Mbps visual scale', () => {
   assert.equal(helpers.semanticTier('internetDownload', 24).label, 'Lower reference range');
+  assert.equal(helpers.semanticTier('internetDownload', 24.99).label, 'Lower reference range');
   assert.equal(helpers.semanticTier('internetDownload', 25).label, 'Standard reference range');
   assert.equal(helpers.semanticTier('internetDownload', 99).label, 'Standard reference range');
   assert.equal(helpers.semanticTier('internetDownload', 100).label, 'Higher reference range');
@@ -26,6 +27,7 @@ test('Download track has its own reference tiers and 250 Mbps visual scale', () 
 
 test('Upload track has independent tiers and a 100 Mbps visual scale', () => {
   assert.equal(helpers.semanticTier('internetUpload', 4).label, 'Lower reference range');
+  assert.equal(helpers.semanticTier('internetUpload', 4.99).label, 'Lower reference range');
   assert.equal(helpers.semanticTier('internetUpload', 5).label, 'Standard reference range');
   assert.equal(helpers.semanticTier('internetUpload', 24).label, 'Standard reference range');
   assert.equal(helpers.semanticTier('internetUpload', 25).label, 'Higher reference range');
@@ -47,6 +49,36 @@ test('Speed parsing uses explicit labels in any order, ignores URL digits, and p
 
   const reverseLabels = helpers.parseInternetSpeed('0 Mbps download · 12.5 Mbps upload · 0 ms latency');
   assert.deepEqual({ ...reverseLabels }, { download: 0, upload: 12.5, latency: 0 });
+});
+
+test('Speed parsing keeps values paired when units appear before the labels', () => {
+  const parsed = helpers.parseInternetSpeed('20.42 MBPS Download - 45.57 MBPS Upload');
+  assert.deepEqual({ ...parsed }, { download: 20.42, upload: 45.57, latency: null });
+
+  const mixed = helpers.parseInternetSpeed('1,000 Mbps Download | Upload speed is 125.25 Mbps');
+  assert.deepEqual({ ...mixed }, { download: 1000, upload: 125.25, latency: null });
+
+  const compactPrefix = helpers.parseInternetSpeed('Download 20.42 Mbps Upload 45.57 Mbps');
+  assert.deepEqual({ ...compactPrefix }, { download: 20.42, upload: 45.57, latency: null });
+
+  const reverseCompactPrefix = helpers.parseInternetSpeed('Upload 45.57 Mbps Download 20.42 Mbps');
+  assert.deepEqual({ ...reverseCompactPrefix }, { download: 20.42, upload: 45.57, latency: null });
+});
+
+test('Recorded speed values and tier labels share the same linear meter coordinates', () => {
+  const download = helpers.speedMeterConfiguration('internetDownload', 20.42);
+  const upload = helpers.speedMeterConfiguration('internetUpload', 45.57);
+  assert.ok(Math.abs(download.position - 8.168) < 1e-9);
+  assert.ok(Math.abs(upload.position - 45.57) < 1e-9);
+  assert.deepEqual([download.lowerStop, download.middleStop], [10, 40]);
+  assert.deepEqual([upload.lowerStop, upload.middleStop], [5, 25]);
+
+  const source = fs.readFileSync(path.join(__dirname, '..', 'operations', 'operations-enhancements.js'), 'utf8');
+  const styles = fs.readFileSync(path.join(__dirname, '..', 'operations', 'talent-file-tabs.css'), 'utf8');
+  assert.match(source, /--limit-position:\$\{meter\.lowerStop\}%/);
+  assert.match(source, /--limit-position:\$\{meter\.middleStop\}%/);
+  assert.match(styles, /left:\s*var\(--limit-position\)/);
+  assert.doesNotMatch(styles, /\.connection-meter__limits\s*\{[^}]*grid-template-columns:\s*repeat\(4,1fr\)/);
 });
 
 test('Speed parsing does not infer meaning from unlabeled number order', () => {

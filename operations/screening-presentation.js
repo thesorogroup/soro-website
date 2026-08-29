@@ -62,8 +62,10 @@
     if (numeric === null) return Object.freeze({ key: 'pending', className: 'screening-tier--pending', label: 'Not recorded' });
     const limits = thresholdsFor(kind, overrides);
     const copy = TIER_COPY[kind] || TIER_COPY.internetDownload;
-    if (numeric <= limits.lowerMax) return Object.freeze({ key: 'low', className: 'screening-tier--low', label: copy.low });
-    if (numeric <= limits.middleMax) return Object.freeze({ key: 'middle', className: 'screening-tier--middle', label: copy.middle });
+    const lowerBoundary = (finiteNumber(limits.lowerMax) ?? 0) + 1;
+    const middleBoundary = (finiteNumber(limits.middleMax) ?? lowerBoundary) + 1;
+    if (numeric < lowerBoundary) return Object.freeze({ key: 'low', className: 'screening-tier--low', label: copy.low });
+    if (numeric < middleBoundary) return Object.freeze({ key: 'middle', className: 'screening-tier--middle', label: copy.middle });
     return Object.freeze({ key: 'high', className: 'screening-tier--high', label: copy.high });
   }
 
@@ -188,16 +190,33 @@
 
   function firstLabeledNumber(text, label) {
     const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const after = text.match(new RegExp(`\\b${escaped}\\b\\s*(?:speed\\s*)?[:=\\-]?\\s*(\\d+(?:\\.\\d+)?)`, 'i'));
-    if (after) return Number(after[1]);
-    const before = text.match(new RegExp(`(\\d+(?:\\.\\d+)?)\\s*(?:mbps|mb\\/s|ms)?\\s*\\b${escaped}\\b`, 'i'));
-    return before ? Number(before[1]) : null;
+    const number = '(\\d[\\d,]*(?:\\.\\d+)?)';
+    const unit = '(?:mbps|mb\\/s|mbit\\/s|megabits?\\s+per\\s+second|ms)';
+    // Prefer a value immediately before its label. Otherwise a string such as
+    // "20.42 Mbps Download - 45.57 Mbps Upload" assigns the following Upload
+    // value to Download as well.
+    const before = text.match(new RegExp(`${number}\\s*(?:${unit})?\\s*\\b${escaped}\\b`, 'i'));
+    if (before) return Number(before[1].replace(/,/g, ''));
+    const after = text.match(new RegExp(`\\b${escaped}\\b\\s*(?:speed\\s*)?(?:(?:is|of)\\s*)?[:=\\-]?\\s*${number}`, 'i'));
+    return after ? Number(after[1].replace(/,/g, '')) : null;
+  }
+
+  function prefixedSpeedPair(text, firstLabel, secondLabel) {
+    const number = '(\\d[\\d,]*(?:\\.\\d+)?)';
+    const unit = '(?:mbps|mb\\/s|mbit\\/s|megabits?\\s+per\\s+second)';
+    const connector = '\\s*(?:speed\\s*)?(?:(?:is|of)\\s*)?[:=\\-]?\\s*';
+    const separator = `\\s*(?:${unit})?\\s*(?:[|,;/·–—-]\\s*)?`;
+    const match = text.match(new RegExp(`\\b${firstLabel}\\b${connector}${number}${separator}\\b${secondLabel}\\b${connector}${number}`, 'i'));
+    if (!match) return null;
+    return [Number(match[1].replace(/,/g, '')), Number(match[2].replace(/,/g, ''))];
   }
 
   function parseInternetSpeed(value) {
     const withoutUrls = String(value || '').replace(/\bhttps?:\/\/\S+/gi, ' ');
-    const download = firstLabeledNumber(withoutUrls, 'download') ?? firstLabeledNumber(withoutUrls, 'down');
-    const upload = firstLabeledNumber(withoutUrls, 'upload') ?? firstLabeledNumber(withoutUrls, 'up');
+    const downloadFirst = prefixedSpeedPair(withoutUrls, 'download', 'upload');
+    const uploadFirst = downloadFirst ? null : prefixedSpeedPair(withoutUrls, 'upload', 'download');
+    const download = downloadFirst?.[0] ?? uploadFirst?.[1] ?? firstLabeledNumber(withoutUrls, 'download') ?? firstLabeledNumber(withoutUrls, 'down');
+    const upload = downloadFirst?.[1] ?? uploadFirst?.[0] ?? firstLabeledNumber(withoutUrls, 'upload') ?? firstLabeledNumber(withoutUrls, 'up');
     const latency = firstLabeledNumber(withoutUrls, 'latency') ?? firstLabeledNumber(withoutUrls, 'ping');
     return Object.freeze({ download, upload, latency });
   }
