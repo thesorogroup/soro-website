@@ -25,7 +25,7 @@ const fixture = {
   talents: [
     {
       id: 'talent-1',
-      displayName: 'Diotay, Jarryd Roy Arnido',
+      displayName: 'Example, Taylor Alex',
       location: { country: 'Philippines', timeZone: 'Asia/Manila' },
       skills: { verified: ['Medical coding', 'Insurance verification', 'Patient scheduling'] },
       experience: {
@@ -39,7 +39,7 @@ const fixture = {
         computerSpecifications: 'MacBook Air, 16 GB RAM',
         internetSpeed: '120 Mbps download · 45 Mbps upload'
       },
-      assignments: [{ id: 'placement-1', status: 'active', startDate: '2026-08-24', scheduleSummary: 'Monday-Friday · 9:00 AM-5:00 PM CT' }]
+      assignments: [{ id: 'placement-1', status: 'active', startDate: '2026-08-24', scheduleSummary: 'Weekday schedule' }]
     }
   ],
   count: 1,
@@ -82,7 +82,7 @@ test('Talent Profile pure renderer shows the approved folder view and only clien
   assert.match(html, /class="client-talent-folder-art"/);
   assert.match(html, /class="client-talent-folder-front-seam" d="M0 85H1240"/);
   assert.match(html, /M31 13\.5C31 2\.5 8 2\.5 8 22v70/);
-  assert.match(html, /Diotay, Jarryd Roy Arnido/);
+  assert.match(html, /Example, Taylor Alex/);
   assert.match(html, />Philippines</);
   assert.match(html, />Asia\/Manila</);
   assert.match(html, /Soro verified/);
@@ -122,13 +122,13 @@ test('multiple assigned Talent use a clean local chooser without rescoping the e
   const second = {
     ...fixture.talents[0],
     id: 'talent-2',
-    displayName: 'Santos, Mariel',
+    displayName: 'Example, Jordan Lee',
     assignments: [{ id: 'placement-2', status: 'onboarding', startDate: '2026-09-01', scheduleSummary: 'Flexible' }]
   };
   const html = preview.renderProfile({ talents: [fixture.talents[0], second] }, 'talent-2');
   assert.match(html, /data-client-talent-select/);
-  assert.match(html, /value="talent-2" selected>Santos, Mariel/);
-  assert.match(html, /id="client-talent-name">Santos, Mariel/);
+  assert.match(html, /value="talent-2" selected>Example, Jordan Lee/);
+  assert.match(html, /id="client-talent-name">Example, Jordan Lee/);
   const source = read('operations/client-talent-profile.js');
   assert.doesNotMatch(source, /ENDPOINT\s*\+|URLSearchParams|\?talent|\?placement/);
 });

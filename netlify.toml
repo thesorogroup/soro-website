@@ -25,3 +25,41 @@
   from = "/contact/"
   to = "/contact.html"
   status = 200
+
+# The repository root is the static publish directory. Keep source-only QA,
+# database, planning, and server-function files unavailable as public assets.
+[[redirects]]
+  from = "/tests/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/supabase/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/planning/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/work/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/netlify/*"
+  to = "/404.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/PHASE-2-PORTAL-PLANNING.md"
+  to = "/404.html"
+  status = 404
+  force = true
