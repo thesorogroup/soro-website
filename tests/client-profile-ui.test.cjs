@@ -60,7 +60,7 @@ test('the page loads cache-busted profile assets before routing and authenticati
   const html = read('operations/index.html');
   assert.match(html, /client-profile\.css\?v=20260829-client-profile/);
   assert.match(html, /client-profile\.js\?v=20260829-client-profile/);
-  assert.ok(html.indexOf('client-profile.js?v=20260829-client-profile') < html.indexOf('operations.js?v=20260829-manual-workday'));
+  assert.ok(html.indexOf('client-profile.js?v=20260829-client-profile') < html.indexOf('operations.js?v=20260829-talent-time-off'));
   assert.match(html, /auth\.js\?v=20260829-talent-self-profile/);
 });
 
