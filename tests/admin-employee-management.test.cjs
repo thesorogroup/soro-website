@@ -67,6 +67,26 @@ test('the Admin Panel exposes a dedicated Employees view and complete employee p
   ].forEach(([label, pattern]) => assert.match(ui, pattern, `Missing ${label} field.`));
 });
 
+test('Administrators explicitly assign and edit the employee payment route without browser inference', () => {
+  const ui = source('ui');
+
+  assert.match(ui, /wise_contractor:\s*['"]Philippines contractor — Wise['"]/);
+  assert.match(ui, /quickbooks_employee:\s*['"]U\.S\. employee — QuickBooks['"]/);
+  assert.match(ui, /needs_setup:\s*['"]Needs setup['"]/);
+  assert.match(ui, /name=["']paymentRoute["']/);
+  assert.match(ui, /name=["']payoutRecipientEmail["'][^>]*type=["']email["']/);
+  assert.match(ui, /route\.value\s*===\s*['"]wise_contractor['"]/);
+  assert.match(ui, /recipientField\.hidden\s*=\s*!usesWise/);
+  assert.match(ui, /recipient\.required\s*=\s*usesWise/);
+  assert.match(ui, /if\s*\(!usesWise\)\s*recipient\.value\s*=\s*['"]['"]/);
+  assert.match(ui, /Required for Wise/);
+  assert.doesNotMatch(ui, /Wise recipient email <span>Optional during setup<\/span>/);
+  assert.match(ui, /payment_route,payout_recipient_email/);
+  assert.match(ui, /action:\s*['"]update_employee_payment_route['"]/);
+  assert.match(ui, /payoutRecipientEmail:\s*paymentRoute\s*===\s*['"]wise_contractor['"]\s*\?\s*payoutRecipientEmail\s*:\s*null/);
+  assert.doesNotMatch(ui, /employee\.(?:country|state_region|city)\s*===?\s*['"][^'"]+['"][\s\S]{0,120}paymentRoute/);
+});
+
 test('employee management is gated by real authenticated access, never the workspace preview role', () => {
   const ui = source('ui');
   const server = source('server');
@@ -304,4 +324,21 @@ test('employee creation writes a minimal audit event without recording credentia
   assert.match(migration, /(?:email|phone|address_line_1|address_line_2|city|state_region|postal_code|country)\s+(?:text|citext)/i);
   ['email', 'phone', 'address_line_1', 'address_line_2', 'city', 'state_region', 'postal_code', 'country']
     .forEach(column => assert.match(migration, new RegExp(`\\b${column}\\s+(?:text|citext)`, 'i'), `Missing ${column} employee profile column.`));
+});
+
+test('employee payment routing is explicit, Admin-only, same-organization, and value-free in audit history', () => {
+  const server = source('server');
+  assert.match(server, /PAYMENT_ROUTES\s*=\s*new Set\(\[['"]wise_contractor['"],\s*['"]quickbooks_employee['"],\s*['"]needs_setup['"]\]\)/);
+  assert.match(server, /payment_route:\s*employee\.paymentRoute/);
+  assert.match(server, /payout_recipient_email:\s*employee\.payoutRecipientEmail/);
+  assert.match(server, /action === ['"]update_employee_payment_route['"]/);
+  assert.match(server, /hasExactKeys\(body, UPDATE_PAYMENT_ROUTE_REQUIRED_KEYS, UPDATE_PAYMENT_ROUTE_OPTIONAL_KEYS\)/);
+  assert.match(server, /async function updateEmployeePaymentRoute[\s\S]*requireAdministrator\(event\)/);
+  assert.match(server, /employee_profiles\?user_id=eq\.\$\{encodeURIComponent\(userId\)\}&organization_id=eq\.\$\{encodeURIComponent\(organizationId\)\}/);
+  assert.match(server, /changed_fields:\s*changedFields/);
+  const updateStart = server.indexOf('async function updateEmployeePaymentRoute');
+  const updateEnd = server.indexOf('async function reissueTemporaryPassword', updateStart);
+  const update = server.slice(updateStart, updateEnd);
+  assert.doesNotMatch(update, /after_value:[^\n]*(?:paymentRoute|payoutRecipientEmail)/);
+  assert.match(update, /reauthentication_required/);
 });

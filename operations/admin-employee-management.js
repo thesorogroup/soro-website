@@ -8,6 +8,12 @@
     sales: 'Sales Associate'
   });
   const EMPLOYEE_ROLES = new Set(Object.keys(EMPLOYEE_ROLE_LABELS));
+  const EMPLOYEE_PAYMENT_ROUTE_LABELS = Object.freeze({
+    wise_contractor: 'Philippines contractor — Wise',
+    quickbooks_employee: 'U.S. employee — QuickBooks',
+    needs_setup: 'Needs setup'
+  });
+  const EMPLOYEE_PAYMENT_ROUTES = new Set(Object.keys(EMPLOYEE_PAYMENT_ROUTE_LABELS));
   const EMPLOYEE_ROLE_ACCESS = Object.freeze({
     admin: 'Broad day-to-day Soro Ops access, including employee administration, Talent operations, clients, placements, documents, and reports. The reserved System Owner account remains separate.',
     talent_management: 'Application review, screening, Talent profiles and private Talent documents, onboarding, verified skills, support, and placements. Employee administration is excluded.',
@@ -28,6 +34,10 @@
 
   function employeeAccess(employee) {
     return employee.platform_users || employee.access || {};
+  }
+
+  function employeePaymentRoute(employee) {
+    return EMPLOYEE_PAYMENT_ROUTES.has(employee?.payment_route) ? employee.payment_route : 'needs_setup';
   }
 
   function formatEmployeeDate(value) {
@@ -63,6 +73,8 @@
       employee.city,
       employee.state_region,
       employee.country,
+      employee.payout_recipient_email,
+      EMPLOYEE_PAYMENT_ROUTE_LABELS[employeePaymentRoute(employee)],
       EMPLOYEE_ROLE_LABELS[employeeAccess(employee).role]
     ].filter(Boolean).join(' ').toLowerCase().includes(query));
   }
@@ -128,7 +140,7 @@
     if (current === 'employees') render();
     const { data: records, error } = await window.soroSupabase
       .from('employee_profiles')
-      .select('user_id,full_name,email,phone,hire_date,address_line_1,address_line_2,city,state_region,postal_code,country,created_at,platform_users!inner(role,active,must_change_password,initial_password_issued_at,password_changed_at)')
+      .select('user_id,full_name,email,phone,hire_date,address_line_1,address_line_2,city,state_region,postal_code,country,payment_route,payout_recipient_email,created_at,platform_users!inner(role,active,must_change_password,initial_password_issued_at,password_changed_at)')
       .order('full_name', { ascending: true });
     loading = false;
     if (error) {
@@ -156,6 +168,21 @@
     return dialog;
   }
 
+  function bindPaymentRouteFields(container) {
+    const route = container.querySelector('[name="paymentRoute"]');
+    const recipientField = container.querySelector('[data-wise-recipient-field]');
+    const recipient = container.querySelector('[name="payoutRecipientEmail"]');
+    if (!route || !recipientField || !recipient) return;
+    const sync = () => {
+      const usesWise = route.value === 'wise_contractor';
+      recipientField.hidden = !usesWise;
+      recipient.required = usesWise;
+      if (!usesWise) recipient.value = '';
+    };
+    route.addEventListener('change', sync);
+    sync();
+  }
+
   function openAddEmployeeDialog() {
     if (!canManageEmployees()) return;
     const maximumHireDate = new Date().toISOString().slice(0, 10);
@@ -163,7 +190,21 @@
       eyebrow: 'Administrator onboarding',
       title: 'Add a new employee',
       className: 'employee-add-dialog',
-      content: `<form class="record-manager-form" id="add-employee-form"><p class="record-manager-note">Create the employee’s private profile and Soro Ops access. A temporary password will be generated and shown once after the account is created.</p><div class="employee-form-section"><h3>Employment</h3><div class="record-manager-grid"><div class="record-manager-field record-manager-field--wide"><label for="employee-full-name">Full name</label><input id="employee-full-name" name="full_name" autocomplete="name" maxlength="120" required /></div><div class="record-manager-field"><label for="employee-hire-date">Hire date</label><input id="employee-hire-date" name="hire_date" type="date" max="${maximumHireDate}" required /></div><div class="record-manager-field"><label for="employee-role">Assigned role</label><select id="employee-role" name="role" required><option value="">Choose a role</option><option value="admin">Administrator</option><option value="talent_management">Talent Management</option><option value="sales">Sales Associate</option></select><small class="employee-role-security-note" hidden>Administrator grants broad Soro Ops access and requires a recent sign-in to assign. The reserved System Owner account cannot be assigned here.</small></div></div></div><div class="employee-form-section"><h3>Contact</h3><div class="record-manager-grid"><div class="record-manager-field"><label for="employee-email">Email</label><input id="employee-email" name="email" type="email" autocomplete="email" maxlength="254" required /></div><div class="record-manager-field"><label for="employee-phone">Phone number</label><input id="employee-phone" name="phone" type="tel" autocomplete="tel" maxlength="40" required /></div></div></div><div class="employee-form-section"><h3>Address</h3><div class="record-manager-grid"><div class="record-manager-field record-manager-field--wide"><label for="employee-address-one">Street address</label><input id="employee-address-one" name="address_line_1" autocomplete="address-line1" maxlength="160" required /></div><div class="record-manager-field record-manager-field--wide"><label for="employee-address-two">Apartment, suite, or unit <span>Optional</span></label><input id="employee-address-two" name="address_line_2" autocomplete="address-line2" maxlength="160" /></div><div class="record-manager-field"><label for="employee-city">City</label><input id="employee-city" name="city" autocomplete="address-level2" maxlength="100" required /></div><div class="record-manager-field"><label for="employee-state">State / province / region</label><input id="employee-state" name="state_region" autocomplete="address-level1" maxlength="100" required /></div><div class="record-manager-field"><label for="employee-postal">Postal code</label><input id="employee-postal" name="postal_code" autocomplete="postal-code" maxlength="24" required /></div><div class="record-manager-field"><label for="employee-country">Country</label><input id="employee-country" name="country" autocomplete="country-name" maxlength="100" required /></div></div></div><p class="employee-form-message" id="employee-form-message" aria-live="polite"></p><footer class="record-manager-footer"><button type="button" class="admin-record-button" data-cancel-employee>Cancel</button><button type="submit" class="admin-record-button admin-record-button--primary">Create employee &amp; password</button></footer></form>`
+      content: `<form class="record-manager-form" id="add-employee-form">
+        <p class="record-manager-note">Create the employee’s private profile and Soro Ops access. A temporary password will be generated and shown once after the account is created.</p>
+        <div class="employee-form-section"><h3>Employment</h3><div class="record-manager-grid">
+          <div class="record-manager-field record-manager-field--wide"><label for="employee-full-name">Full name</label><input id="employee-full-name" name="full_name" autocomplete="name" maxlength="120" required /></div>
+          <div class="record-manager-field"><label for="employee-hire-date">Hire date</label><input id="employee-hire-date" name="hire_date" type="date" max="${maximumHireDate}" required /></div>
+          <div class="record-manager-field"><label for="employee-role">Assigned role</label><select id="employee-role" name="role" required><option value="">Choose a role</option><option value="admin">Administrator</option><option value="talent_management">Talent Management</option><option value="sales">Sales Associate</option></select><small class="employee-role-security-note" hidden>Administrator grants broad Soro Ops access and requires a recent sign-in to assign. The reserved System Owner account cannot be assigned here.</small></div>
+        </div></div>
+        <div class="employee-form-section"><h3>Payment setup</h3><div class="record-manager-grid">
+          <div class="record-manager-field record-manager-field--wide"><label for="employee-payment-route">Payment route</label><select id="employee-payment-route" name="paymentRoute" required><option value="">Choose a payment route</option><option value="wise_contractor">Philippines contractor — Wise</option><option value="quickbooks_employee">U.S. employee — QuickBooks</option><option value="needs_setup">Needs setup</option></select><small>The Administrator chooses this route. Soro never infers it from the employee’s address.</small></div>
+          <div class="record-manager-field record-manager-field--wide" data-wise-recipient-field hidden><label for="employee-payout-recipient-email">Wise recipient email <span>Required for Wise</span></label><input id="employee-payout-recipient-email" name="payoutRecipientEmail" type="email" autocomplete="email" maxlength="254" /><small>Choose Needs setup instead if the Wise recipient email is not available yet.</small></div>
+        </div></div>
+        <div class="employee-form-section"><h3>Contact</h3><div class="record-manager-grid"><div class="record-manager-field"><label for="employee-email">Email</label><input id="employee-email" name="email" type="email" autocomplete="email" maxlength="254" required /></div><div class="record-manager-field"><label for="employee-phone">Phone number</label><input id="employee-phone" name="phone" type="tel" autocomplete="tel" maxlength="40" required /></div></div></div>
+        <div class="employee-form-section"><h3>Address</h3><div class="record-manager-grid"><div class="record-manager-field record-manager-field--wide"><label for="employee-address-one">Street address</label><input id="employee-address-one" name="address_line_1" autocomplete="address-line1" maxlength="160" required /></div><div class="record-manager-field record-manager-field--wide"><label for="employee-address-two">Apartment, suite, or unit <span>Optional</span></label><input id="employee-address-two" name="address_line_2" autocomplete="address-line2" maxlength="160" /></div><div class="record-manager-field"><label for="employee-city">City</label><input id="employee-city" name="city" autocomplete="address-level2" maxlength="100" required /></div><div class="record-manager-field"><label for="employee-state">State / province / region</label><input id="employee-state" name="state_region" autocomplete="address-level1" maxlength="100" required /></div><div class="record-manager-field"><label for="employee-postal">Postal code</label><input id="employee-postal" name="postal_code" autocomplete="postal-code" maxlength="24" required /></div><div class="record-manager-field"><label for="employee-country">Country</label><input id="employee-country" name="country" autocomplete="country-name" maxlength="100" required /></div></div></div>
+        <p class="employee-form-message" id="employee-form-message" aria-live="polite"></p><footer class="record-manager-footer"><button type="button" class="admin-record-button" data-cancel-employee>Cancel</button><button type="submit" class="admin-record-button admin-record-button--primary">Create employee &amp; password</button></footer>
+      </form>`
     });
     const roleSelect = dialog.querySelector('#employee-role');
     const roleSecurityNote = dialog.querySelector('.employee-role-security-note');
@@ -185,6 +226,7 @@
       roleAccessSummary.textContent = EMPLOYEE_ROLE_ACCESS[roleSelect.value]
         || 'Choose a role to review its access before creating the account.';
     });
+    bindPaymentRouteFields(dialog);
     dialog.querySelector('[data-cancel-employee]')?.addEventListener('click', () => dialog.close('cancel'));
     dialog.querySelector('form')?.addEventListener('submit', event => submitEmployee(event, dialog));
     dialog.showModal();
@@ -205,6 +247,20 @@
       message.className = 'employee-form-message employee-form-message--error';
       return;
     }
+    const paymentRoute = String(values.paymentRoute || '');
+    const payoutRecipientEmail = String(values.payoutRecipientEmail || '').trim().toLowerCase();
+    if (!EMPLOYEE_PAYMENT_ROUTES.has(paymentRoute)) {
+      message.textContent = 'Choose Philippines contractor — Wise, U.S. employee — QuickBooks, or Needs setup.';
+      message.className = 'employee-form-message employee-form-message--error';
+      return;
+    }
+    if (paymentRoute === 'wise_contractor' && !form.elements.payoutRecipientEmail.checkValidity()) {
+      message.textContent = 'Enter a valid Wise recipient email, or choose Needs setup until it is available.';
+      message.className = 'employee-form-message employee-form-message--error';
+      return;
+    }
+    values.paymentRoute = paymentRoute;
+    values.payoutRecipientEmail = paymentRoute === 'wise_contractor' ? payoutRecipientEmail : null;
     submit.disabled = true;
     submit.textContent = 'Creating secure account…';
     message.textContent = '';
@@ -279,15 +335,96 @@
     if (!employee || !canManageEmployees()) return;
     const access = employeeAccess(employee);
     const status = employeeStatus(employee);
+    const paymentRoute = employeePaymentRoute(employee);
+    const recipientDetail = paymentRoute === 'wise_contractor'
+      ? `<div><dt>Wise recipient</dt><dd>${escapeHtml(employee.payout_recipient_email || 'Not recorded')}</dd></div>`
+      : '';
     const dialog = dialogShell({
       eyebrow: 'Private employee profile',
       title: employee.full_name,
       className: 'employee-profile-dialog',
-      content: `<div class="employee-profile-content"><div class="employee-profile-lead"><span class="employee-profile-avatar">${escapeHtml(initials(employee.full_name))}</span><div><span class="employee-role">${escapeHtml(EMPLOYEE_ROLE_LABELS[access.role] || titleCase(access.role))}</span><span class="employee-status ${status.className}">${escapeHtml(status.label)}</span></div></div><section class="employee-effective-access"><strong>Effective access</strong><p>${escapeHtml(EMPLOYEE_ROLE_ACCESS[access.role] || 'Access follows the assigned Soro role.')}</p></section><dl class="employee-profile-details"><div><dt>Hire date</dt><dd>${escapeHtml(formatEmployeeDate(employee.hire_date))}</dd></div><div><dt>Email</dt><dd><a href="mailto:${escapeHtml(employee.email)}">${escapeHtml(employee.email)}</a></dd></div><div><dt>Phone</dt><dd><a href="tel:${escapeHtml(employee.phone)}">${escapeHtml(employee.phone)}</a></dd></div><div class="employee-profile-address"><dt>Address</dt><dd>${escapeHtml(employeeAddress(employee)).replaceAll('\n', '<br>')}</dd></div></dl>${status.setupRequired && access.role === 'admin' ? '<label class="employee-profile-security-check">Administrator security check<input name="administrator_password" type="password" autocomplete="current-password" placeholder="Re-enter your Soro password" /><small>Required before generating new credentials for an Administrator.</small></label>' : ''}<p class="employee-profile-action-message" aria-live="polite"></p><footer class="record-manager-footer">${status.setupRequired ? '<button type="button" class="admin-record-button" data-reissue-credentials>Generate new temporary password</button>' : ''}<button type="button" class="admin-record-button admin-record-button--primary" data-close-profile>Close profile</button></footer></div>`
+      content: `<div class="employee-profile-content">
+        <div class="employee-profile-lead"><span class="employee-profile-avatar">${escapeHtml(initials(employee.full_name))}</span><div><span class="employee-role">${escapeHtml(EMPLOYEE_ROLE_LABELS[access.role] || titleCase(access.role))}</span><span class="employee-status ${status.className}">${escapeHtml(status.label)}</span></div></div>
+        <section class="employee-effective-access"><strong>Effective access</strong><p>${escapeHtml(EMPLOYEE_ROLE_ACCESS[access.role] || 'Access follows the assigned Soro role.')}</p></section>
+        <dl class="employee-profile-details"><div><dt>Hire date</dt><dd>${escapeHtml(formatEmployeeDate(employee.hire_date))}</dd></div><div><dt>Email</dt><dd><a href="mailto:${escapeHtml(employee.email)}">${escapeHtml(employee.email)}</a></dd></div><div><dt>Phone</dt><dd><a href="tel:${escapeHtml(employee.phone)}">${escapeHtml(employee.phone)}</a></dd></div><div><dt>Payment route</dt><dd>${escapeHtml(EMPLOYEE_PAYMENT_ROUTE_LABELS[paymentRoute])}</dd></div>${recipientDetail}<div class="employee-profile-address"><dt>Address</dt><dd>${escapeHtml(employeeAddress(employee)).replaceAll('\n', '<br>')}</dd></div></dl>
+        ${status.setupRequired && access.role === 'admin' ? '<label class="employee-profile-security-check">Administrator security check<input name="administrator_password" type="password" autocomplete="current-password" placeholder="Re-enter your Soro password" /><small>Required before generating new credentials for an Administrator.</small></label>' : ''}
+        <p class="employee-profile-action-message" aria-live="polite"></p><footer class="record-manager-footer">${status.setupRequired ? '<button type="button" class="admin-record-button" data-reissue-credentials>Generate new temporary password</button>' : ''}<button type="button" class="admin-record-button" data-edit-payment-route>Edit payment setup</button><button type="button" class="admin-record-button admin-record-button--primary" data-close-profile>Close profile</button></footer>
+      </div>`
     });
     dialog.querySelector('[data-close-profile]')?.addEventListener('click', () => dialog.close('done'));
     dialog.querySelector('[data-reissue-credentials]')?.addEventListener('click', event => reissueTemporaryPassword(employee, dialog, event.currentTarget));
+    dialog.querySelector('[data-edit-payment-route]')?.addEventListener('click', () => openEmployeePaymentDialog(employee, dialog));
     dialog.showModal();
+  }
+
+  function openEmployeePaymentDialog(employee, profileDialog) {
+    if (!employee || !canManageEmployees()) return;
+    const currentRoute = employeePaymentRoute(employee);
+    const dialog = dialogShell({
+      eyebrow: 'Administrator payment setup',
+      title: `Payment route for ${employee.full_name}`,
+      className: 'employee-payment-dialog',
+      content: `<form class="record-manager-form" id="employee-payment-form">
+        <p class="record-manager-note">Choose the employee’s actual payment route. This setting controls which external payment workflow may include them; Soro does not infer it from address, country, or role.</p>
+        <div class="employee-form-section"><div class="record-manager-grid">
+          <div class="record-manager-field record-manager-field--wide"><label for="profile-payment-route">Payment route</label><select id="profile-payment-route" name="paymentRoute" required><option value="wise_contractor" ${currentRoute === 'wise_contractor' ? 'selected' : ''}>Philippines contractor — Wise</option><option value="quickbooks_employee" ${currentRoute === 'quickbooks_employee' ? 'selected' : ''}>U.S. employee — QuickBooks</option><option value="needs_setup" ${currentRoute === 'needs_setup' ? 'selected' : ''}>Needs setup</option></select></div>
+          <div class="record-manager-field record-manager-field--wide" data-wise-recipient-field><label for="profile-payout-recipient-email">Wise recipient email <span>Required for Wise</span></label><input id="profile-payout-recipient-email" name="payoutRecipientEmail" type="email" autocomplete="email" maxlength="254" value="${escapeHtml(currentRoute === 'wise_contractor' ? employee.payout_recipient_email || '' : '')}" /><small>Choose Needs setup instead if the Wise recipient email is not available yet.</small></div>
+        </div></div>
+        <p class="employee-form-message" aria-live="polite"></p><footer class="record-manager-footer"><button type="button" class="admin-record-button" data-cancel-payment-route>Cancel</button><button type="submit" class="admin-record-button admin-record-button--primary">Save payment setup</button></footer>
+      </form>`
+    });
+    bindPaymentRouteFields(dialog);
+    dialog.querySelector('[data-cancel-payment-route]')?.addEventListener('click', () => dialog.close('cancel'));
+    dialog.querySelector('form')?.addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!canManageEmployees()) return;
+      const form = event.currentTarget;
+      const submit = form.querySelector('[type="submit"]');
+      const message = form.querySelector('.employee-form-message');
+      const values = Object.fromEntries(new FormData(form).entries());
+      const paymentRoute = String(values.paymentRoute || '');
+      const payoutRecipientEmail = String(values.payoutRecipientEmail || '').trim().toLowerCase();
+      if (!EMPLOYEE_PAYMENT_ROUTES.has(paymentRoute)) {
+        message.textContent = 'Choose an available employee payment route.';
+        message.className = 'employee-form-message employee-form-message--error';
+        return;
+      }
+      if (paymentRoute === 'wise_contractor' && !form.elements.payoutRecipientEmail.checkValidity()) {
+        message.textContent = 'Enter a valid Wise recipient email, or choose Needs setup until it is available.';
+        message.className = 'employee-form-message employee-form-message--error';
+        return;
+      }
+      submit.disabled = true;
+      submit.textContent = 'Saving payment setup…';
+      message.textContent = '';
+      try {
+        const { data: { session } } = await window.soroSupabase.auth.getSession();
+        if (!session?.access_token) throw new Error('Your secure session expired. Sign in again and retry.');
+        const response = await fetch('/.netlify/functions/admin-employees', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'update_employee_payment_route',
+            userId: employee.user_id,
+            paymentRoute,
+            payoutRecipientEmail: paymentRoute === 'wise_contractor' ? payoutRecipientEmail : null
+          })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.message || 'The employee payment setup could not be saved.');
+        dialog.close('saved');
+        profileDialog?.close('updated');
+        await loadEmployees();
+        openEmployeeProfile(employee.user_id);
+      } catch (error) {
+        submit.disabled = false;
+        submit.textContent = 'Save payment setup';
+        message.textContent = error.message || 'The employee payment setup could not be saved.';
+        message.className = 'employee-form-message employee-form-message--error';
+      }
+    });
+    dialog.showModal();
+    dialog.querySelector('[name="paymentRoute"]')?.focus();
   }
 
   async function reissueTemporaryPassword(employee, profileDialog, button) {
@@ -355,6 +492,7 @@
   window.soroEmployeeManagement = {
     EMPLOYEE_ROLE_LABELS,
     EMPLOYEE_ROLE_ACCESS,
+    EMPLOYEE_PAYMENT_ROUTE_LABELS,
     canManageEmployees,
     loadEmployees
   };

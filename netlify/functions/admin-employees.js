@@ -14,6 +14,23 @@ const EMPLOYEE_ROLE_LABELS = Object.freeze({
   sales: 'Sales Associate'
 });
 const EMPLOYEE_ROLES = new Set(Object.keys(EMPLOYEE_ROLE_LABELS));
+const PAYMENT_ROUTES = new Set(['wise_contractor', 'quickbooks_employee', 'needs_setup']);
+const CREATE_EMPLOYEE_ALLOWED_KEYS = new Set([
+  'action', 'fullName', 'full_name', 'email', 'phone', 'hireDate', 'hire_date', 'role',
+  'addressLine1', 'address_line_1', 'addressLine2', 'address_line_2', 'city',
+  'stateRegion', 'state_region', 'postalCode', 'postal_code', 'country',
+  'paymentRoute', 'payoutRecipientEmail'
+]);
+const CREATE_EMPLOYEE_ALIAS_PAIRS = Object.freeze([
+  ['fullName', 'full_name'],
+  ['hireDate', 'hire_date'],
+  ['addressLine1', 'address_line_1'],
+  ['addressLine2', 'address_line_2'],
+  ['stateRegion', 'state_region'],
+  ['postalCode', 'postal_code']
+]);
+const UPDATE_PAYMENT_ROUTE_REQUIRED_KEYS = Object.freeze(['action', 'userId', 'paymentRoute']);
+const UPDATE_PAYMENT_ROUTE_OPTIONAL_KEYS = Object.freeze(['payoutRecipientEmail']);
 
 const json = (statusCode, body) => ({
   statusCode,
@@ -80,6 +97,25 @@ function parseBody(event) {
   try { return event.body ? JSON.parse(event.body) : {}; } catch { return {}; }
 }
 
+function hasOnlyAllowedKeys(body, allowedKeys) {
+  return Boolean(body)
+    && typeof body === 'object'
+    && !Array.isArray(body)
+    && Object.keys(body).every(key => allowedKeys.has(key));
+}
+
+function hasExactKeys(body, requiredKeys, optionalKeys = []) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return false;
+  const keys = Object.keys(body);
+  const allowed = new Set([...requiredKeys, ...optionalKeys]);
+  return requiredKeys.every(key => Object.hasOwn(body, key))
+    && keys.every(key => allowed.has(key));
+}
+
+function hasDuplicateAliases(body) {
+  return CREATE_EMPLOYEE_ALIAS_PAIRS.some(pair => pair.every(key => Object.hasOwn(body, key)));
+}
+
 async function authenticatedUser(event) {
   const token = bearerToken(event);
   if (!token) return null;
@@ -119,6 +155,23 @@ function validEmail(value) {
   return value.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function validatePaymentRouting(body) {
+  const paymentRoute = String(body.paymentRoute || '').trim().toLowerCase();
+  if (!PAYMENT_ROUTES.has(paymentRoute)) {
+    return { error: 'Choose Wise contractor, QuickBooks employee, or Needs setup.' };
+  }
+  const payoutRecipientEmail = paymentRoute === 'wise_contractor'
+    ? normalizedEmail(body.payoutRecipientEmail)
+    : '';
+  if (payoutRecipientEmail && !validEmail(payoutRecipientEmail)) {
+    return { error: 'Enter a valid payout recipient email or leave it blank.' };
+  }
+  if (paymentRoute === 'wise_contractor' && !payoutRecipientEmail) {
+    return { error: 'Enter the Wise payout recipient email for this employee.' };
+  }
+  return { paymentRoute, payoutRecipientEmail: payoutRecipientEmail || null };
+}
+
 function validIsoDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
   const date = new Date(`${value}T00:00:00Z`);
@@ -126,6 +179,7 @@ function validIsoDate(value) {
 }
 
 function validateEmployee(body) {
+  const routing = validatePaymentRouting(body);
   const employee = {
     fullName: normalizedText(body.fullName || body.full_name, 120),
     email: normalizedEmail(body.email),
@@ -137,7 +191,9 @@ function validateEmployee(body) {
     city: normalizedText(body.city, 100),
     stateRegion: normalizedText(body.stateRegion || body.state_region, 100),
     postalCode: normalizedText(body.postalCode || body.postal_code, 24),
-    country: normalizedText(body.country, 100)
+    country: normalizedText(body.country, 100),
+    paymentRoute: routing.paymentRoute,
+    payoutRecipientEmail: routing.payoutRecipientEmail
   };
   if (employee.fullName.length < 2) return { error: 'Enter the employee’s full name.' };
   if (!validEmail(employee.email)) return { error: 'Enter a valid employee email address.' };
@@ -145,6 +201,7 @@ function validateEmployee(body) {
   if (!validIsoDate(employee.hireDate) || employee.hireDate > new Date().toISOString().slice(0, 10)) return { error: 'Enter a valid hire date that is not in the future.' };
   if (!EMPLOYEE_ROLES.has(employee.role)) return { error: 'Choose Administrator, Talent Management, or Sales Associate.' };
   if (!employee.addressLine1 || !employee.city || !employee.stateRegion || !employee.postalCode || !employee.country) return { error: 'Complete the employee’s address.' };
+  if (routing.error) return routing;
   return { employee };
 }
 
@@ -180,13 +237,23 @@ function auditNote(eventType, outcome) {
     ? 'employee account provisioning'
     : eventType === 'temporary_password_reissue'
       ? 'temporary-password reissue'
+      : eventType === 'employee_payment_route_update'
+        ? 'employee payment-routing update'
       : 'first-sign-in password replacement';
   if (outcome === 'pending') return `Soro authorized ${action}; the final outcome is pending.`;
   if (outcome === 'failed') return `Soro recorded that ${action} did not complete and requires review.`;
   return `Soro recorded that ${action} completed.`;
 }
 
-async function beginAuditAction({ organizationId, actorId, employeeId, eventType, role }) {
+function auditAfterValue({ role, changedFields, outcome }) {
+  return {
+    ...(role ? { role } : {}),
+    ...(Array.isArray(changedFields) && changedFields.length ? { changed_fields: changedFields } : {}),
+    outcome
+  };
+}
+
+async function beginAuditAction({ organizationId, actorId, employeeId, eventType, role, changedFields }) {
   const response = await serviceRequest('/rest/v1/audit_events?select=id', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
@@ -196,7 +263,7 @@ async function beginAuditAction({ organizationId, actorId, employeeId, eventType
       entity_type: 'employee',
       entity_id: employeeId,
       event_type: eventType,
-      after_value: { ...(role ? { role } : {}), outcome: 'pending' },
+      after_value: auditAfterValue({ role, changedFields, outcome: 'pending' }),
       note: auditNote(eventType, 'pending')
     })
   });
@@ -205,13 +272,13 @@ async function beginAuditAction({ organizationId, actorId, employeeId, eventType
   return record.id;
 }
 
-async function finalizeAuditAction({ auditId, eventType, role, outcome }) {
+async function finalizeAuditAction({ auditId, eventType, role, changedFields, outcome }) {
   try {
     await serviceRequest(`/rest/v1/audit_events?id=eq.${encodeURIComponent(auditId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({
-        after_value: { ...(role ? { role } : {}), outcome },
+        after_value: auditAfterValue({ role, changedFields, outcome }),
         note: auditNote(eventType, outcome)
       })
     });
@@ -228,10 +295,10 @@ function isDuplicateError(error) {
   return error?.status === 409 || error?.status === 422 || /already|duplicate|unique|registered/.test(detail);
 }
 
-async function createEmployee(event) {
+async function createEmployee(event, body) {
   const administrator = await requireAdministrator(event);
   if (!administrator) return json(403, { message: 'Only an active Soro Administrator can add employees.' });
-  const validation = validateEmployee(parseBody(event));
+  const validation = validateEmployee(body);
   if (validation.error) return json(400, { message: validation.error });
   const employee = validation.employee;
   if (employee.role === 'admin' && !administrator.tokenFresh) {
@@ -290,7 +357,9 @@ async function createEmployee(event) {
         city: employee.city,
         state_region: employee.stateRegion,
         postal_code: employee.postalCode,
-        country: employee.country
+        country: employee.country,
+        payment_route: employee.paymentRoute,
+        payout_recipient_email: employee.payoutRecipientEmail
       })
     });
 
@@ -329,7 +398,9 @@ async function createEmployee(event) {
       fullName: employee.fullName,
       email: employee.email,
       role: employee.role,
-      roleLabel: EMPLOYEE_ROLE_LABELS[employee.role]
+      roleLabel: EMPLOYEE_ROLE_LABELS[employee.role],
+      paymentRoute: employee.paymentRoute,
+      payoutRecipientEmail: employee.payoutRecipientEmail
     },
     temporaryPassword,
     temporaryPasswordExpiresInHours: TEMPORARY_PASSWORD_TTL_HOURS,
@@ -340,6 +411,83 @@ async function createEmployee(event) {
 
 function validUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
+}
+
+async function updateEmployeePaymentRoute(event, body) {
+  const administrator = await requireAdministrator(event);
+  if (!administrator) return json(403, { message: 'Only an active Soro Administrator can update employee payment routing.' });
+  if (!administrator.tokenFresh) {
+    return json(401, {
+      code: 'reauthentication_required',
+      message: 'For security, sign out and sign back in before changing employee payment routing.'
+    });
+  }
+
+  const userId = String(body.userId || '').trim().toLowerCase();
+  if (!validUuid(userId)) return json(400, { message: 'Choose a valid employee profile.' });
+  const routing = validatePaymentRouting(body);
+  if (routing.error) return json(400, { message: routing.error });
+
+  const organizationId = administrator.access.organization_id;
+  const profileResponse = await serviceRequest(`/rest/v1/employee_profiles?user_id=eq.${encodeURIComponent(userId)}&organization_id=eq.${encodeURIComponent(organizationId)}&select=user_id,payment_route,payout_recipient_email&limit=2`);
+  const profiles = await profileResponse.json();
+  if (!Array.isArray(profiles) || profiles.length !== 1) {
+    return json(404, { message: 'The employee profile could not be found.' });
+  }
+
+  const profile = profiles[0];
+  const currentPayoutEmail = normalizedEmail(profile.payout_recipient_email) || null;
+  const changedFields = [];
+  if (profile.payment_route !== routing.paymentRoute) changedFields.push('payment_route');
+  if (currentPayoutEmail !== routing.payoutRecipientEmail) changedFields.push('payout_recipient_email');
+  if (!changedFields.length) {
+    return json(200, {
+      employee: { userId, paymentRoute: routing.paymentRoute, payoutRecipientEmail: routing.payoutRecipientEmail },
+      changedFields: [],
+      auditLogged: false,
+      auditPending: false
+    });
+  }
+
+  const auditEventType = 'employee_payment_route_update';
+  const auditId = await beginAuditAction({
+    organizationId,
+    actorId: administrator.user.id,
+    employeeId: userId,
+    eventType: auditEventType,
+    changedFields
+  });
+  let auditPending = false;
+  try {
+    const updateResponse = await serviceRequest(`/rest/v1/employee_profiles?user_id=eq.${encodeURIComponent(userId)}&organization_id=eq.${encodeURIComponent(organizationId)}&select=user_id,payment_route,payout_recipient_email`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({
+        payment_route: routing.paymentRoute,
+        payout_recipient_email: routing.payoutRecipientEmail
+      })
+    });
+    const updated = await updateResponse.json();
+    if (!Array.isArray(updated) || updated.length !== 1 || updated[0]?.user_id !== userId) {
+      throw new Error('The employee payment route could not be confirmed.');
+    }
+    auditPending = !await finalizeAuditAction({
+      auditId,
+      eventType: auditEventType,
+      changedFields,
+      outcome: 'completed'
+    });
+  } catch (error) {
+    await finalizeAuditAction({ auditId, eventType: auditEventType, changedFields, outcome: 'failed' });
+    throw error;
+  }
+
+  return json(200, {
+    employee: { userId, paymentRoute: routing.paymentRoute, payoutRecipientEmail: routing.payoutRecipientEmail },
+    changedFields,
+    auditLogged: true,
+    auditPending
+  });
 }
 
 async function reissueTemporaryPassword(event) {
@@ -476,8 +624,22 @@ async function changeInitialPassword(event) {
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return json(405, { message: 'Method not allowed.' });
   try {
-    const action = parseBody(event).action;
-    if (action === 'create_employee') return await createEmployee(event);
+    const body = parseBody(event);
+    const action = body.action;
+    if (action === 'create_employee') {
+      if (!hasOnlyAllowedKeys(body, CREATE_EMPLOYEE_ALLOWED_KEYS)
+        || hasDuplicateAliases(body)
+        || !Object.hasOwn(body, 'paymentRoute')) {
+        return json(400, { code: 'unsupported_scope', message: 'Only the approved employee profile fields are accepted.' });
+      }
+      return await createEmployee(event, body);
+    }
+    if (action === 'update_employee_payment_route') {
+      if (!hasExactKeys(body, UPDATE_PAYMENT_ROUTE_REQUIRED_KEYS, UPDATE_PAYMENT_ROUTE_OPTIONAL_KEYS)) {
+        return json(400, { code: 'unsupported_scope', message: 'Only employee payment-routing fields are accepted.' });
+      }
+      return await updateEmployeePaymentRoute(event, body);
+    }
     if (action === 'reissue_temporary_password') return await reissueTemporaryPassword(event);
     if (action === 'change_initial_password') return await changeInitialPassword(event);
     return json(400, { message: 'Choose a supported employee action.' });
@@ -490,7 +652,10 @@ exports.handler = async (event) => {
 };
 
 exports.EMPLOYEE_ROLE_LABELS = EMPLOYEE_ROLE_LABELS;
+exports.PAYMENT_ROUTES = PAYMENT_ROUTES;
 exports.TEMPORARY_PASSWORD_TTL_HOURS = TEMPORARY_PASSWORD_TTL_HOURS;
 exports.generateTemporaryPassword = generateTemporaryPassword;
+exports.hasExactKeys = hasExactKeys;
 exports.tokenIssuedRecently = tokenIssuedRecently;
 exports.validateEmployee = validateEmployee;
+exports.validatePaymentRouting = validatePaymentRouting;

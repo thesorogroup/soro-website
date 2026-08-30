@@ -1,6 +1,6 @@
 # Soro Operations Platform — Phase 2 Planning
 
-Last updated: August 21, 2026
+Last updated: August 29, 2026
 
 ## Product direction
 
@@ -32,6 +32,8 @@ Access model:
 - Administrators may add employee-specific grants or restrictions.
 - Each employee profile shows an easy-to-understand effective-access summary.
 - All permission and record changes are audited.
+
+First employee-management rollout (August 2026): the Admin Panel can assign Administrator, Talent Management, or Sales Associate. “Administrator” maps to the Delegated Administrator access above; the reserved System Owner account is not assignable from this screen. Employee-specific permission overrides remain deferred until the broader permissions workspace is implemented.
 
 ## Responsibility split
 
@@ -274,6 +276,19 @@ Suggested actions: **Archive instead**, **Cancel**, and **Continue to permanent 
 - Client appears only when at least one placement is connected to the Talent, and Documents remains the final tab in every state.
 - Benefits never appears to a Sales user and cannot be fetched through a direct client query.
 - The Talent File remains readable, keyboard-accessible, and usable on desktop and mobile.
+
+## Payroll & payouts — first preparation build
+
+The Admin Panel uses one **Payroll & Payouts** section with two deliberately separate lanes:
+
+- **Employee Payroll** prepares a Wise-ready staff batch for Soro's Philippines-based internal contractors, separately from placed Talent. Administrators create a period, enter optional manual amounts and notes, review exceptions, approve the locked snapshot, export it, and record the external provider reference after reconciliation. Soro does not calculate withholding. U.S. employees are excluded from this lane because taxes, withholding, deductions, and net pay are completed in QuickBooks.
+- **Talent Payouts** prepares placement-based payment batches for Philippines-based contract Talent. Current placement records establish the eligible population, but payout amounts remain manual. Talent Management may verify recipient details and record review notes; only an Administrator may approve the locked batch, export the preparation file, or record the Wise release reference. Soro does not withhold taxes in this lane.
+
+The two lanes produce two separate Wise batches: one for internal Philippines-based Soro staff and another for placed Philippines-based Talent. They have separate tables, permissions, states, exports, and histories. Shared financial-operation controls provide server-calculated totals, organization scoping, replay protection, immutable approved snapshots, and auditable actions. Editing an included Talent's amount, recipient email, or inclusion state invalidates any prior verification.
+
+Each employee profile stores an explicit payment route: **Philippines contractor — Wise**, **U.S. employee — QuickBooks**, or **Needs setup**. Existing Philippines and U.S. records receive a one-time country-based initialization during migration; any other existing record remains **Needs setup**. Future employee records default to **Needs setup** until an Administrator deliberately selects a route. Wise-routed staff also require a valid payout-recipient email. Payroll creation never dynamically infers or changes the route from an address after that initial migration.
+
+This first build never sends money and does not use attendance or time-off records to calculate compensation. Soro's operating rule is that Philippines-based Talent use the contractor payout lane, while any U.S. worker requiring payroll withholding is configured as an employee in QuickBooks. The platform does not infer legal worker classification from country alone. The exact QuickBooks import format, Wise account-template mapping, employee cadence and gross-pay source, contractor agreements and classification compliance, currency and exchange-rate rules, approval separation, correction handling, and retention policy remain explicit validation items before production activation.
 
 ## Guiding interaction rule
 

@@ -4,8 +4,8 @@ const roleConfig={admin:{label:'Administrator',person:'Matt Johnson',className:'
 const roleDashboards={sales:{title:'Sales Panel',caption:'Your priority client work is ready.',metrics:[['Tasks needing attention','6','2 overdue','alert'],['My client pipeline','18','4 ready for matching',''],['Open hiring requests','7','3 awaiting shortlist',''],['My available Talent','14','6 available now','']],primary:'Priority accounts needing action',items:[['red','Complete discovery for Northstar Legal','Required specialty checklist still has 2 items','Today'],['','Send shortlist to Brightlane Medical','Three selected Talent members are ready to present','Today'],['','Follow up after client interview','Haven & Co. · Mariel Santos','Tomorrow']],secondary:'Pipeline movement'},talent:{title:'Talent Management Panel',caption:'Your Talent readiness and support work is ready.',metrics:[['Talent actions needing attention','8','3 need follow-up','alert'],['Active Talent today','—','Loading live attendance…',''],['Talent Review Queue','12','5 interview ready',''],['Upcoming reviews','4','2 this week','']],primary:'Priority Talent support',items:[['red','Check in with Alex Ramos','15 minutes past scheduled start','Now'],['','Review 2 incomplete applications','Video or equipment proof missing','Today'],['','Prepare Mariel’s onboarding session','Placement begins Monday','Tomorrow']],secondary:'Talent readiness'},client:{title:'Client Portal',caption:'Your active Talent support and Soro actions are all in one place.',metrics:[['Action needed','2','1 document is awaiting your signature','alert'],['Your current Talent','3','All active placements',''],['Open hiring requests','1','Next review tomorrow',''],['Invoices','1','Due this Friday','warning']],primary:'Action needed',items:[['red','Sign the Soro client agreement','Haven & Co. · secure document ready','Today'],['','Choose interview windows','Operations support role · 3 candidates ready','Tomorrow']],secondary:'Your current Talent'},va:{title:'Talent Portal',caption:'Your workday, progress, and support are all here.',metrics:[['Today’s work','—','Current placement status will appear here',''],['Dream Pathway','1 next step','Review education options',''],['Next payout','Friday','Current pay period',''],['Documents','1 action','Update Wise recipient verification','warning']],primary:'Action needed',items:[['','Complete your Dream Pathway action','Choose two education programs to discuss at your next review','This week'],['','Update payout verification','Wise recipient details need confirmation','This week']],secondary:'Your progress'}};
 const root=document.getElementById('view-root'),nav=document.getElementById('main-nav');
 const authenticatedEmployeeViews=Object.freeze({
-  admin:new Set(['overview','tasks','clients','vas','talent-profile','placements','documents','reports','employees','help']),
-  talent_management:new Set(['overview','tasks','clients','vas','talent-profile','placements','documents','reports','help']),
+  admin:new Set(['overview','tasks','clients','vas','talent-profile','placements','documents','reports','employees','payroll','help']),
+  talent_management:new Set(['overview','tasks','clients','vas','talent-profile','placements','documents','reports','talent-payout-review','help']),
   sales:new Set(['overview','tasks','clients','placements','reports','help']),
   sales_management:new Set(['overview','tasks','clients','placements','reports','help']),
   billing:new Set(['overview','tasks','clients','placements','documents','reports','help']),
@@ -118,6 +118,11 @@ function syncAuthorizedNavigation(access=window.soroCurrentAccess){
   document.querySelectorAll('#main-nav [data-view]').forEach(button=>{
     button.hidden=!allowed.has(button.dataset.view);
   });
+  const actualRole=actualAuthenticatedRole(access);
+  const payrollNav=document.getElementById('payroll-nav');
+  const talentPayoutReviewNav=document.getElementById('talent-payout-review-nav');
+  if(payrollNav)payrollNav.hidden=actualRole!=='admin'||accessRole!=='admin';
+  if(talentPayoutReviewNav)talentPayoutReviewNav.hidden=actualRole!=='talent_management'||accessRole!=='talent_management';
   document.querySelectorAll('[data-notification-view]').forEach(button=>{
     button.hidden=clientPortal||!allowed.has(button.dataset.notificationView);
   });
