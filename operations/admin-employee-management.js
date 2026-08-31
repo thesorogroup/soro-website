@@ -28,6 +28,14 @@
   let loadError = '';
   let employeeSearch = '';
 
+  function payrollReadinessApi() {
+    return window.soroEmployeePayrollReadiness || null;
+  }
+
+  function payrollReadinessFilter() {
+    return payrollReadinessApi()?.filterState(location.search) || { active: false, asOf: '' };
+  }
+
   function canManageEmployees() {
     return window.soroCurrentAccess?.role === 'admin';
   }
@@ -63,32 +71,45 @@
     return { label: 'Active', className: 'employee-status--active' };
   }
 
+  function employeePayrollReadiness(employee, asOf) {
+    return payrollReadinessApi()?.employeeState(employee, asOf) || { key: 'invalid', label: 'Readiness unavailable' };
+  }
+
   function filteredEmployees() {
     const query = employeeSearch.trim().toLowerCase();
-    if (!query) return employees;
-    return employees.filter(employee => [
-      employee.full_name,
-      employee.email,
-      employee.phone,
-      employee.city,
-      employee.state_region,
-      employee.country,
-      employee.payout_recipient_email,
-      EMPLOYEE_PAYMENT_ROUTE_LABELS[employeePaymentRoute(employee)],
-      EMPLOYEE_ROLE_LABELS[employeeAccess(employee).role]
-    ].filter(Boolean).join(' ').toLowerCase().includes(query));
+    const readinessFilter = payrollReadinessFilter();
+    return employees.filter(employee => {
+      if (readinessFilter.active) {
+        return payrollReadinessApi()?.includedInReview(employee, { asOf: readinessFilter.asOf, query }) === true;
+      }
+      return !query || [
+        employee.full_name,
+        employee.email,
+        employee.phone,
+        employee.city,
+        employee.state_region,
+        employee.country,
+        employee.payout_recipient_email,
+        EMPLOYEE_PAYMENT_ROUTE_LABELS[employeePaymentRoute(employee)],
+        EMPLOYEE_ROLE_LABELS[employeeAccess(employee).role]
+      ].filter(Boolean).join(' ').toLowerCase().includes(query);
+    });
   }
 
   function employeeRows() {
     const filtered = filteredEmployees();
     if (!filtered.length) {
-      const message = employees.length ? 'No employees match that search.' : 'No employee profiles have been added yet.';
+      const readinessFilter = payrollReadinessFilter();
+      const message = readinessFilter.active
+        ? 'No employee payment setups need attention for this payroll period.'
+        : employees.length ? 'No employees match that search.' : 'No employee profiles have been added yet.';
       return `<tr><td class="employee-directory-empty" colspan="6">${escapeHtml(message)}</td></tr>`;
     }
     return filtered.map(employee => {
       const access = employeeAccess(employee);
       const status = employeeStatus(employee);
-      return `<tr class="employee-directory-row" data-employee-id="${escapeHtml(employee.user_id)}" tabindex="0" role="button" aria-label="Open ${escapeHtml(employee.full_name)} employee profile"><td><span class="employee-person"><b>${escapeHtml(initials(employee.full_name))}</b><span><strong>${escapeHtml(employee.full_name)}</strong><small>${escapeHtml(employee.email)}</small></span></span></td><td><span class="employee-role">${escapeHtml(EMPLOYEE_ROLE_LABELS[access.role] || titleCase(access.role))}</span></td><td>${escapeHtml(formatEmployeeDate(employee.hire_date))}</td><td>${escapeHtml(employee.phone)}</td><td>${escapeHtml([employee.city, employee.state_region].filter(Boolean).join(', '))}</td><td><span class="employee-status ${status.className}">${escapeHtml(status.label)}</span></td></tr>`;
+      const payrollState = employeePayrollReadiness(employee, payrollReadinessFilter().asOf);
+      return `<tr class="employee-directory-row" data-employee-id="${escapeHtml(employee.user_id)}" tabindex="0" role="button" aria-label="Open ${escapeHtml(employee.full_name)} employee profile"><td><span class="employee-person"><b>${escapeHtml(initials(employee.full_name))}</b><span><strong>${escapeHtml(employee.full_name)}</strong><small>${escapeHtml(employee.email)}</small></span></span></td><td><span class="employee-role">${escapeHtml(EMPLOYEE_ROLE_LABELS[access.role] || titleCase(access.role))}</span>${payrollReadinessFilter().active ? `<small class="employee-payroll-state employee-payroll-state--${escapeHtml(payrollState.key)}">${escapeHtml(payrollState.label)}</small>` : ''}</td><td>${escapeHtml(formatEmployeeDate(employee.hire_date))}</td><td>${escapeHtml(employee.phone)}</td><td>${escapeHtml([employee.city, employee.state_region].filter(Boolean).join(', '))}</td><td><span class="employee-status ${status.className}">${escapeHtml(status.label)}</span></td></tr>`;
     }).join('');
   }
 
@@ -96,7 +117,11 @@
     const adminCount = employees.filter(employee => employeeAccess(employee).role === 'admin').length;
     const talentCount = employees.filter(employee => employeeAccess(employee).role === 'talent_management').length;
     const salesCount = employees.filter(employee => employeeAccess(employee).role === 'sales').length;
-    return `<main class="page employee-management-page"><div class="page-heading employee-page-heading"><div><p class="eyebrow">Admin Panel</p><h1>Employees</h1><p class="employee-page-caption">Create Soro employee profiles, assign access, and manage first sign-in setup.</p></div><button class="button primary" id="add-employee" type="button">+ Add employee</button></div><section class="employee-summary" aria-label="Employee summary"><article><span>Total employees</span><strong>${employees.length}</strong></article><article><span>Administrators</span><strong>${adminCount}</strong></article><article><span>Talent Management</span><strong>${talentCount}</strong></article><article><span>Sales Associates</span><strong>${salesCount}</strong></article></section><section class="panel employee-directory"><div class="employee-directory-toolbar"><div><h2>Employee directory</h2><p>Private contact and employment details are available only to Administrators.</p></div><label class="employee-search"><span aria-hidden="true">⌕</span><input id="employee-search" type="search" value="${escapeHtml(employeeSearch)}" placeholder="Search employees" autocomplete="off" /></label></div>${loading ? '<div class="employee-loading">Loading employee profiles…</div>' : loadError ? `<div class="employee-error"><strong>Employee profiles could not be loaded.</strong><span>${escapeHtml(loadError)}</span><button class="button" id="retry-employees" type="button">Try again</button></div>` : `<div class="employee-table-wrap"><table class="data-table employee-table"><thead><tr><th>Employee</th><th>Role</th><th>Hire date</th><th>Phone</th><th>Location</th><th>Access</th></tr></thead><tbody>${employeeRows()}</tbody></table></div>`}</section></main>`;
+    const readinessFilter = payrollReadinessFilter();
+    const readinessBanner = readinessFilter.active
+      ? `<section class="employee-payroll-filter" aria-label="Payroll readiness filter"><div><span>Payroll readiness review</span><strong>Showing employee payment setups that need attention</strong><small>Eligibility is checked for the payroll period ending ${escapeHtml(formatEmployeeDate(readinessFilter.asOf))}. Open a profile to complete its payment route or Wise recipient.</small></div><button class="button" id="clear-payroll-readiness-filter" type="button">Show all employees</button></section>`
+      : '';
+    return `<main class="page employee-management-page"><div class="page-heading employee-page-heading"><div><p class="eyebrow">Admin Panel</p><h1>Employees</h1><p class="employee-page-caption">Create Soro employee profiles, assign access, and manage first sign-in setup.</p></div><button class="button primary" id="add-employee" type="button">+ Add employee</button></div>${readinessBanner}<section class="employee-summary" aria-label="Employee summary"><article><span>Total employees</span><strong>${employees.length}</strong></article><article><span>Administrators</span><strong>${adminCount}</strong></article><article><span>Talent Management</span><strong>${talentCount}</strong></article><article><span>Sales Associates</span><strong>${salesCount}</strong></article></section><section class="panel employee-directory"><div class="employee-directory-toolbar"><div><h2>Employee directory</h2><p>Private contact and employment details are available only to Administrators.</p></div><label class="employee-search"><span aria-hidden="true">⌕</span><input id="employee-search" type="search" value="${escapeHtml(employeeSearch)}" placeholder="Search employees" autocomplete="off" /></label></div>${loading ? '<div class="employee-loading">Loading employee profiles…</div>' : loadError ? `<div class="employee-error"><strong>Employee profiles could not be loaded.</strong><span>${escapeHtml(loadError)}</span><button class="button" id="retry-employees" type="button">Try again</button></div>` : `<div class="employee-table-wrap"><table class="data-table employee-table"><thead><tr><th>Employee</th><th>Role</th><th>Hire date</th><th>Phone</th><th>Location</th><th>Access</th></tr></thead><tbody>${employeeRows()}</tbody></table></div>`}</section></main>`;
   }
 
   render = function () {
@@ -114,6 +139,13 @@
   function bindEmployeePage() {
     document.getElementById('add-employee')?.addEventListener('click', openAddEmployeeDialog);
     document.getElementById('retry-employees')?.addEventListener('click', loadEmployees);
+    document.getElementById('clear-payroll-readiness-filter')?.addEventListener('click', () => {
+      const destination = new URL(location.href);
+      destination.searchParams.delete('employeeFilter');
+      destination.searchParams.delete('payrollAsOf');
+      history.replaceState({}, '', `${destination.pathname}${destination.search}#employees`);
+      render();
+    });
     document.getElementById('employee-search')?.addEventListener('input', event => {
       employeeSearch = event.target.value;
       render();
@@ -487,6 +519,10 @@
       render();
     }
     loadEmployees();
+  });
+
+  window.addEventListener('soro:employee-payroll-review', () => {
+    if (canManageEmployees()) employeeSearch = '';
   });
 
   window.soroEmployeeManagement = {

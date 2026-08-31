@@ -14,6 +14,46 @@
   line-height: 1.55;
 }
 
+.employee-payroll-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+  padding: 16px 18px;
+  border: 1px solid #efd8c9;
+  border-left: 4px solid #d66a35;
+  border-radius: 12px;
+  background: #fff9f5;
+}
+
+.employee-payroll-filter span,
+.employee-payroll-filter strong,
+.employee-payroll-filter small {
+  display: block;
+}
+
+.employee-payroll-filter span {
+  color: #9a4d27;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+
+.employee-payroll-filter strong {
+  margin-top: 4px;
+  color: #153b66;
+  font-size: 14px;
+}
+
+.employee-payroll-filter small {
+  margin-top: 4px;
+  color: #687a8f;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
 .employee-summary {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -158,6 +198,15 @@
 .employee-role {
   background: #edf3fa;
   color: #184a7d;
+}
+
+.employee-payroll-state {
+  display: block;
+  width: max-content;
+  margin-top: 5px;
+  color: #9a4b20;
+  font-size: 10px;
+  font-weight: 700;
 }
 
 .employee-status--active {
@@ -407,6 +456,11 @@
   }
 
   .employee-directory-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .employee-payroll-filter {
     align-items: stretch;
     flex-direction: column;
   }

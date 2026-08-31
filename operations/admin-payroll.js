@@ -96,9 +96,47 @@
   function freezeWorkspace(value) {
     return Object.freeze({
       ...value,
-      employeePayroll: value.employeePayroll ? Object.freeze({ runs: Object.freeze(value.employeePayroll.runs) }) : null,
+      employeePayroll: value.employeePayroll ? Object.freeze({
+        runs: Object.freeze(value.employeePayroll.runs),
+        readiness: value.employeePayroll.readiness
+      }) : null,
       talentPayouts: Object.freeze({ runs: Object.freeze(value.talentPayouts?.runs || []) })
     });
+  }
+
+  function unavailableEmployeeReadiness() {
+    return Object.freeze({
+      valid: false,
+      asOf: '',
+      wiseEligible: 0,
+      wiseConfigured: 0,
+      needsSetup: 0,
+      quickbooks: 0,
+      inactive: 0,
+      futureHire: 0,
+      total: 0,
+      canRunPayroll: false
+    });
+  }
+
+  function normalizeEmployeeReadiness(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return unavailableEmployeeReadiness();
+    const readiness = {
+      asOf: validDate(value.asOf),
+      wiseEligible: nonnegativeInteger(value.wiseEligible),
+      wiseConfigured: nonnegativeInteger(value.wiseConfigured),
+      needsSetup: nonnegativeInteger(value.needsSetup),
+      quickbooks: nonnegativeInteger(value.quickbooks),
+      inactive: nonnegativeInteger(value.inactive),
+      futureHire: nonnegativeInteger(value.futureHire),
+      total: nonnegativeInteger(value.total),
+      canRunPayroll: value.canRunPayroll
+    };
+    const counts = [readiness.wiseEligible, readiness.wiseConfigured, readiness.needsSetup, readiness.quickbooks, readiness.inactive, readiness.futureHire, readiness.total];
+    if (!readiness.asOf || counts.some(item => item === null) || typeof readiness.canRunPayroll !== 'boolean') return unavailableEmployeeReadiness();
+    if (readiness.wiseConfigured > readiness.wiseEligible || readiness.wiseEligible > readiness.total) return unavailableEmployeeReadiness();
+    if (readiness.canRunPayroll !== (readiness.wiseEligible > 0)) return unavailableEmployeeReadiness();
+    return Object.freeze({ valid: true, ...readiness });
   }
 
   function normalizeEmployeeItem(value) {
@@ -219,7 +257,11 @@
   function normalizeLane(value, lane) {
     if (!value || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.runs) || value.runs.length > 500) return null;
     const runs = value.runs.map(run => normalizeRun(run, lane));
-    return runs.some(run => !run) ? null : Object.freeze({ runs: Object.freeze(runs) });
+    if (runs.some(run => !run)) return null;
+    return Object.freeze({
+      runs: Object.freeze(runs),
+      ...(lane === 'employee' ? { readiness: normalizeEmployeeReadiness(value.readiness) } : {})
+    });
   }
 
   function normalizeWorkspace(payload, expectedRole = actualRole()) {
@@ -403,12 +445,28 @@
     return runs.find(run => run.runId === selectedId) || preferredRun(runs, lane);
   }
 
+  function employeeReadinessMarkup(readiness) {
+    if (!readiness?.valid) {
+      return `<section class="payroll-readiness payroll-readiness--unavailable" aria-label="Employee payroll readiness"><div><span>Payroll readiness</span><strong>Needs review</strong></div><p>Current employee eligibility could not be verified. Review employee setup before creating a Wise payroll draft.</p></section>`;
+    }
+    const notEligible = readiness.inactive + readiness.futureHire;
+    const needsSetup = readiness.needsSetup + (readiness.wiseEligible - readiness.wiseConfigured);
+    return `<section class="payroll-readiness" aria-label="Employee payroll readiness"><header><div><span>Payroll readiness</span><strong>As of ${escapeHtml(formatDate(readiness.asOf))}</strong></div><small>${readiness.total} employee${readiness.total === 1 ? '' : 's'} reviewed by the server</small></header><dl>
+      <div class="payroll-readiness-stat payroll-readiness-stat--ready"><dt>Wise-ready</dt><dd>${readiness.wiseConfigured}</dd><small>Wise recipient recorded</small></div>
+      <div class="payroll-readiness-stat payroll-readiness-stat--setup"><dt>Needs setup</dt><dd>${needsSetup}</dd><small>Payment route or recipient needs attention</small></div>
+      <div class="payroll-readiness-stat payroll-readiness-stat--quickbooks"><dt>QuickBooks-only</dt><dd>${readiness.quickbooks}</dd><small>Excluded from the Wise batch</small></div>
+      <div class="payroll-readiness-stat payroll-readiness-stat--ineligible"><dt>Not currently eligible</dt><dd>${notEligible}</dd><small>${readiness.inactive} inactive · ${readiness.futureHire} future hire</small></div>
+    </dl></section>`;
+  }
+
   function laneCardMarkup(lane, role) {
     const employee = lane === 'employee';
     const runs = employee ? workspace.employeePayroll?.runs || [] : workspace.talentPayouts?.runs || [];
     const run = preferredRun(runs, lane);
     const active = run && !(employee ? FINAL_EMPLOYEE_STATUSES : FINAL_TALENT_STATUSES).has(run.status);
     const canCreate = role === ADMIN_ROLE;
+    const readiness = employee ? workspace.employeePayroll?.readiness : null;
+    const canStartEmployeePayroll = employee && readiness?.valid && readiness.canRunPayroll;
     const title = employee ? 'Employee Payroll' : 'Talent Payouts';
     const label = employee ? 'Philippines internal staff' : 'Philippines contract Talent';
     const description = employee
@@ -425,9 +483,11 @@
     const button = active
       ? `<button class="button payroll-lane-primary" type="button" data-payroll-open-lane="${lane}">${escapeHtml(primaryLabel)}</button>`
       : canCreate
-        ? `<button class="button payroll-lane-primary" type="button" data-payroll-create="${lane}">${escapeHtml(primaryLabel)}</button>`
+        ? employee && !canStartEmployeePayroll
+          ? '<button class="button payroll-lane-primary payroll-lane-primary--review" type="button" data-payroll-review-employees>Review employee setup</button>'
+          : `<button class="button payroll-lane-primary" type="button" data-payroll-create="${lane}">${escapeHtml(primaryLabel)}</button>`
         : '<button class="button" type="button" disabled>No batch to review</button>';
-    return `<article class="payroll-lane-card payroll-lane-card--${lane}"><div class="payroll-lane-head"><div><p class="payroll-lane-label">${escapeHtml(label)}</p><h2>${escapeHtml(title)}</h2></div><span class="payroll-lane-icon">${ICONS[lane]}</span></div><p>${escapeHtml(description)}</p><dl class="payroll-lane-summary">${summary.map(([term, value]) => `<div><dt>${escapeHtml(term)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl><div class="payroll-lane-actions">${button}<small>${employee ? 'Payment route is set by an Administrator in Employees; the browser never infers it.' : 'Only an Administrator can approve, export, or record release.'}</small></div></article>`;
+    return `<article class="payroll-lane-card payroll-lane-card--${lane}"><div class="payroll-lane-head"><div><p class="payroll-lane-label">${escapeHtml(label)}</p><h2>${escapeHtml(title)}</h2></div><span class="payroll-lane-icon">${ICONS[lane]}</span></div><p>${escapeHtml(description)}</p>${employee ? employeeReadinessMarkup(readiness) : ''}<dl class="payroll-lane-summary">${summary.map(([term, value]) => `<div><dt>${escapeHtml(term)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl><div class="payroll-lane-actions">${button}<small>${employee ? 'Payment route is set by an Administrator in Employees; the browser never infers it.' : 'Only an Administrator can approve, export, or record release.'}</small></div></article>`;
   }
 
   function statusMarkup(value) {
@@ -520,7 +580,22 @@
     return dialog;
   }
 
-  function defaultRunDates() {
+  function shiftIsoDate(value, days) {
+    if (!validDate(value) || !Number.isSafeInteger(days)) return '';
+    const [year, month, day] = value.split('-').map(Number);
+    const date = new Date(Date.UTC(year, month - 1, day));
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  }
+
+  function defaultRunDates(employeeReadinessAsOf = '') {
+    if (validDate(employeeReadinessAsOf)) {
+      return {
+        periodStart: shiftIsoDate(employeeReadinessAsOf, -13),
+        periodEnd: employeeReadinessAsOf,
+        payDate: shiftIsoDate(employeeReadinessAsOf, 1)
+      };
+    }
     const today = new Date();
     const payDate = new Date(today);
     const daysUntilFriday = (5 - payDate.getDay() + 7) % 7;
@@ -536,7 +611,8 @@
   function openCreateDialog(lane) {
     if (actualRole() !== ADMIN_ROLE || !['employee', 'talent'].includes(lane)) return;
     const employee = lane === 'employee';
-    const dates = defaultRunDates();
+    const readiness = workspace.employeePayroll?.readiness;
+    const dates = defaultRunDates(employee && readiness?.valid ? readiness.asOf : '');
     const dialog = dialogShell({
       eyebrow: employee ? 'Employee Payroll' : 'Talent Payouts',
       title: employee ? 'Run payroll' : 'Create payout batch',
@@ -698,8 +774,25 @@
     return runs.find(run => run.runId === runId) || null;
   }
 
+  function openEmployeeReadinessReview() {
+    if (actualRole() !== ADMIN_ROLE || !root?.location || typeof current === 'undefined') return;
+    const readiness = workspace.employeePayroll?.readiness;
+    const destination = new URL(root.location.href);
+    destination.searchParams.set('employeeFilter', 'payroll-readiness');
+    if (readiness?.valid) destination.searchParams.set('payrollAsOf', readiness.asOf);
+    else destination.searchParams.delete('payrollAsOf');
+    destination.hash = 'employees';
+    current = 'employees';
+    root.history.pushState({}, '', `${destination.pathname}${destination.search}${destination.hash}`);
+    if (typeof root.CustomEvent === 'function') root.dispatchEvent(new root.CustomEvent('soro:employee-payroll-review'));
+    if (typeof setActive === 'function') setActive();
+    if (typeof render === 'function') render();
+    root.scrollTo?.({ top: 0, behavior: 'smooth' });
+  }
+
   function bindPage(scope = root?.document) {
     scope?.querySelector('[data-payroll-retry]')?.addEventListener('click', load);
+    scope?.querySelector('[data-payroll-review-employees]')?.addEventListener('click', openEmployeeReadinessReview);
     scope?.querySelectorAll('[data-payroll-create]').forEach(button => button.addEventListener('click', () => openCreateDialog(button.dataset.payrollCreate)));
     scope?.querySelectorAll('[data-payroll-open-lane]').forEach(button => button.addEventListener('click', () => {
       selectedLane = button.dataset.payrollOpenLane;
@@ -786,7 +879,9 @@
     ENDPOINT,
     canUse,
     canOpenView,
+    normalizeEmployeeReadiness,
     normalizeWorkspace,
+    defaultRunDates,
     pageMarkup,
     load,
     reset,

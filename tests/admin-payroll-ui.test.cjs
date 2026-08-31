@@ -112,3 +112,63 @@ test('export is a download-only action and UI never claims that Soro sent funds'
   assert.match(source, /This button does not send money/);
   assert.doesNotMatch(source, /payment sent successfully|funds sent successfully/i);
 });
+
+test('employee readiness is server-shaped, validated, and fails closed before payroll creation', () => {
+  const ui = loadModule('admin');
+  const valid = ui.normalizeEmployeeReadiness({
+    asOf: '2026-09-03',
+    total: 8,
+    wiseEligible: 4,
+    wiseConfigured: 3,
+    needsSetup: 1,
+    quickbooks: 2,
+    inactive: 1,
+    futureHire: 0,
+    canRunPayroll: true
+  });
+  assert.equal(valid.valid, true);
+  assert.equal(valid.wiseConfigured, 3);
+  assert.equal(valid.canRunPayroll, true);
+
+  for (const malformed of [
+    null,
+    {},
+    { ...valid, wiseEligible: -1 },
+    { ...valid, wiseConfigured: 5 },
+    { ...valid, canRunPayroll: false },
+    { ...valid, asOf: '09/03/2026' }
+  ]) {
+    const normalized = ui.normalizeEmployeeReadiness(malformed);
+    assert.equal(normalized.valid, false);
+    assert.equal(normalized.canRunPayroll, false);
+    assert.equal(normalized.wiseConfigured, 0);
+  }
+});
+
+test('employee payroll dates use the server readiness cutoff without browser timezone inference', () => {
+  const ui = loadModule('admin');
+  assert.deepEqual(ui.defaultRunDates('2026-09-03'), {
+    periodStart: '2026-08-21',
+    periodEnd: '2026-09-03',
+    payDate: '2026-09-04'
+  });
+});
+
+test('zero-ready payroll routes Administrators to the filtered Employee setup review', () => {
+  const payroll = read('operations/admin-payroll.js');
+  const employees = read('operations/admin-employee-management.js');
+  const readiness = read('operations/employee-payroll-readiness.js');
+  const html = read('operations/index.html');
+  assert.match(payroll, /data-payroll-review-employees>Review employee setup/);
+  assert.match(payroll, /searchParams\.set\(['"]employeeFilter['"],\s*['"]payroll-readiness['"]\)/);
+  assert.match(payroll, /destination\.hash\s*=\s*['"]employees['"]/);
+  assert.match(employees, /payrollReadinessApi\(\)\?\.filterState\(location\.search\)/);
+  assert.match(readiness, /params\.get\(['"]employeeFilter['"]\)\s*===\s*['"]payroll-readiness['"]/);
+  assert.match(employees, /includedInReview\(employee,\s*\{\s*asOf:\s*readinessFilter\.asOf,\s*query\s*\}\)/);
+  assert.match(employees, /clear-payroll-readiness-filter/);
+  assert.match(payroll, /new root\.CustomEvent\(['"]soro:employee-payroll-review['"]\)/);
+  assert.match(employees, /soro:employee-payroll-review[\s\S]*employeeSearch\s*=\s*['"]/);
+  assert.match(readiness, /date\.toISOString\(\)\.slice\(0,\s*10\)\s*===\s*normalized/);
+  assert.match(html, /employee-payroll-readiness\.js/);
+  assert.match(employees, /No employee payment setups need attention for this payroll period/);
+});

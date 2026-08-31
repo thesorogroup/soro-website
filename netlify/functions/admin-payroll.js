@@ -419,11 +419,44 @@ function publicRun(value, kind) {
   return run;
 }
 
+function publicEmployeeReadiness(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw httpError(502, 'payroll_service_error', 'Payroll & Payouts returned an invalid response.');
+  }
+  const readiness = {
+    asOf: requiredDate(value.asOf),
+    total: requiredInteger(value.total),
+    wiseEligible: requiredInteger(value.wiseEligible),
+    wiseConfigured: requiredInteger(value.wiseConfigured),
+    needsSetup: requiredInteger(value.needsSetup),
+    quickbooks: requiredInteger(value.quickbooks),
+    inactive: requiredInteger(value.inactive),
+    futureHire: requiredInteger(value.futureHire),
+    canRunPayroll: requiredBoolean(value.canRunPayroll)
+  };
+  const categorized = readiness.wiseEligible
+    + readiness.needsSetup
+    + readiness.quickbooks
+    + readiness.inactive
+    + readiness.futureHire;
+  if (
+    readiness.wiseConfigured > readiness.wiseEligible
+    || readiness.wiseEligible > readiness.total
+    || categorized !== readiness.total
+    || readiness.canRunPayroll !== (readiness.wiseEligible > 0)
+  ) {
+    throw httpError(502, 'payroll_service_error', 'Payroll & Payouts returned an invalid response.');
+  }
+  return readiness;
+}
+
 function publicSection(value, kind) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.runs) || value.runs.length > MAX_RUNS) {
     throw httpError(502, 'payroll_service_error', 'Payroll & Payouts returned an invalid response.');
   }
-  return { runs: value.runs.map(run => publicRun(run, kind)) };
+  const section = { runs: value.runs.map(run => publicRun(run, kind)) };
+  if (kind === 'employee') section.readiness = publicEmployeeReadiness(value.readiness);
+  return section;
 }
 
 function publicPayload(payload) {
@@ -738,6 +771,7 @@ exports.exportFileName = exportFileName;
 exports.exportSnapshot = exportSnapshot;
 exports.hasExactKeys = hasExactKeys;
 exports.inputAmount = inputAmount;
+exports.publicEmployeeReadiness = publicEmployeeReadiness;
 exports.publicPayload = publicPayload;
 exports.validDate = validDate;
 exports.validUuid = validUuid;

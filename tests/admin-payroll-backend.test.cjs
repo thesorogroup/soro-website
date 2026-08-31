@@ -119,11 +119,26 @@ function talentRun(overrides = {}) {
   });
 }
 
+function employeeReadiness(overrides = {}) {
+  return {
+    asOf: '2026-09-03',
+    total: 5,
+    wiseEligible: 2,
+    wiseConfigured: 1,
+    needsSetup: 1,
+    quickbooks: 1,
+    inactive: 0,
+    futureHire: 1,
+    canRunPayroll: true,
+    ...overrides
+  };
+}
+
 function workspace(viewerRole = 'admin', overrides = {}) {
   return {
     generatedAt: '2026-08-29T22:05:00.000Z',
     viewerRole,
-    employeePayroll: viewerRole === 'admin' ? { runs: [employeeRun()] } : null,
+    employeePayroll: viewerRole === 'admin' ? { readiness: employeeReadiness(), runs: [employeeRun()] } : null,
     talentPayouts: { runs: [talentRun()] },
     ...overrides
   };
@@ -178,6 +193,35 @@ test('workspace projection strips unknown finance and identity fields and withho
   assert.equal(result.body.includes('bankAccount'), false);
 });
 
+test('Administrator workspace exposes only validated organization readiness counts', async t => {
+  installFetch(t, () => workspace('admin', {
+    employeePayroll: {
+      readiness: employeeReadiness({ employeeNames: ['Private Person'], bankAccount: 'private' }),
+      runs: [employeeRun()]
+    }
+  }));
+  const result = await backend.handler(event());
+  const payload = body(result);
+
+  assert.equal(result.statusCode, 200);
+  assert.deepEqual(payload.employeePayroll.readiness, employeeReadiness());
+  assert.equal(result.body.includes('Private Person'), false);
+  assert.equal(result.body.includes('bankAccount'), false);
+});
+
+test('inconsistent employee readiness summaries fail closed', async t => {
+  installFetch(t, () => workspace('admin', {
+    employeePayroll: {
+      readiness: employeeReadiness({ wiseEligible: 0, canRunPayroll: true }),
+      runs: [employeeRun()]
+    }
+  }));
+  const result = await backend.handler(event());
+
+  assert.equal(result.statusCode, 502);
+  assert.equal(body(result).code, 'payroll_service_error');
+});
+
 test('workspace counts included rows while safely preserving excluded adjustment rows', async t => {
   const excluded = employeeRun({
     totalAmount: 0,
@@ -185,7 +229,7 @@ test('workspace counts included rows while safely preserving excluded adjustment
     exceptionCount: 0,
     items: [{ ...employeeRun().items[0], included: false, amount: null }]
   });
-  installFetch(t, () => workspace('admin', { employeePayroll: { runs: [excluded] } }));
+  installFetch(t, () => workspace('admin', { employeePayroll: { readiness: employeeReadiness(), runs: [excluded] } }));
 
   const result = await backend.handler(event());
   const payload = body(result);
