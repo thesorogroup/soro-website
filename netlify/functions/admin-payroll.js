@@ -169,11 +169,32 @@ async function responseJson(response) {
 
 function rpcError(status, payload) {
   const databaseCode = String(payload?.code || '');
+  const databaseMessage = String(payload?.message || '');
   if (databaseCode === '42501') {
     return httpError(403, 'payroll_forbidden', 'Your account does not have access to this payroll action.');
   }
   if (databaseCode === '23505') {
     return httpError(409, 'payroll_duplicate', 'This payroll action has already been recorded.');
+  }
+  if (
+    databaseCode === 'P0001'
+    && databaseMessage === 'No active Wise-contractor employee profiles are eligible for this payroll period.'
+  ) {
+    return httpError(
+      409,
+      'no_eligible_employee_payroll',
+      'No active Philippines contractor employees are eligible for this period. In Employees, confirm the hire date and set Payment route to Philippines contractor — Wise, then try again.'
+    );
+  }
+  if (
+    databaseCode === 'P0001'
+    && databaseMessage === 'No current Talent placements are eligible for this payout period.'
+  ) {
+    return httpError(
+      409,
+      'no_eligible_talent_payouts',
+      'No current Talent placements are eligible for this period. Confirm the placement dates and payout setup, then try again.'
+    );
   }
   if (databaseCode === '23514' || databaseCode === 'P0001') {
     return httpError(409, 'payroll_conflict', 'This payroll action is not available in the current state.');

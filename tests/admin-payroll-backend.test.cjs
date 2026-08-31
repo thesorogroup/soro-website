@@ -347,6 +347,86 @@ test('exports fail closed when a server snapshot omits a payout amount', async t
   assert.equal(result.headers['Cache-Control'], 'no-store');
 });
 
+test('known empty employee payroll populations return an actionable setup message', async t => {
+  installFetch(t, () => ({
+    body: {
+      code: 'P0001',
+      message: 'No active Wise-contractor employee profiles are eligible for this payroll period.'
+    },
+    httpStatus: 400
+  }));
+  const result = await backend.handler(event({
+    httpMethod: 'POST',
+    body: JSON.stringify({
+      action: 'create_employee_run',
+      requestId,
+      periodStart: '2026-08-21',
+      periodEnd: '2026-09-03',
+      payDate: '2026-09-04',
+      currency: 'USD'
+    })
+  }));
+  const payload = body(result);
+
+  assert.equal(result.statusCode, 409);
+  assert.equal(payload.code, 'no_eligible_employee_payroll');
+  assert.match(payload.message, /Employees/i);
+  assert.match(payload.message, /Philippines contractor/i);
+});
+
+test('known empty Talent payout populations return an actionable placement message', async t => {
+  installFetch(t, () => ({
+    body: {
+      code: 'P0001',
+      message: 'No current Talent placements are eligible for this payout period.'
+    },
+    httpStatus: 400
+  }));
+  const result = await backend.handler(event({
+    httpMethod: 'POST',
+    body: JSON.stringify({
+      action: 'create_talent_run',
+      requestId,
+      periodStart: '2026-08-21',
+      periodEnd: '2026-09-03',
+      payDate: '2026-09-04',
+      currency: 'USD'
+    })
+  }));
+  const payload = body(result);
+
+  assert.equal(result.statusCode, 409);
+  assert.equal(payload.code, 'no_eligible_talent_payouts');
+  assert.match(payload.message, /placements/i);
+  assert.match(payload.message, /payout setup/i);
+});
+
+test('unknown payroll conflicts never expose database details', async t => {
+  installFetch(t, () => ({
+    body: {
+      code: 'P0001',
+      message: 'private SQL detail for finance@example.com'
+    },
+    httpStatus: 400
+  }));
+  const result = await backend.handler(event({
+    httpMethod: 'POST',
+    body: JSON.stringify({
+      action: 'create_employee_run',
+      requestId,
+      periodStart: '2026-08-21',
+      periodEnd: '2026-09-03',
+      payDate: '2026-09-04',
+      currency: 'USD'
+    })
+  }));
+
+  assert.equal(result.statusCode, 409);
+  assert.equal(body(result).code, 'payroll_conflict');
+  assert.equal(result.body.includes('finance@example.com'), false);
+  assert.equal(result.body.includes('private SQL detail'), false);
+});
+
 test('signed-out, unauthorized, unsupported, and malformed database responses fail closed with no-store', async t => {
   let calls = installFetch(t);
   const signedOut = await backend.handler(event({ headers: {} }));
