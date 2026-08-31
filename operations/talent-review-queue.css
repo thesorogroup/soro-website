@@ -1,0 +1,328 @@
+.talent-review-page { max-width: 1320px; }
+
+.talent-review-page-heading { align-items: center; }
+.talent-review-page-heading h1 { margin-bottom: 8px; }
+.talent-review-page-heading p:last-child {
+  max-width: 680px;
+  margin: 0;
+  color: #61748a;
+  line-height: 1.55;
+}
+
+.talent-review-summary {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.talent-review-summary-card {
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid #e3e9f0;
+  border-radius: 13px;
+  background: #fffdfb;
+  color: #53677f;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(8,45,92,.045);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease;
+}
+
+.talent-review-summary-card:hover,
+.talent-review-summary-card.is-selected {
+  border-color: #8caecf;
+  box-shadow: 0 10px 25px rgba(8,45,92,.09);
+  transform: translateY(-1px);
+}
+
+.talent-review-summary-card.is-selected { box-shadow: inset 0 3px 0 #2477b7, 0 10px 25px rgba(8,45,92,.08); }
+.talent-review-summary-card span { display: block; min-height: 34px; font-size: 12px; font-weight: 700; line-height: 1.35; }
+.talent-review-summary-card strong { display: block; margin-top: 7px; color: var(--navy); font-size: 26px; }
+
+.talent-review-workspace { padding: 22px; }
+.talent-review-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.talent-review-toolbar label {
+  display: flex;
+  align-items: center;
+  width: min(430px, 100%);
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #ccd9e7;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #61748a;
+}
+
+.talent-review-toolbar input {
+  width: 100%;
+  padding: 9px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.talent-review-toolbar small { color: #6c7d91; white-space: nowrap; }
+.talent-review-stage-chips { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 18px; border-bottom: 1px solid #e4eaf1; }
+
+.talent-review-stage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border: 1px solid #d2deea;
+  border-radius: 999px;
+  background: #fff;
+  color: #4f6279;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.talent-review-stage-chip span { min-width: 21px; padding: 2px 6px; border-radius: 999px; background: #edf3f8; text-align: center; font-size: 10px; }
+.talent-review-stage-chip:hover,
+.talent-review-stage-chip.is-active { border-color: #789fc6; background: #eef5fb; color: var(--navy); }
+.talent-review-stage-chip.is-active span { background: #fff; }
+
+.talent-review-list { display: grid; gap: 14px; margin-top: 18px; }
+.talent-review-card {
+  overflow: hidden;
+  border: 1px solid #dbe4ee;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(8,45,92,.045);
+}
+
+.talent-review-card-heading {
+  display: grid;
+  grid-template-columns: auto minmax(0,1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 17px 18px 14px;
+}
+
+.talent-review-avatar {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #dbeaf6;
+  color: var(--navy);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.talent-review-person { min-width: 0; }
+.talent-review-profile-link {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--navy);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.talent-review-profile-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+.talent-review-person span,
+.talent-review-person small { display: block; margin-top: 3px; overflow-wrap: anywhere; color: #64778d; font-size: 12px; }
+
+.talent-review-stage {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 9px;
+  border-radius: 999px;
+  background: #edf2f7;
+  color: #4d6178;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.talent-review-stage--submitted { background: #eaf2fb; color: #245d91; }
+.talent-review-stage--in_review { background: #fff3df; color: #8a5816; }
+.talent-review-stage--needs_more_info { background: #fff0e4; color: #a04416; }
+.talent-review-stage--bench_ready { background: #e5f5ef; color: #11644e; }
+.talent-review-stage--closed { background: #eef1f5; color: #566579; }
+
+.talent-review-card-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid #e6edf4;
+  border-bottom: 1px solid #e6edf4;
+  background: #fafcfe;
+}
+
+.talent-review-card-meta > span { min-width: 0; padding: 11px 18px; border-right: 1px solid #e6edf4; }
+.talent-review-card-meta > span:last-child { border-right: 0; }
+.talent-review-card-meta small,
+.talent-review-card-meta strong { display: block; }
+.talent-review-card-meta small { margin-bottom: 4px; color: #6b7d91; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+.talent-review-card-meta strong { overflow: hidden; color: #29435f; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+
+.talent-review-checklist { padding: 15px 18px; }
+.talent-review-checklist-heading { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 10px; color: #53677e; font-size: 12px; }
+.talent-review-checklist-heading strong { color: var(--navy); font-size: 13px; }
+.talent-review-checklist ul { display: flex; flex-wrap: wrap; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.talent-review-checklist li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid #dbe4ed;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #4e6279;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.talent-review-checklist li > span { display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; background: #e2e9f0; font-size: 10px; }
+.talent-review-checklist li small { color: #78899b; font-size: 9px; font-weight: 650; }
+.talent-review-checklist li.is-complete { border-color: #cce7dc; background: #f0faf6; color: #17634f; }
+.talent-review-checklist li.is-complete > span { background: #d8f0e7; }
+.talent-review-checklist li.is-needs_review { border-color: #f1d5ae; background: #fff9ef; color: #8a5715; }
+.talent-review-checklist li.is-needs_review > span { background: #ffebc9; }
+
+.talent-review-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 18px;
+  border-top: 1px solid #e6edf4;
+  background: #fffdfb;
+}
+
+.talent-review-card-actions > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.talent-review-card-main-actions { align-items: center; }
+.talent-review-resume {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-color: #b9cfe3;
+  color: var(--navy);
+  background: #f6fafe;
+}
+.talent-review-resume:hover:not(:disabled) { border-color: #6f9bc4; background: #eaf3fb; }
+.talent-review-resume svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.talent-review-resume:disabled { border-color: #dce3ea; background: #f7f8fa; color: #8795a5; cursor: not-allowed; opacity: 1; }
+.talent-review-action-divider { width: 1px; height: 25px; margin: 0 2px; background: #dce4ec; }
+.talent-review-action { padding: 8px 11px; font-size: 12px; }
+.talent-review-action:disabled { opacity: .52; cursor: not-allowed; filter: grayscale(.25); }
+.talent-review-action--guarded { border-color: #e9c3b9; color: #a43b2e; }
+.talent-review-action--guarded:hover { border-color: #c96354; background: #fff4f1; }
+.talent-review-action--restore { border-color: #bcd2e6; color: var(--navy); }
+.talent-review-action--restore:hover { border-color: #769fc5; background: #f1f7fc; }
+.talent-review-no-actions { color: #718195; font-size: 12px; }
+
+.talent-review-secondary { position: relative; }
+.talent-review-secondary summary { color: #63758a; font-size: 12px; font-weight: 700; cursor: pointer; }
+.talent-review-secondary[open] > div {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 4;
+  display: grid;
+  gap: 7px;
+  min-width: 170px;
+  padding: 9px;
+  border: 1px solid #d8e1ea;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(8,45,92,.15);
+}
+
+.talent-review-empty,
+.talent-review-loading,
+.talent-review-error { padding: 54px 24px; text-align: center; color: #63768c; }
+.talent-review-empty strong,
+.talent-review-error strong { display: block; margin-bottom: 7px; color: var(--navy); font-size: 18px; }
+.talent-review-empty p,
+.talent-review-error p { margin: 0 0 16px; }
+
+.talent-review-feedback {
+  margin-bottom: 14px;
+  padding: 10px 13px;
+  border: 1px solid #bde0d3;
+  border-radius: 9px;
+  background: #eef9f5;
+  color: #175f4d;
+  font-size: 13px;
+}
+.talent-review-feedback.is-error { border-color: #efc3b8; background: #fff3ef; color: #973c2a; }
+
+.talent-review-dialog {
+  width: min(520px, calc(100vw - 28px));
+  padding: 0;
+  border: 0;
+  border-radius: 16px;
+  color: var(--ink);
+  box-shadow: 0 24px 70px rgba(8,45,92,.25);
+}
+.talent-review-dialog::backdrop { background: rgba(8,26,53,.66); }
+.talent-review-dialog form { padding: 23px; }
+.talent-review-dialog header { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.talent-review-dialog h2 { margin: 0; color: var(--navy); font: 400 25px/1.1 Georgia,"Times New Roman",serif; }
+.talent-review-dialog header button { border: 0; background: transparent; color: var(--navy); font-size: 27px; cursor: pointer; }
+.talent-review-dialog form > p { color: #607288; font-size: 13px; line-height: 1.5; }
+.talent-review-dialog label { display: grid; gap: 7px; color: #344a62; font-size: 13px; font-weight: 750; }
+.talent-review-dialog label span { color: #9b3f2b; font-size: 10px; text-transform: uppercase; }
+.talent-review-dialog textarea { min-height: 120px; resize: vertical; padding: 11px; border: 1px solid #cbd8e5; border-radius: 9px; font: inherit; }
+.talent-review-dialog footer { display: flex; justify-content: flex-end; gap: 9px; margin-top: 17px; padding-top: 15px; border-top: 1px solid #e4eaf1; }
+.talent-review-confirm-guarded { border-color: #b74637; background: #b74637; color: #fff; }
+.talent-review-dialog-status { min-height: 18px; margin-top: 9px; color: #9b3f2b; font-size: 12px; }
+
+@media (max-width: 1050px) {
+  .talent-review-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .talent-review-page-heading,
+  .talent-review-toolbar,
+  .talent-review-card-actions { align-items: stretch; flex-direction: column; }
+  .talent-review-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .talent-review-toolbar label { width: 100%; }
+  .talent-review-toolbar small { white-space: normal; }
+  .talent-review-card-heading { grid-template-columns: auto minmax(0,1fr); }
+  .talent-review-stage { grid-column: 2; justify-self: start; }
+  .talent-review-card-meta { grid-template-columns: 1fr; }
+  .talent-review-card-meta > span { border-right: 0; border-bottom: 1px solid #e6edf4; }
+  .talent-review-card-meta > span:last-child { border-bottom: 0; }
+  .talent-review-card-actions > div { width: 100%; }
+  .talent-review-resume { flex: 0 0 auto; }
+  .talent-review-action-divider { display: none; }
+  .talent-review-action { flex: 1; }
+  .talent-review-secondary { align-self: flex-end; }
+}
+
+@media (max-width: 430px) {
+  .talent-review-summary { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .talent-review-summary-card { padding: 12px; }
+  .talent-review-summary-card span { min-height: 31px; }
+  .talent-review-workspace { padding: 15px; }
+  .talent-review-card-heading,
+  .talent-review-checklist,
+  .talent-review-card-actions { padding-left: 14px; padding-right: 14px; }
+  .talent-review-checklist li { width: 100%; }
+  .talent-review-checklist li small { margin-left: auto; }
+}

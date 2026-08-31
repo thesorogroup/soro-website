@@ -56,9 +56,25 @@
   }
 
   async function archiveInstead(type, id, name, dialog) {
-    const table = type === 'talent' ? 'applicants' : 'clients';
-    const { error } = await window.soroSupabase.from(table).update({ archived_at: new Date().toISOString() }).eq('id', id);
-    if (error) return setDialogError(dialog, error.message || `Could not archive ${name}.`);
+    if (type === 'talent') {
+      const record = typeof liveApplicants !== 'undefined' ? liveApplicants.find(item => item.id === id) : null;
+      if (!record?.updated_at || !window.soroTalentReviewQueue?.changeApplicant) {
+        return setDialogError(dialog, 'The secure Talent review service is not available yet. Refresh and try again.');
+      }
+      try {
+        await window.soroTalentReviewQueue.changeApplicant({
+          applicantId: id,
+          expectedUpdatedAt: record.updated_at,
+          action: 'archive',
+          note: 'Archived from the Administrator retention control.'
+        });
+      } catch (error) {
+        return setDialogError(dialog, error.message || `Could not archive ${name}.`);
+      }
+    } else {
+      const { error } = await window.soroSupabase.from('clients').update({ archived_at: new Date().toISOString() }).eq('id', id);
+      if (error) return setDialogError(dialog, error.message || `Could not archive ${name}.`);
+    }
     closeDialog(dialog);
     toast(`${name} was archived and can be restored later.`);
     if (type === 'talent') {

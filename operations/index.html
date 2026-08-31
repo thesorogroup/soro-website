@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="admin-payroll.css?v=20260830-payroll-payouts" />
     <link rel="stylesheet" href="active-talent-today.css?v=20260829-active-talent-today" />
     <link rel="stylesheet" href="talent-time-off.css?v=20260829-talent-time-off" />
+    <link rel="stylesheet" href="talent-review-queue.css?v=20260830-talent-review-queue" />
   </head>
   <body>
     <section class="auth-checking" id="auth-checking" aria-live="polite">
@@ -88,6 +89,7 @@
           <button class="nav-link" data-view="tasks">My Tasks <b>5</b></button>
           <button class="nav-link" data-view="clients">Clients</button>
           <button class="nav-link" data-view="vas">Talent</button>
+          <button class="nav-link" id="talent-review-nav" data-view="talent-review" hidden>Review Queue</button>
           <button class="nav-link" data-view="placements">Placements</button>
           <button class="nav-link" data-view="documents">Documents</button>
           <button class="nav-link" data-view="reports">Reports</button>
@@ -108,7 +110,7 @@
     </main>
     <dialog id="task-dialog"><form method="dialog" class="modal"><div class="modal-title"><h2>Add task</h2><button type="button" class="modal-close" aria-label="Close dialog">×</button></div><label>Task name<input id="task-name" required placeholder="What needs attention?" /></label><label>Due date<input type="date" /></label><label>Assign to<select><option>Me — Matt Johnson</option><option>Talent Management</option><option>Billing</option></select></label><div class="modal-actions"><button type="button" class="button modal-cancel">Cancel</button><button value="default" class="primary">Add task</button></div></form></dialog>
     <dialog id="role-dialog"><form method="dialog" class="modal"><div class="modal-title"><h2>Preview a workspace</h2><button type="button" class="modal-close" aria-label="Close dialog">×</button></div><div class="role-options"><button value="admin" class="role-option"><strong>Admin Panel</strong><small>Company-wide operations and oversight</small></button><button value="sales" class="role-option"><strong>Sales Panel</strong><small>Clients, follow-ups, and shortlists</small></button><button value="talent" class="role-option"><strong>Talent Management Panel</strong><small>Virtual Assistant readiness, support, and reviews</small></button><button value="client" class="role-option"><strong>Client Portal</strong><small>Active Virtual Assistants, documents, invoices, and hiring</small></button><button value="va" class="role-option"><strong>Talent Portal</strong><small>Daily work, Dream Pathway, and support</small></button></div></form></dialog>
-    <dialog id="notifications-dialog"><section class="modal notifications-modal" aria-labelledby="notifications-title"><div class="modal-title"><div><p class="eyebrow">Soro Ops</p><h2 id="notifications-title">Notifications</h2></div><button type="button" class="modal-close" aria-label="Close notifications">×</button></div><div class="notification-list"><button type="button" data-notification-view="vas"><span class="notification-dot urgent"></span><span><strong>3 Talent profiles need review</strong><small>New application information is ready for Talent Management.</small></span><b>Open</b></button><button type="button" data-notification-view="overview"><span class="notification-dot"></span><span><strong>1 billing verification is due tomorrow</strong><small>Confirm the payout recipient details before the pay run.</small></span><b>Open</b></button></div></section></dialog>
+    <dialog id="notifications-dialog"><section class="modal notifications-modal" aria-labelledby="notifications-title"><div class="modal-title"><div><p class="eyebrow">Soro Ops</p><h2 id="notifications-title">Notifications</h2></div><button type="button" class="modal-close" aria-label="Close notifications">×</button></div><div class="notification-list"><button type="button" data-notification-view="talent-review"><span class="notification-dot urgent"></span><span><strong>Talent profiles need review</strong><small>New application information is ready for Talent Management.</small></span><b>Open</b></button><button type="button" data-notification-view="overview"><span class="notification-dot"></span><span><strong>1 billing verification is due tomorrow</strong><small>Confirm the payout recipient details before the pay run.</small></span><b>Open</b></button></div></section></dialog>
     <dialog id="active-talent-today-dialog" class="active-talent-dialog"><section aria-labelledby="active-talent-today-title"><div class="modal-title"><div><p class="eyebrow">Live attendance</p><h2 id="active-talent-today-title">Active Talent Today</h2></div><button type="button" class="modal-close" aria-label="Close Active Talent Today">×</button></div><div id="active-talent-today-content" aria-live="polite"></div></section></dialog>
     <dialog id="talent-time-off-dialog" class="talent-time-off-dialog"><section aria-labelledby="talent-time-off-title"><div class="modal-title"><div><p class="eyebrow">Schedule availability</p><h2 id="talent-time-off-title">Request Time Off</h2></div><button type="button" class="modal-close" aria-label="Close Request Time Off">×</button></div><div id="talent-time-off-content" aria-live="polite"></div></section></dialog>
     <dialog id="time-off-management-dialog" class="talent-time-off-dialog time-off-management-dialog"><section aria-labelledby="time-off-management-title"><div class="modal-title"><div><p class="eyebrow">Talent scheduling</p><h2 id="time-off-management-title">Time Off Requests</h2></div><button type="button" class="modal-close" aria-label="Close Time Off Requests">×</button></div><div id="time-off-management-content" aria-live="polite"></div></section></dialog>
@@ -120,6 +122,7 @@
     <script src="talent-workday.js?v=20260829-manual-workday"></script>
     <script src="active-talent-today.js?v=20260829-active-talent-today"></script>
     <script src="talent-time-off.js?v=20260829-talent-time-off"></script>
+    <script src="talent-review-queue.js?v=20260830-talent-review-queue"></script>
     <script src="operations.js?v=20260829-talent-time-off"></script>
     <script src="talent-directory-filters.js?v=20260828-skill-disclosure"></script>
     <script src="admin-skill-library.js?v=20260817-skill-library"></script>

@@ -389,7 +389,9 @@ Zimbabwe`.split('\n');
         <div class="record-manager-field"><label for="talent-country">Country</label><select id="talent-country" name="country">${locationOptions(countryNames, record.country, 'Philippines', true)}</select></div>
         <div class="record-manager-field"><label for="talent-timezone">Time zone</label><select id="talent-timezone" name="timezone">${locationOptions(timeZoneOptions, record.timezone, 'Asia/Manila')}</select></div>
         <div class="record-manager-field"><label for="talent-work-status">Work status</label><select id="talent-work-status" name="workStatus"><option value="unemployed" ${record.work_status === 'unemployed' ? 'selected' : ''}>Unemployed</option><option value="employed" ${record.work_status === 'employed' ? 'selected' : ''}>Employed</option><option value="freelancer" ${record.work_status === 'freelancer' ? 'selected' : ''}>Freelancer</option></select></div>
-        <div class="record-manager-field"><label for="talent-application-status">Application status</label><select id="talent-application-status" name="applicationStatus">${talentStatuses.map(status => option(status, currentStatus)).join('')}</select></div>
+        ${record.id
+          ? `<div class="record-manager-field"><label>Application stage</label><div class="record-manager-stage"><strong>${escapeHtml(titleCase(currentStatus))}</strong><button type="button" class="admin-record-button" data-open-talent-review>Manage in Review Queue</button></div></div>`
+          : `<div class="record-manager-field"><label for="talent-application-status">Starting stage</label><select id="talent-application-status" name="applicationStatus"><option value="draft">Draft</option><option value="submitted" selected>New application</option></select></div>`}
         <div class="record-manager-field"><label for="talent-rate">Expected hourly rate</label><input id="talent-rate" type="number" min="0" step="0.01" name="expectedRate" value="${value(record, 'expected_hourly_rate')}"></div>
         <div class="record-manager-field record-manager-field--wide"><label for="talent-address">Private address / location</label><input id="talent-address" name="address" value="${value(record, 'address_line_1')}"></div>
         <div class="record-manager-field record-manager-field--wide"><label for="talent-skills">Skills (comma-separated)</label><textarea id="talent-skills" name="skills">${Array.isArray(record.verified_skills) ? escapeHtml(record.verified_skills.join(', ')) : value(record, 'verified_skills')}</textarea></div>
@@ -417,7 +419,7 @@ Zimbabwe`.split('\n');
       email: formData.get('email').trim(), phone: formData.get('phone').trim() || null,
       country: formData.get('country').trim() || null, timezone: formData.get('timezone').trim() || null,
       address_line_1: formData.get('address').trim() || null, work_status: formData.get('workStatus'),
-      status: formData.get('applicationStatus'), expected_hourly_rate: formData.get('expectedRate') || null,
+      expected_hourly_rate: formData.get('expectedRate') || null,
       verified_skills: formData.get('skills').split(',').map(skill => skill.trim()).filter(Boolean),
       relevant_experience_years: formData.get('experienceYears') || null,
       relevant_experience_summary: formData.get('experience').trim() || null,
@@ -432,7 +434,8 @@ Zimbabwe`.split('\n');
       const organizationId = await getOrganizationId();
       if (!organizationId) throw new Error('No Soro organization is available for this profile.');
       const now = new Date().toISOString();
-      result = await client.from('applicants').insert({ ...payload, organization_id: organizationId, application_received_at: now, submitted_at: payload.status === 'draft' ? null : now }).select().single();
+      const startingStatus = formData.get('applicationStatus') === 'draft' ? 'draft' : 'submitted';
+      result = await client.from('applicants').insert({ ...payload, organization_id: organizationId, status: startingStatus, application_received_at: now, submitted_at: startingStatus === 'draft' ? null : now }).select().single();
     }
     if (result.error) throw result.error;
     await refreshTalent();
@@ -446,6 +449,10 @@ Zimbabwe`.split('\n');
   function editTalent(record) {
     openModal({ eyebrow: record?.id ? 'Edit Talent profile' : 'New Talent', title: record?.id ? `Edit ${record.full_name}` : 'Add Talent', note: 'Only Soro staff can see private contact and address information.', content: talentForm(record), onOpen(dialog) {
       $('[data-close]', dialog).addEventListener('click', closeModal);
+      $('[data-open-talent-review]', dialog)?.addEventListener('click', () => {
+        closeModal();
+        window.dispatchEvent(new CustomEvent('soro:talent-review-open-queue'));
+      });
       bindIdentityPreferenceControls(dialog);
       $('#talent-editor-form', dialog).addEventListener('submit', async event => {
         event.preventDefault();
@@ -481,8 +488,17 @@ Zimbabwe`.split('\n');
   async function archiveTalent(record, restore = false, requireConfirmation = true) {
     const action = restore ? 'restore' : 'archive';
     if (requireConfirmation && !window.confirm(`Do you want to ${action} ${record.full_name}? ${restore ? 'They will return to the active Talent Directory.' : 'Their profile and private files will be kept and can be restored later.'}`)) return;
-    const { error } = await database().from('applicants').update({ archived_at: restore ? null : new Date().toISOString() }).eq('id', record.id);
-    if (error) return notify(error.message || `Could not ${action} this Talent.`);
+    if (!window.soroTalentReviewQueue?.changeApplicant) return notify('The secure Talent review service is not available yet. Refresh and try again.');
+    try {
+      await window.soroTalentReviewQueue.changeApplicant({
+        applicantId: record.id,
+        expectedUpdatedAt: record.updated_at,
+        action,
+        note: restore ? '' : 'Archived from the Talent profile retention control.'
+      });
+    } catch (error) {
+      return notify(error.message || `Could not ${action} this Talent.`);
+    }
     if (!restore) {
       current = 'vas';
       selectedTalentId = null;
