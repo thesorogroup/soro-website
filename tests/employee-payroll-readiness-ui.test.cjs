@@ -13,8 +13,20 @@ const employee = overrides => ({
   payout_recipient_email: 'jordan@example.com',
   city: 'Manila',
   country: 'Philippines',
+  profile_complete: true,
   platform_users: { active: true, role: 'talent_management' },
   ...overrides
+});
+
+test('the portal cache-busts the Founder-aware payroll readiness helper', () => {
+  const html = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'operations', 'index.html'), 'utf8');
+  assert.match(html, /employee-payroll-readiness\.js\?v=20260831-founder-readiness/);
+});
+
+test('an incomplete directory-only identity never appears as a payroll setup exception', () => {
+  const incomplete = employee({ profile_complete: false, hire_date: null, payment_route: 'needs_setup' });
+  assert.deepEqual(readiness.employeeState(incomplete, AS_OF), { key: 'profile_incomplete', label: 'Employee profile incomplete' });
+  assert.equal(readiness.includedInReview(incomplete, { asOf: AS_OF }), false);
 });
 
 test('employee payroll readiness classifies every directory state without browser inference', () => {

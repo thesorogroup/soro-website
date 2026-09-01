@@ -72,6 +72,11 @@
     return `${names[0]?.[0] || ''}${names.length > 1 ? names[names.length - 1][0] : ''}`.toUpperCase() || 'SO';
   }
 
+  function roleLabelForAccess(access) {
+    if (access?.role === 'admin' && access?.is_founder === true) return 'The Founder';
+    return accessRoleLabel[access?.role] || 'Soro employee';
+  }
+
   function updateSignedInIdentity(session, access) {
     const profile = document.getElementById('role-switcher');
     const mobileProfile = document.getElementById('client-mobile-profile');
@@ -85,8 +90,10 @@
     const previewAvailable = access.role === 'admin';
     if (roleLabel) roleLabel.textContent = clientProfileAvailable
       ? `${accessRoleLabel[access.role]} · Account Settings`
-      : (accessRoleLabel[access.role] || 'Soro employee');
+      : roleLabelForAccess(access);
     if (profile) {
+      profile.dataset.authenticatedName = name;
+      profile.dataset.authenticatedRoleLabel = roleLabelForAccess(access);
       profile.disabled = !(previewAvailable || clientProfileAvailable);
       profile.classList.toggle('profile--fixed-identity', !(previewAvailable || clientProfileAvailable));
       profile.dataset.accountAction = clientProfileAvailable ? 'my-profile' : (previewAvailable ? 'workspace-preview' : 'identity');
@@ -174,7 +181,7 @@
     if (!session?.user?.id) return;
     const { data: access, error } = await client
       .from('platform_users')
-      .select('organization_id,role,display_name,active,must_change_password,initial_password_issued_at,password_changed_at')
+      .select('organization_id,role,display_name,is_founder,active,must_change_password,initial_password_issued_at,password_changed_at')
       .eq('id', session.user.id)
       .maybeSingle();
     if (check !== recoveryAccessCheck || !recoveryMode) return;
@@ -210,7 +217,7 @@
     showChecking();
     const { data: access, error } = await client
       .from('platform_users')
-      .select('organization_id,role,display_name,active,must_change_password,initial_password_issued_at,password_changed_at')
+      .select('organization_id,role,display_name,is_founder,active,must_change_password,initial_password_issued_at,password_changed_at')
       .eq('id', session.user.id)
       .maybeSingle();
     if (check !== authCheck) return;

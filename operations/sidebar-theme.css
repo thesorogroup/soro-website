@@ -14,6 +14,20 @@
   background: var(--sidebar-navy);
 }
 
+.sidebar > .brand {
+  flex: 0 0 auto;
+}
+
+.sidebar > nav {
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: start;
+  grid-auto-rows: max-content;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+}
+
 .nav-link:hover {
   background: var(--sidebar-hover);
   color: #fff;
@@ -35,6 +49,8 @@
 }
 
 .profile {
+  flex: 0 0 auto;
+  margin-top: 12px;
   border-radius: 9px;
   transition: background-color 150ms ease;
 }
@@ -46,4 +62,27 @@
 .profile.active,
 .profile[aria-expanded="true"] {
   background: var(--sidebar-active);
+}
+
+@media (min-width: 951px) {
+  .sidebar {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    padding-bottom: max(15px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 950px) {
+  .sidebar {
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow: hidden;
+    padding-bottom: max(15px, env(safe-area-inset-bottom));
+  }
 }

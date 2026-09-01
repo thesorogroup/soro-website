@@ -44,6 +44,16 @@
     return employee.platform_users || employee.access || {};
   }
 
+  function employeeRoleLabel(employee) {
+    const access = employeeAccess(employee);
+    if (access.role === 'admin' && access.is_founder === true) return 'The Founder';
+    return EMPLOYEE_ROLE_LABELS[access.role] || titleCase(access.role);
+  }
+
+  function hasCompleteEmployeeProfile(employee) {
+    return employee?.profile_complete === true;
+  }
+
   function employeePaymentRoute(employee) {
     return EMPLOYEE_PAYMENT_ROUTES.has(employee?.payment_route) ? employee.payment_route : 'needs_setup';
   }
@@ -63,6 +73,7 @@
   function employeeStatus(employee) {
     const access = employeeAccess(employee);
     if (!access.active) return { label: 'Inactive', className: 'employee-status--inactive' };
+    if (!hasCompleteEmployeeProfile(employee)) return { label: 'Profile setup needed', className: 'employee-status--setup', profileIncomplete: true };
     if (access.must_change_password) {
       const issuedAt = Date.parse(access.initial_password_issued_at || '');
       const expired = !Number.isFinite(issuedAt) || Date.now() - issuedAt > TEMPORARY_PASSWORD_TTL_MS;
@@ -91,7 +102,7 @@
         employee.country,
         employee.payout_recipient_email,
         EMPLOYEE_PAYMENT_ROUTE_LABELS[employeePaymentRoute(employee)],
-        EMPLOYEE_ROLE_LABELS[employeeAccess(employee).role]
+        employeeRoleLabel(employee)
       ].filter(Boolean).join(' ').toLowerCase().includes(query);
     });
   }
@@ -109,7 +120,7 @@
       const access = employeeAccess(employee);
       const status = employeeStatus(employee);
       const payrollState = employeePayrollReadiness(employee, payrollReadinessFilter().asOf);
-      return `<tr class="employee-directory-row" data-employee-id="${escapeHtml(employee.user_id)}" tabindex="0" role="button" aria-label="Open ${escapeHtml(employee.full_name)} employee profile"><td><span class="employee-person"><b>${escapeHtml(initials(employee.full_name))}</b><span><strong>${escapeHtml(employee.full_name)}</strong><small>${escapeHtml(employee.email)}</small></span></span></td><td><span class="employee-role">${escapeHtml(EMPLOYEE_ROLE_LABELS[access.role] || titleCase(access.role))}</span>${payrollReadinessFilter().active ? `<small class="employee-payroll-state employee-payroll-state--${escapeHtml(payrollState.key)}">${escapeHtml(payrollState.label)}</small>` : ''}</td><td>${escapeHtml(formatEmployeeDate(employee.hire_date))}</td><td>${escapeHtml(employee.phone)}</td><td>${escapeHtml([employee.city, employee.state_region].filter(Boolean).join(', '))}</td><td><span class="employee-status ${status.className}">${escapeHtml(status.label)}</span></td></tr>`;
+      return `<tr class="employee-directory-row" data-employee-id="${escapeHtml(employee.user_id)}" tabindex="0" role="button" aria-label="Open ${escapeHtml(employee.full_name)} employee profile"><td><span class="employee-person"><b>${escapeHtml(initials(employee.full_name))}</b><span><strong>${escapeHtml(employee.full_name)}</strong><small>${escapeHtml(employee.email || 'Email not recorded')}</small></span></span></td><td><span class="employee-role">${escapeHtml(employeeRoleLabel(employee))}</span>${access.is_founder === true ? '<small class="employee-founder-note">Reserved overseer identity</small>' : ''}${payrollReadinessFilter().active ? `<small class="employee-payroll-state employee-payroll-state--${escapeHtml(payrollState.key)}">${escapeHtml(payrollState.label)}</small>` : ''}</td><td>${escapeHtml(formatEmployeeDate(employee.hire_date))}</td><td>${escapeHtml(employee.phone || 'Not recorded')}</td><td>${escapeHtml([employee.city, employee.state_region].filter(Boolean).join(', ') || 'Not recorded')}</td><td><span class="employee-status ${status.className}">${escapeHtml(status.label)}</span></td></tr>`;
     }).join('');
   }
 
@@ -170,16 +181,13 @@
     loading = true;
     loadError = '';
     if (current === 'employees') render();
-    const { data: records, error } = await window.soroSupabase
-      .from('employee_profiles')
-      .select('user_id,full_name,email,phone,hire_date,address_line_1,address_line_2,city,state_region,postal_code,country,payment_route,payout_recipient_email,created_at,platform_users!inner(role,active,must_change_password,initial_password_issued_at,password_changed_at)')
-      .order('full_name', { ascending: true });
+    const { data: records, error } = await window.soroSupabase.rpc('admin_employee_directory');
     loading = false;
     if (error) {
       employees = [];
       loadError = error.message || 'Refresh your secure session and try again.';
     } else {
-      employees = records || [];
+      employees = Array.isArray(records) ? records : [];
     }
     if (current === 'employees') render();
   }
@@ -368,6 +376,10 @@
     const access = employeeAccess(employee);
     const status = employeeStatus(employee);
     const paymentRoute = employeePaymentRoute(employee);
+    const profileComplete = hasCompleteEmployeeProfile(employee);
+    const effectiveAccess = access.is_founder === true
+      ? 'The Founder oversees Soro through the established Administrator access boundary. The title does not create a separate permission role.'
+      : (EMPLOYEE_ROLE_ACCESS[access.role] || 'Access follows the assigned Soro role.');
     const recipientDetail = paymentRoute === 'wise_contractor'
       ? `<div><dt>Wise recipient</dt><dd>${escapeHtml(employee.payout_recipient_email || 'Not recorded')}</dd></div>`
       : '';
@@ -376,11 +388,12 @@
       title: employee.full_name,
       className: 'employee-profile-dialog',
       content: `<div class="employee-profile-content">
-        <div class="employee-profile-lead"><span class="employee-profile-avatar">${escapeHtml(initials(employee.full_name))}</span><div><span class="employee-role">${escapeHtml(EMPLOYEE_ROLE_LABELS[access.role] || titleCase(access.role))}</span><span class="employee-status ${status.className}">${escapeHtml(status.label)}</span></div></div>
-        <section class="employee-effective-access"><strong>Effective access</strong><p>${escapeHtml(EMPLOYEE_ROLE_ACCESS[access.role] || 'Access follows the assigned Soro role.')}</p></section>
-        <dl class="employee-profile-details"><div><dt>Hire date</dt><dd>${escapeHtml(formatEmployeeDate(employee.hire_date))}</dd></div><div><dt>Email</dt><dd><a href="mailto:${escapeHtml(employee.email)}">${escapeHtml(employee.email)}</a></dd></div><div><dt>Phone</dt><dd><a href="tel:${escapeHtml(employee.phone)}">${escapeHtml(employee.phone)}</a></dd></div><div><dt>Payment route</dt><dd>${escapeHtml(EMPLOYEE_PAYMENT_ROUTE_LABELS[paymentRoute])}</dd></div>${recipientDetail}<div class="employee-profile-address"><dt>Address</dt><dd>${escapeHtml(employeeAddress(employee)).replaceAll('\n', '<br>')}</dd></div></dl>
+        <div class="employee-profile-lead"><span class="employee-profile-avatar">${escapeHtml(initials(employee.full_name))}</span><div><span class="employee-role">${escapeHtml(employeeRoleLabel(employee))}</span><span class="employee-status ${status.className}">${escapeHtml(status.label)}</span></div></div>
+        <section class="employee-effective-access"><strong>Effective access</strong><p>${escapeHtml(effectiveAccess)}</p></section>
+        ${profileComplete ? '' : '<section class="employee-effective-access employee-profile-incomplete"><strong>Private profile details are not complete</strong><p>The Founder identity is active and has Administrator access. Hire date, phone, address, and payment details have intentionally not been invented and can be completed when the real information is available.</p></section>'}
+        <dl class="employee-profile-details"><div><dt>Hire date</dt><dd>${escapeHtml(formatEmployeeDate(employee.hire_date))}</dd></div><div><dt>Email</dt><dd>${employee.email ? `<a href="mailto:${escapeHtml(employee.email)}">${escapeHtml(employee.email)}</a>` : 'Not recorded'}</dd></div><div><dt>Phone</dt><dd>${employee.phone ? `<a href="tel:${escapeHtml(employee.phone)}">${escapeHtml(employee.phone)}</a>` : 'Not recorded'}</dd></div><div><dt>Payment route</dt><dd>${profileComplete ? escapeHtml(EMPLOYEE_PAYMENT_ROUTE_LABELS[paymentRoute]) : 'Not recorded'}</dd></div>${profileComplete ? recipientDetail : ''}<div class="employee-profile-address"><dt>Address</dt><dd>${employeeAddress(employee) ? escapeHtml(employeeAddress(employee)).replaceAll('\n', '<br>') : 'Not recorded'}</dd></div></dl>
         ${status.setupRequired && access.role === 'admin' ? '<label class="employee-profile-security-check">Administrator security check<input name="administrator_password" type="password" autocomplete="current-password" placeholder="Re-enter your Soro password" /><small>Required before generating new credentials for an Administrator.</small></label>' : ''}
-        <p class="employee-profile-action-message" aria-live="polite"></p><footer class="record-manager-footer">${status.setupRequired ? '<button type="button" class="admin-record-button" data-reissue-credentials>Generate new temporary password</button>' : ''}<button type="button" class="admin-record-button" data-edit-payment-route>Edit payment setup</button><button type="button" class="admin-record-button admin-record-button--primary" data-close-profile>Close profile</button></footer>
+        <p class="employee-profile-action-message" aria-live="polite"></p><footer class="record-manager-footer">${profileComplete && status.setupRequired ? '<button type="button" class="admin-record-button" data-reissue-credentials>Generate new temporary password</button>' : ''}${profileComplete ? '<button type="button" class="admin-record-button" data-edit-payment-route>Edit payment setup</button>' : ''}<button type="button" class="admin-record-button admin-record-button--primary" data-close-profile>Close profile</button></footer>
       </div>`
     });
     dialog.querySelector('[data-close-profile]')?.addEventListener('click', () => dialog.close('done'));

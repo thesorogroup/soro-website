@@ -46,6 +46,7 @@
     }
     const access = accessFor(employee);
     if (access.active !== true) return Object.freeze({ key: 'inactive', label: 'Inactive' });
+    if (employee.profile_complete !== true) return Object.freeze({ key: 'profile_incomplete', label: 'Employee profile incomplete' });
     const hireDate = validIsoDate(employee.hire_date);
     if (!hireDate) return Object.freeze({ key: 'needs_setup', label: 'Hire date needs review' });
     if (hireDate > asOf) return Object.freeze({ key: 'future_hire', label: 'Future hire' });

@@ -11,6 +11,7 @@ const paths = {
   server: path.join(root, 'netlify', 'functions', 'admin-employees.js'),
   migration: path.join(root, 'supabase', 'migrations', '20260827_018_employee_onboarding.sql'),
   hardening: path.join(root, 'supabase', 'migrations', '20260827_019_employee_role_access_hardening.sql'),
+  founder: path.join(root, 'supabase', 'migrations', '20260831_031_founder_identity.sql'),
   rolePolicies: path.join(root, 'supabase', 'migrations', '20260816_006_private_role_helpers.sql')
 };
 
@@ -69,6 +70,7 @@ test('the Admin Panel exposes a dedicated Employees view and complete employee p
 
 test('Administrators explicitly assign and edit the employee payment route without browser inference', () => {
   const ui = source('ui');
+  const founder = source('founder');
 
   assert.match(ui, /wise_contractor:\s*['"]Philippines contractor — Wise['"]/);
   assert.match(ui, /quickbooks_employee:\s*['"]U\.S\. employee — QuickBooks['"]/);
@@ -81,7 +83,8 @@ test('Administrators explicitly assign and edit the employee payment route witho
   assert.match(ui, /if\s*\(!usesWise\)\s*recipient\.value\s*=\s*['"]['"]/);
   assert.match(ui, /Required for Wise/);
   assert.doesNotMatch(ui, /Wise recipient email <span>Optional during setup<\/span>/);
-  assert.match(ui, /payment_route,payout_recipient_email/);
+  assert.match(ui, /\.rpc\(['"]admin_employee_directory['"]\)/);
+  assert.match(founder, /profile\.payment_route::text as payment_route,[\s\S]*profile\.payout_recipient_email/);
   assert.match(ui, /action:\s*['"]update_employee_payment_route['"]/);
   assert.match(ui, /payoutRecipientEmail:\s*paymentRoute\s*===\s*['"]wise_contractor['"]\s*\?\s*payoutRecipientEmail\s*:\s*null/);
   assert.doesNotMatch(ui, /employee\.(?:country|state_region|city)\s*===?\s*['"][^'"]+['"][\s\S]{0,120}paymentRoute/);

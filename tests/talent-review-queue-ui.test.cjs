@@ -303,7 +303,7 @@ test('the canonical portal wires the queue route, profile event, navigation, and
   const portalTest = read('tests/portal-workspace-preview.test.cjs');
 
   assert.ok(html.indexOf('talent-review-queue.js') >= 0 && html.indexOf('talent-review-queue.js') < html.indexOf('operations.js'));
-  assert.match(html, /data-view="talent-review"[^>]*>Review Queue</);
+  assert.match(html, /data-view="talent-review"[^>]*>[\s\S]*?Talent Review Queue[\s\S]*?id="talent-review-count"/);
   assert.match(operations, /admin\s*:\s*new Set\(\[[^\]]*'talent-review'/);
   assert.match(operations, /talent_management\s*:\s*new Set\(\[[^\]]*'talent-review'/);
   for (const role of ['sales', 'sales_management', 'billing', 'client_admin', 'client_reviewer', 'client_billing', 'virtual_assistant']) {
@@ -320,4 +320,15 @@ test('the canonical portal wires the queue route, profile event, navigation, and
   assert.doesNotMatch(source, /storage_path|storagePath|signedUrl|createSignedUrl|soro-private-documents/i);
   assert.match(source, /function dashboardMetric/);
   assert.match(portalTest, /'talent-review'/, 'the exact portal allowlist test must include the new authorized view');
+});
+
+test('the review count refreshes while an authorized portal remains open', () => {
+  const source = read('operations/talent-review-queue.js');
+  assert.match(source, /const AUTO_REFRESH_MS = 30000/);
+  assert.match(source, /addEventListener\?\.\(['"]focus['"], refreshWhenActive\)/);
+  assert.match(source, /addEventListener\?\.\(['"]visibilitychange['"], refreshWhenActive\)/);
+  assert.match(source, /setInterval\?\.\(refreshWhenActive, AUTO_REFRESH_MS\)/);
+  assert.match(source, /reviewDialogOpen\(\)/);
+  assert.match(source, /refresh\(\{ silent: true \}\)/);
+  assert.match(source, /if \(silent && reviewDialogOpen\(\)\) return currentQueue\(\)/);
 });

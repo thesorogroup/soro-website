@@ -209,6 +209,15 @@
   font-weight: 700;
 }
 
+.employee-founder-note {
+  display: block;
+  width: max-content;
+  margin-top: 5px;
+  color: #7a4e0d;
+  font-size: 10px;
+  font-weight: 700;
+}
+
 .employee-status--active {
   background: #e8f7f1;
   color: #14684f;
@@ -313,6 +322,11 @@
 .employee-effective-access strong {
   color: #0a376b;
   font-size: 13px;
+}
+
+.employee-profile-incomplete {
+  border-color: #ecd7b8;
+  background: #fffaf1;
 }
 
 .employee-profile-security-check {

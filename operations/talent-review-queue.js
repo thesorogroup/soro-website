@@ -7,6 +7,7 @@
   'use strict';
 
   const ENDPOINT = '/.netlify/functions/talent-review-queue';
+  const AUTO_REFRESH_MS = 30000;
   const VERIFICATION_ENDPOINT = '/.netlify/functions/talent-verification';
   const AUTHORIZED_ROLES = new Set(['admin', 'talent_management']);
   const STAGES = Object.freeze(['submitted', 'in_review', 'needs_more_info', 'bench_ready', 'closed']);
@@ -612,23 +613,34 @@
 
   function setQueue(value) {
     queue = value;
+    syncNavigationBadge(queue);
     dispatchUpdated();
     render();
     return queue;
   }
 
-  async function refresh() {
+  function reviewDialogOpen() {
+    return Boolean(root?.document?.querySelector?.('[data-review-dialog][open], [data-verification-dialog][open]'));
+  }
+
+  async function refresh(options = {}) {
     if (!canOpenForRole()) return currentQueue();
+    const silent = options.silent === true && queue.phase === 'ready';
     const version = ++requestVersion;
-    feedback = Object.freeze({ type: '', message: '' });
-    queue = freezeQueue({ phase: 'loading', generatedAt: '', viewerRole: actualRole(), summary: emptySummary(), applicants: [] });
-    render();
+    if (!silent) {
+      feedback = Object.freeze({ type: '', message: '' });
+      queue = freezeQueue({ phase: 'loading', generatedAt: '', viewerRole: actualRole(), summary: emptySummary(), applicants: [] });
+      syncNavigationBadge(queue);
+      render();
+    }
     try {
       const next = await requestQueue();
       if (version !== requestVersion || !canOpenForRole()) return currentQueue();
+      if (silent && reviewDialogOpen()) return currentQueue();
       return setQueue(next);
     } catch (error) {
       if (version !== requestVersion || !canOpenForRole()) return currentQueue();
+      if (silent) return currentQueue();
       return setQueue(freezeQueue({
         phase: 'error', generatedAt: '', viewerRole: actualRole(), summary: emptySummary(), applicants: [],
         message: error.message || 'The Talent review queue could not be loaded.'
@@ -1123,6 +1135,7 @@
     });
     if (mountedRoot) return setQueue(next);
     queue = next;
+    syncNavigationBadge(queue);
     dispatchUpdated();
     return queue;
   }
@@ -1360,19 +1373,48 @@
     return ['Talent Review Queue', '—', 'Loading live applications…', ''];
   }
 
+  function navigationReviewCount(queueValue = queue) {
+    if (queueValue?.phase !== 'ready') return 0;
+    const summary = queueValue.summary || emptySummary();
+    return summary.submitted + summary.in_review + summary.needs_more_info;
+  }
+
+  function syncNavigationBadge(queueValue = queue, roleValue = actualRole()) {
+    const navigation = root?.document?.getElementById?.('talent-review-nav');
+    const badge = root?.document?.getElementById?.('talent-review-count');
+    if (!navigation || !badge) return 0;
+    const count = canOpenForRole(roleValue) ? navigationReviewCount(queueValue) : 0;
+    badge.textContent = String(count);
+    badge.hidden = count === 0;
+    navigation.setAttribute('aria-label', count ? `Talent Review Queue, ${count} awaiting review` : 'Talent Review Queue, none awaiting review');
+    return count;
+  }
+
   function handleAuthChange(event) {
     const detail = event?.detail || event || {};
     if (!detail.session || !canOpenForRole(detail.access?.role)) {
       if (mountedRoot) unmount();
+      syncNavigationBadge(emptyQueue(), detail.access?.role);
       return Promise.resolve(emptyQueue());
     }
     return refresh();
   }
 
+  function refreshWhenActive() {
+    if (!canOpenForRole() || queue.phase === 'loading' || reviewDialogOpen() || root?.document?.visibilityState === 'hidden') return;
+    refresh({ silent: true });
+  }
+
   root?.addEventListener?.('soro-auth-changed', handleAuthChange);
+  if (root?.document) {
+    root.addEventListener?.('focus', refreshWhenActive);
+    root.document.addEventListener?.('visibilitychange', refreshWhenActive);
+    root.setInterval?.(refreshWhenActive, AUTO_REFRESH_MS);
+  }
 
   return Object.freeze({
     ENDPOINT,
+    AUTO_REFRESH_MS,
     VERIFICATION_ENDPOINT,
     STAGES,
     ACTIONS,
@@ -1395,6 +1437,8 @@
     unmount,
     dashboardMetric,
     bindDashboardMetric,
+    navigationReviewCount,
+    syncNavigationBadge,
     handleAuthChange
   });
 }));

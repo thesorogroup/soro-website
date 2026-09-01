@@ -1,0 +1,76 @@
+.task-field-optional {
+  color: #718197;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.task-form-message {
+  min-height: 20px;
+  margin: 12px 0 0;
+  color: #52677e;
+  font-size: 13px;
+}
+
+.task-form-message--error { color: #a73a31; }
+
+.task-empty {
+  padding: 44px 24px;
+  text-align: center;
+}
+
+.task-empty strong {
+  display: block;
+  color: #0b3768;
+  font-size: 18px;
+}
+
+.task-empty p,
+.notifications-empty {
+  margin: 8px 0 0;
+  color: #667085;
+}
+
+.task-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 210px;
+}
+
+.task-priority {
+  border-radius: 999px;
+  padding: 3px 7px;
+  background: #eef3f8;
+  color: #50657b;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.task-priority--high { background: #fff1df; color: #9c5a00; }
+.task-priority--urgent { background: #fde9e6; color: #a22e25; }
+.task-priority--low { background: #eef6ef; color: #3e6e4c; }
+.task-due--overdue { color: #b2332c; font-weight: 750; }
+.task-status-action { padding: 7px 10px; }
+
+.task-truncation-notice {
+  margin: 0 0 12px;
+  border: 1px solid #dbe6f1;
+  border-radius: 9px;
+  padding: 10px 12px;
+  background: #f5f9fd;
+  color: #405a75;
+  font-size: 13px;
+}
+
+.notification-list .notifications-empty {
+  padding: 24px 6px;
+  text-align: center;
+}
+
+@media (max-width: 700px) {
+  .task-center-page .heading-actions { margin-top: 16px; }
+  .task-table { min-width: 760px; }
+}

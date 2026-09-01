@@ -6,13 +6,14 @@
     <title>Soro Ops</title>
     <link rel="stylesheet" href="operations.css?v=20260829-profile-center" />
     <link rel="stylesheet" href="roles.css?v=20260829-portal-sidebar" />
-    <link rel="stylesheet" href="sidebar-theme.css?v=20260829-portal-sidebar" />
+    <link rel="stylesheet" href="sidebar-theme.css?v=20260831-fixed-switcher" />
     <link rel="stylesheet" href="auth.css?v=20260828-password-recovery" />
   <link rel="stylesheet" href="profile-dialog.css?v=20260817-profile-layout" />
   <link rel="stylesheet" href="inline-intro-video.css?v=20260822-identity-preferences" />
     <link rel="stylesheet" href="talent-profile-privacy.css?v=20260822-timezone-screening" />
     <link rel="stylesheet" href="talent-file-tabs.css?v=20260829-talent-self-profile-layout2" />
     <link rel="stylesheet" href="task-modal-polish.css?v=20260817-task-modal" />
+    <link rel="stylesheet" href="task-center.css?v=20260831-live-tasks" />
     <link rel="stylesheet" href="support.css" />
     <link rel="stylesheet" href="talent-directory-filters.css?v=20260828-skill-disclosure" />
     <link rel="stylesheet" href="admin-skill-library.css?v=20260817-skill-library" />
@@ -21,7 +22,7 @@
     <link rel="stylesheet" href="client-profile.css?v=20260829-client-profile" />
     <link rel="stylesheet" href="client-talent-profile.css?v=20260829-production-visuals" />
     <link rel="stylesheet" href="admin-permanent-deletion.css?v=20260820-record-security" />
-    <link rel="stylesheet" href="admin-employee-management.css?v=20260827-employee-onboarding" />
+    <link rel="stylesheet" href="admin-employee-management.css?v=20260831-founder-directory" />
     <link rel="stylesheet" href="admin-payroll.css?v=20260830-payroll-payouts" />
     <link rel="stylesheet" href="active-talent-today.css?v=20260829-active-talent-today" />
     <link rel="stylesheet" href="talent-time-off.css?v=20260829-talent-time-off" />
@@ -86,10 +87,10 @@
           <button class="nav-link" id="talent-my-profile-nav" data-view="talent-my-profile" hidden>My Profile</button>
           <button class="nav-link" id="client-talent-profile-nav" data-view="client-talent-profile" hidden>Talent Profile</button>
           <button class="nav-link" id="client-account-settings-nav" data-view="my-profile" hidden>Account Settings</button>
-          <button class="nav-link" data-view="tasks">My Tasks <b>5</b></button>
+          <button class="nav-link" id="my-tasks-nav" data-view="tasks">My Tasks <b id="my-tasks-count" hidden>0</b></button>
           <button class="nav-link" data-view="clients">Clients</button>
           <button class="nav-link" data-view="vas">Talent</button>
-          <button class="nav-link" id="talent-review-nav" data-view="talent-review" hidden>Review Queue</button>
+          <button class="nav-link" id="talent-review-nav" data-view="talent-review" hidden><span>Talent Review Queue</span><b id="talent-review-count" hidden>0</b></button>
           <button class="nav-link" data-view="placements">Placements</button>
           <button class="nav-link" data-view="documents">Documents</button>
           <button class="nav-link" data-view="reports">Reports</button>
@@ -103,14 +104,14 @@
         <header class="topbar">
           <button class="mobile-menu" id="mobile-menu" aria-label="Open menu">☰</button>
           <label class="global-search"><span>⌕</span><input id="global-search" placeholder="Search clients, Talent, tasks…" /></label>
-          <div class="top-actions"><button class="icon-button client-mobile-profile" id="client-mobile-profile" type="button" aria-label="Open Account Settings" title="Account Settings" hidden><span class="avatar">CP</span></button><button class="text-button" id="sign-out" type="button">Sign out</button><button class="icon-button notification-button" id="notifications-button" aria-label="View 3 notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><em>3</em></button><button class="help" id="help-button" type="button" aria-label="Help and support">?</button></div>
+          <div class="top-actions"><button class="icon-button client-mobile-profile" id="client-mobile-profile" type="button" aria-label="Open Account Settings" title="Account Settings" hidden><span class="avatar">CP</span></button><button class="text-button" id="sign-out" type="button">Sign out</button><button class="icon-button notification-button" id="notifications-button" aria-label="No notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><em id="notifications-count" hidden>0</em></button><button class="help" id="help-button" type="button" aria-label="Help and support">?</button></div>
         </header>
         <div id="view-root"></div>
       </section>
     </main>
-    <dialog id="task-dialog"><form method="dialog" class="modal"><div class="modal-title"><h2>Add task</h2><button type="button" class="modal-close" aria-label="Close dialog">×</button></div><label>Task name<input id="task-name" required placeholder="What needs attention?" /></label><label>Due date<input type="date" /></label><label>Assign to<select><option>Me — Matt Johnson</option><option>Talent Management</option><option>Billing</option></select></label><div class="modal-actions"><button type="button" class="button modal-cancel">Cancel</button><button value="default" class="primary">Add task</button></div></form></dialog>
+    <dialog id="task-dialog"><form class="modal" id="task-form"><div class="modal-title"><h2>Add task</h2><button type="button" class="modal-close" aria-label="Close dialog">×</button></div><label>Task name<input id="task-name" name="title" required maxlength="160" placeholder="What needs attention?" /></label><label>Related to <span class="task-field-optional">Optional</span><input id="task-related" name="relatedLabel" maxlength="200" placeholder="Client, Talent, or project" /></label><label>Due date <span class="task-field-optional">Optional</span><input id="task-due-date" name="dueDate" type="date" /></label><label>Priority<select id="task-priority" name="priority"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option><option value="low">Low</option></select></label><label>Assign to<select id="task-assignee" name="assignedTo"><option value="">Loading available employees…</option></select></label><p class="task-form-message" id="task-form-message" aria-live="polite"></p><div class="modal-actions"><button type="button" class="button modal-cancel">Cancel</button><button type="submit" class="primary">Add task</button></div></form></dialog>
     <dialog id="role-dialog"><form method="dialog" class="modal"><div class="modal-title"><h2>Preview a workspace</h2><button type="button" class="modal-close" aria-label="Close dialog">×</button></div><div class="role-options"><button value="admin" class="role-option"><strong>Admin Panel</strong><small>Company-wide operations and oversight</small></button><button value="sales" class="role-option"><strong>Sales Panel</strong><small>Clients, follow-ups, and shortlists</small></button><button value="talent" class="role-option"><strong>Talent Management Panel</strong><small>Virtual Assistant readiness, support, and reviews</small></button><button value="client" class="role-option"><strong>Client Portal</strong><small>Active Virtual Assistants, documents, invoices, and hiring</small></button><button value="va" class="role-option"><strong>Talent Portal</strong><small>Daily work, Dream Pathway, and support</small></button></div></form></dialog>
-    <dialog id="notifications-dialog"><section class="modal notifications-modal" aria-labelledby="notifications-title"><div class="modal-title"><div><p class="eyebrow">Soro Ops</p><h2 id="notifications-title">Notifications</h2></div><button type="button" class="modal-close" aria-label="Close notifications">×</button></div><div class="notification-list"><button type="button" data-notification-view="talent-review"><span class="notification-dot urgent"></span><span><strong>Talent profiles need review</strong><small>New application information is ready for Talent Management.</small></span><b>Open</b></button><button type="button" data-notification-view="overview"><span class="notification-dot"></span><span><strong>1 billing verification is due tomorrow</strong><small>Confirm the payout recipient details before the pay run.</small></span><b>Open</b></button></div></section></dialog>
+    <dialog id="notifications-dialog"><section class="modal notifications-modal" aria-labelledby="notifications-title"><div class="modal-title"><div><p class="eyebrow">Soro Ops</p><h2 id="notifications-title">Notifications</h2></div><button type="button" class="modal-close" aria-label="Close notifications">×</button></div><div class="notification-list" id="notification-list"><p class="notifications-empty">You have no notifications requiring attention.</p></div></section></dialog>
     <dialog id="active-talent-today-dialog" class="active-talent-dialog"><section aria-labelledby="active-talent-today-title"><div class="modal-title"><div><p class="eyebrow">Live attendance</p><h2 id="active-talent-today-title">Active Talent Today</h2></div><button type="button" class="modal-close" aria-label="Close Active Talent Today">×</button></div><div id="active-talent-today-content" aria-live="polite"></div></section></dialog>
     <dialog id="talent-time-off-dialog" class="talent-time-off-dialog"><section aria-labelledby="talent-time-off-title"><div class="modal-title"><div><p class="eyebrow">Schedule availability</p><h2 id="talent-time-off-title">Request Time Off</h2></div><button type="button" class="modal-close" aria-label="Close Request Time Off">×</button></div><div id="talent-time-off-content" aria-live="polite"></div></section></dialog>
     <dialog id="time-off-management-dialog" class="talent-time-off-dialog time-off-management-dialog"><section aria-labelledby="time-off-management-title"><div class="modal-title"><div><p class="eyebrow">Talent scheduling</p><h2 id="time-off-management-title">Time Off Requests</h2></div><button type="button" class="modal-close" aria-label="Close Time Off Requests">×</button></div><div id="time-off-management-content" aria-live="polite"></div></section></dialog>
@@ -122,8 +123,9 @@
     <script src="talent-workday.js?v=20260829-manual-workday"></script>
     <script src="active-talent-today.js?v=20260829-active-talent-today"></script>
     <script src="talent-time-off.js?v=20260829-talent-time-off"></script>
-    <script src="talent-review-queue.js?v=20260830-talent-review-queue"></script>
-    <script src="operations.js?v=20260829-talent-time-off"></script>
+    <script src="talent-review-queue.js?v=20260831-review-badge"></script>
+    <script src="task-center.js?v=20260831-live-tasks"></script>
+    <script src="operations.js?v=20260831-live-task-center"></script>
     <script src="talent-directory-filters.js?v=20260828-skill-disclosure"></script>
     <script src="admin-skill-library.js?v=20260817-skill-library"></script>
     <script src="screening-presentation.js?v=20260829-speed-meter-fix"></script>
@@ -133,10 +135,10 @@
     <script src="talent-profile-privacy.js?v=20260822-timezone-screening"></script>
     <script src="talent-file-tabs.js?v=20260829-manual-workday"></script>
     <script src="task-modal-behavior.js?v=20260817-task-modal"></script>
-    <script src="employee-payroll-readiness.js?v=20260830-payroll-readiness"></script>
-    <script src="admin-employee-management.js?v=20260827-employee-onboarding"></script>
+    <script src="employee-payroll-readiness.js?v=20260831-founder-readiness"></script>
+    <script src="admin-employee-management.js?v=20260831-founder-directory"></script>
     <script src="admin-payroll.js?v=20260830-payroll-payouts"></script>
-    <script src="auth.js?v=20260829-talent-self-profile"></script>
+    <script src="auth.js?v=20260831-founder-identity"></script>
     <script src="admin-record-management.js?v=20260822-identity-preferences"></script>
     <script src="talent-portal-access.js?v=20260828-va-portal-access"></script>
     <script src="admin-permanent-deletion.js?v=20260821-concept-match"></script>
