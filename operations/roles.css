@@ -1,1 +1,42 @@
-.brand{min-height:92px;margin:0 8px 35px;gap:8px}.brand img{display:block;width:180px;height:92px;max-height:none;object-fit:contain;object-position:left center;filter:drop-shadow(0 5px 10px rgba(0,0,0,.18))}.brand-ops{align-self:flex-end;margin:0 0 16px -42px;padding:4px 7px;border-radius:999px;background:var(--orange);color:#fff;font-size:10px;font-weight:800;letter-spacing:1.35px;line-height:1;box-shadow:0 4px 12px rgba(0,0,0,.22)}.content{background:radial-gradient(circle at 100% 0,rgba(244,90,31,.10),transparent 320px),linear-gradient(180deg,#fffaf4 0%,#fff 42%,#fff7ed 100%)}.topbar{background:rgba(255,253,251,.94)}.page h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;color:#082d5c;font-size:34px}.eyebrow{letter-spacing:.02em}.panel,.metric{border-color:#eadfd5;box-shadow:0 12px 28px rgba(8,45,92,.055)}.metric{background:#fffdfb}.metric:hover{border-color:#f1b18c}.button.primary{background:#f45a1f;border-color:#f45a1f}.button.primary:hover{background:#d94712}.button{border-color:#dccfc5}.text-button{color:#d94712}.role-options{display:grid;gap:10px}.role-option{background:#fff;border:1px solid #eadfd5;border-radius:10px;padding:14px;text-align:left;cursor:pointer}.role-option:hover{border-color:#f45a1f;background:#fff7ed}.role-option strong,.role-option small{display:block}.role-option small{color:#667085;margin-top:4px}.role-sales .metric:first-child,.role-talent .metric:first-child{border-top:4px solid #2477b7}.role-admin .metric:first-child{border-top:4px solid #f45a1f}.role-client .metric:first-child{border-top:4px solid #e9a337}.role-va .metric:first-child{border-top:4px solid #38a5a5}
+.brand {
+  width: 100%;
+  min-height: 92px;
+  margin: 0 0 35px;
+  overflow: hidden;
+  gap: 0;
+}
+
+.brand img {
+  display: block;
+  width: 248px;
+  height: auto;
+  max-width: none;
+  max-height: 92px;
+  object-fit: contain;
+  object-position: left center;
+  filter: none;
+}
+
+.content {
+  background: radial-gradient(circle at 100% 0, rgba(244, 90, 31, .10), transparent 320px), linear-gradient(180deg, #fffaf4 0%, #fff 42%, #fff7ed 100%);
+}
+
+.topbar { background: rgba(255, 253, 251, .94); }
+.page h1 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; color: #082d5c; font-size: 34px; }
+.eyebrow { letter-spacing: .02em; }
+.panel, .metric { border-color: #eadfd5; box-shadow: 0 12px 28px rgba(8, 45, 92, .055); }
+.metric { background: #fffdfb; }
+.metric:hover { border-color: #f1b18c; }
+.button.primary { background: #f45a1f; border-color: #f45a1f; }
+.button.primary:hover { background: #d94712; }
+.button { border-color: #dccfc5; }
+.text-button { color: #d94712; }
+.role-options { display: grid; gap: 10px; }
+.role-option { background: #fff; border: 1px solid #eadfd5; border-radius: 10px; padding: 14px; text-align: left; cursor: pointer; }
+.role-option:hover { border-color: #f45a1f; background: #fff7ed; }
+.role-option strong, .role-option small { display: block; }
+.role-option small { color: #667085; margin-top: 4px; }
+.role-sales .metric:first-child, .role-talent .metric:first-child { border-top: 4px solid #2477b7; }
+.role-admin .metric:first-child { border-top: 4px solid #f45a1f; }
+.role-client .metric:first-child { border-top: 4px solid #e9a337; }
+.role-va .metric:first-child { border-top: 4px solid #38a5a5; }

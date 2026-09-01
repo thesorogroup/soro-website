@@ -123,9 +123,20 @@ test('every portal uses the same accessible Soro navy sidebar treatment', () => 
   const base = read('operations/operations.css');
   const roles = read('operations/roles.css');
   const theme = read('operations/sidebar-theme.css');
+  const foxCommand = read('assets/soro-ops-fox-command.svg');
 
   assert.match(html, /operations\.css\?v=20260829-profile-center/);
+  assert.match(html, /roles\.css\?v=20260831-fox-command/);
   assert.match(html, /sidebar-theme\.css\?v=20260831-fixed-switcher/);
+  assert.equal((html.match(/src="\.\.\/assets\/soro-ops-fox-command\.svg" alt="Soro Ops"/g) || []).length, 5);
+  assert.match(html, /rel="icon"[^>]+soro-ops-fox-command-icon\.png/);
+  assert.match(html, /rel="apple-touch-icon"[^>]+soro-ops-fox-command-icon\.png/);
+  assert.doesNotMatch(html, /brand-ops|soro-logo-horizontal\.svg/);
+  assert.ok(fs.existsSync(path.join(root, 'assets/soro-ops-fox-command.png')));
+  assert.ok(fs.existsSync(path.join(root, 'assets/soro-ops-fox-command-icon.png')));
+  assert.match(foxCommand, /viewBox="0 0 1350 480"/);
+  assert.match(foxCommand, /<rect[^>]+fill="#082550"/);
+  assert.doesNotMatch(foxCommand, /<text\b/i);
   assert.match(theme, /--sidebar-navy:\s*#082550/);
   assert.match(theme, /--sidebar-hover:\s*#123b6d/);
   assert.match(theme, /--sidebar-active:\s*#1e578e/);
@@ -134,6 +145,8 @@ test('every portal uses the same accessible Soro navy sidebar treatment', () => 
   assert.match(theme, /#app \[hidden\][\s\S]*display:\s*none !important/);
   assert.match(theme, /\.profile:not\(:disabled\):hover/);
   assert.match(base, /\.profile\{[^}]*padding:10px;[^}]*align-items:center/);
+  assert.match(roles, /\.brand\s*\{[^}]*width:\s*100%[^}]*overflow:\s*hidden/s);
+  assert.match(roles, /\.brand img\s*\{[^}]*width:\s*248px[^}]*height:\s*auto[^}]*max-width:\s*none[^}]*filter:\s*none/s);
   assert.match(theme, /\.nav-link:focus-visible,[\s\S]*\.profile:focus-visible/);
   assert.doesNotMatch(roles, /\.role-(?:talent|client|va)\s+\.sidebar\s*\{/);
 });
