@@ -49,8 +49,8 @@ const fixture = {
 test('Client Portal navigation contains only Dashboard, Talent Profile, Account Settings and Help for Talent viewers', () => {
   const operations = read('operations/operations.js');
   const html = read('operations/index.html');
-  assert.match(operations, /client_admin:new Set\(\['overview','client-talent-profile','my-profile','help'\]\)/);
-  assert.match(operations, /client_reviewer:new Set\(\['overview','client-talent-profile','my-profile','help'\]\)/);
+  assert.match(operations, /client_admin:new Set\(\['overview','client-candidate-review','client-talent-profile','my-profile','help'\]\)/);
+  assert.match(operations, /client_reviewer:new Set\(\['overview','client-candidate-review','client-talent-profile','my-profile','help'\]\)/);
   assert.match(operations, /client_billing:new Set\(\['overview','my-profile','help'\]\)/);
   assert.doesNotMatch(operations, /client_billing:new Set\([^\n]*client-talent-profile/);
   assert.match(html, /id="client-talent-profile-nav"[^>]*data-view="client-talent-profile"[^>]*hidden>Talent Profile</);
@@ -150,7 +150,7 @@ test('Client Talent assets load before routing and include desktop/mobile safegu
   assert.match(html, /talent-profile-visuals\.js\?v=20260829-production-visuals/);
   assert.match(html, /client-talent-profile\.js\?v=20260829-production-visuals/);
   assert.ok(html.indexOf('talent-profile-visuals.js?v=20260829-production-visuals') < html.indexOf('client-talent-profile.js?v=20260829-production-visuals'));
-  assert.ok(html.indexOf('client-talent-profile.js?v=20260829-production-visuals') < html.indexOf('operations.js?v=20260901-available-talent-bench'));
+  assert.ok(html.indexOf('client-talent-profile.js?v=20260829-production-visuals') < html.indexOf('operations.js?v=20260901-client-shortlists'));
   assert.match(css, /grid-template-columns:\s*230px minmax\(0, 1fr\) minmax\(280px, 350px\)/);
   assert.match(css, /@media \(min-width: 1101px\)[\s\S]*\.client-talent-folder-art/);
   assert.match(css, /\.client-talent-folder-front-seam[\s\S]*stroke:\s*rgba\(144, 125, 91, \.24\)/);

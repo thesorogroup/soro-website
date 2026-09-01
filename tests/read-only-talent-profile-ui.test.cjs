@@ -122,8 +122,8 @@ test('the portal renderer routes Sales through the isolated profile and keeps a 
   const tabs = read('operations/talent-file-tabs.js');
   const html = read('operations/index.html');
 
-  assert.match(operations, /sales:new Set\(\['overview','tasks','clients','available-talent','talent-profile','placements','reports','help'\]\)/);
-  assert.match(operations, /sales_management:new Set\(\['overview','tasks','clients','available-talent','talent-profile','placements','reports','help'\]\)/);
+  assert.match(operations, /sales:new Set\(\['overview','tasks','clients','client-shortlists','available-talent','talent-profile','placements','reports','help'\]\)/);
+  assert.match(operations, /sales_management:new Set\(\['overview','tasks','clients','client-shortlists','available-talent','talent-profile','placements','reports','help'\]\)/);
   assert.match(enhancements, /current === 'talent-profile'[\s\S]*\['sales', 'sales_management'\]\.includes\(accessRole\)[\s\S]*SoroReadOnlyTalentProfile\?\.canOpenForRole[\s\S]*SoroReadOnlyTalentProfile\.mount\(root/);
   assert.match(enhancements, /secure read-only profile is still loading/);
   assert.match(operations, /if\(\['sales','sales_management'\]\.includes\(accessRole\)\)[\s\S]*SoroReadOnlyTalentProfile\?\.canOpenForRole[\s\S]*secure read-only profile is still loading/);

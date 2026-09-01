@@ -401,7 +401,7 @@
   }
 
   function cardMarkup(item) {
-    return `<article class="bench-talent-card" data-applicant-id="${item.applicantId}">
+    return `<article class="bench-talent-card" data-applicant-id="${item.applicantId}" data-bench-stage="${escapeHtml(item.stage)}">
       <div class="bench-person"><span class="bench-avatar" aria-hidden="true">${escapeHtml(initials(item.fullName))}</span><div><button type="button" class="bench-profile-link" data-bench-profile="${item.applicantId}">${escapeHtml(item.fullName)}</button><small>${item.preferredName ? `Goes by ${escapeHtml(item.preferredName)} · ` : ''}${escapeHtml(stageLabel(item.stage))}</small></div></div>
       <div class="bench-card-section"><small>VA types</small><div class="bench-chips">${chipsMarkup(item.vaTypes, 'bench-chip-type')}</div></div>
       <div class="bench-card-section"><small>Verified skills</small><div class="bench-chips">${chipsMarkup(item.verifiedSkills, 'bench-chip-skill')}</div></div>

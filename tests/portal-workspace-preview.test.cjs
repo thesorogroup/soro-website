@@ -48,10 +48,10 @@ test('Admin workspace previews map all five choices to the real role navigation'
     assert.match(source, new RegExp(`\\b${workspace}\\s*:\\s*['"]${accessRole}['"]`), `${workspace} must preview ${accessRole}.`);
   }
 
-  assert.deepEqual(roleViews(source, 'admin'), ['overview', 'tasks', 'clients', 'vas', 'available-talent', 'talent-review', 'talent-profile', 'placements', 'documents', 'reports', 'employees', 'payroll', 'help']);
-  assert.deepEqual(roleViews(source, 'sales'), ['overview', 'tasks', 'clients', 'available-talent', 'talent-profile', 'placements', 'reports', 'help']);
+  assert.deepEqual(roleViews(source, 'admin'), ['overview', 'tasks', 'clients', 'client-shortlists', 'vas', 'available-talent', 'talent-review', 'talent-profile', 'placements', 'documents', 'reports', 'employees', 'payroll', 'help']);
+  assert.deepEqual(roleViews(source, 'sales'), ['overview', 'tasks', 'clients', 'client-shortlists', 'available-talent', 'talent-profile', 'placements', 'reports', 'help']);
   assert.deepEqual(roleViews(source, 'talent_management'), ['overview', 'tasks', 'clients', 'vas', 'available-talent', 'talent-review', 'talent-profile', 'placements', 'documents', 'reports', 'talent-payout-review', 'help']);
-  assert.deepEqual(roleViews(source, 'client_admin'), ['overview', 'client-talent-profile', 'my-profile', 'help']);
+  assert.deepEqual(roleViews(source, 'client_admin'), ['overview', 'client-candidate-review', 'client-talent-profile', 'my-profile', 'help']);
   assert.deepEqual(roleViews(source, 'virtual_assistant'), ['overview', 'talent-my-profile', 'documents', 'help']);
 
   assert.match(source, /function actualAuthenticatedRole\(access=window\.soroCurrentAccess\)\{return String\(access\?\.role\|\|''\)\.toLowerCase\(\)\}/);

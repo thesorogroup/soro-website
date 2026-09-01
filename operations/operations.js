@@ -4,13 +4,13 @@ const roleConfig={admin:{label:'The Founder',person:'Matt',className:'role-admin
 const roleDashboards={sales:{title:'Sales Panel',caption:'Your priority client work is ready.',metrics:[['Tasks needing attention','—','Loading your assigned tasks…',''],['My client pipeline','18','4 ready for matching',''],['Open hiring requests','7','3 awaiting shortlist',''],['My available Talent','14','6 available now','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Pipeline movement'},talent:{title:'Talent Management Panel',caption:'Your Talent readiness and support work is ready.',metrics:[['Talent actions needing attention','—','Loading your assigned tasks…',''],['Active Talent today','—','Loading live attendance…',''],['Talent Review Queue','—','Loading live applications…',''],['Upcoming reviews','4','2 this week','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Talent readiness'},client:{title:'Client Portal',caption:'Your active Talent support and Soro actions are all in one place.',metrics:[['Action needed','2','1 document is awaiting your signature','alert'],['Your current Talent','3','All active placements',''],['Open hiring requests','1','Next review tomorrow',''],['Invoices','1','Due this Friday','warning']],primary:'Action needed',items:[],emptyMessage:'No actions are assigned right now.',secondary:'Your current Talent'},va:{title:'Talent Portal',caption:'Your workday, progress, and support are all here.',metrics:[['Today’s work','—','Current placement status will appear here',''],['Dream Pathway','1 next step','Review education options',''],['Next payout','Friday','Current pay period',''],['Documents','1 action','Update Wise recipient verification','warning']],primary:'Action needed',items:[],emptyMessage:'No actions are assigned right now.',secondary:'Your progress'}};
 const root=document.getElementById('view-root'),nav=document.getElementById('main-nav');
 const authenticatedEmployeeViews=Object.freeze({
-  admin:new Set(['overview','tasks','clients','vas','available-talent','talent-review','talent-profile','placements','documents','reports','employees','payroll','help']),
+  admin:new Set(['overview','tasks','clients','client-shortlists','vas','available-talent','talent-review','talent-profile','placements','documents','reports','employees','payroll','help']),
   talent_management:new Set(['overview','tasks','clients','vas','available-talent','talent-review','talent-profile','placements','documents','reports','talent-payout-review','help']),
-  sales:new Set(['overview','tasks','clients','available-talent','talent-profile','placements','reports','help']),
-  sales_management:new Set(['overview','tasks','clients','available-talent','talent-profile','placements','reports','help']),
+  sales:new Set(['overview','tasks','clients','client-shortlists','available-talent','talent-profile','placements','reports','help']),
+  sales_management:new Set(['overview','tasks','clients','client-shortlists','available-talent','talent-profile','placements','reports','help']),
   billing:new Set(['overview','tasks','clients','placements','documents','reports','help']),
-  client_admin:new Set(['overview','client-talent-profile','my-profile','help']),
-  client_reviewer:new Set(['overview','client-talent-profile','my-profile','help']),
+  client_admin:new Set(['overview','client-candidate-review','client-talent-profile','my-profile','help']),
+  client_reviewer:new Set(['overview','client-candidate-review','client-talent-profile','my-profile','help']),
   client_billing:new Set(['overview','my-profile','help']),
   virtual_assistant:new Set(['overview','talent-my-profile','documents','help'])
 });
@@ -213,6 +213,7 @@ function render(){
   if(current!=='talent-profile')window.SoroReadOnlyTalentProfile?.reset?.();
   if(current!=='talent-review')window.soroTalentReviewQueue?.unmount?.();
   if(current!=='available-talent')window.soroAvailableTalentBench?.unmount?.({clear:false});
+  if(!['client-shortlists','client-candidate-review'].includes(current))window.soroClientShortlistWorkflow?.unmount?.({clear:false});
   if(current==='client-record'){
     if(!selectedClientId||!window.SoroInternalClientProfile?.load){
       root.innerHTML='<main class="page"><button class="text-button back-to-clients">← Back to Clients</button><section class="panel profile-missing"><h1>Client profile unavailable</h1><p>This profile could not be opened right now.</p></section></main>';
@@ -278,6 +279,20 @@ function render(){
   if(current==='available-talent'){
     if(!window.soroAvailableTalentBench?.canOpenForRole?.(currentAuthenticatedRole())){root.replaceChildren();return}
     window.soroAvailableTalentBench.mount(root,{role:currentAuthenticatedRole()});
+    setActive();
+    return;
+  }
+  if(current==='client-shortlists'){
+    const accessRole=actualAuthenticatedRole();
+    if(!window.soroClientShortlistWorkflow?.canOpenForRole?.(accessRole,'sales')){root.replaceChildren();return}
+    window.soroClientShortlistWorkflow.mount(root,{role:accessRole,mode:'sales'});
+    setActive();
+    return;
+  }
+  if(current==='client-candidate-review'){
+    const accessRole=actualAuthenticatedRole();
+    if(!window.soroClientShortlistWorkflow?.canOpenForRole?.(accessRole,'client')){root.replaceChildren();return}
+    window.soroClientShortlistWorkflow.mount(root,{role:accessRole,mode:'client'});
     setActive();
     return;
   }
@@ -509,6 +524,31 @@ window.addEventListener('soro:talent-review-queue-updated',()=>{
   if(viewAllowedForAuthenticatedRole('vas'))loadLiveApplicants();
   if(current==='overview'&&window.soroTalentReviewQueue?.canOpenForRole?.(actualAuthenticatedRole()))render();
 });
+window.addEventListener('soro:client-shortlist-open',event=>{
+  if(!viewAllowedForAuthenticatedRole('client-shortlists'))return;
+  current='client-shortlists';
+  selectedTalentId=null;
+  selectedClientId=null;
+  history.pushState({},'',`${location.pathname}#client-shortlists`);
+  setActive();
+  window.soroClientShortlistWorkflow?.mount?.(root,{role:actualAuthenticatedRole(),mode:'sales',requestId:event.detail?.requestId});
+  document.querySelector('.sidebar')?.classList.remove('open');
+});
+window.addEventListener('soro:client-shortlist-open-bench',()=>{
+  if(!viewAllowedForAuthenticatedRole('available-talent'))return;
+  current='available-talent';
+  selectedTalentId=null;
+  selectedClientId=null;
+  history.pushState({},'',`${location.pathname}#available-talent`);
+  setActive();
+  render();
+  document.querySelector('.sidebar')?.classList.remove('open');
+});
+window.addEventListener('soro:client-shortlist-open-profile',event=>{
+  const applicantId=String(event.detail?.applicantId||'');
+  if(!viewAllowedForAuthenticatedRole('talent-profile')||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(applicantId))return;
+  openTalentProfile(applicantId);
+});
 window.addEventListener('soro:task-center-updated',()=>{
   if(current==='tasks'||(current==='overview'&&['admin','sales','talent'].includes(role)))render();
 });
@@ -536,7 +576,7 @@ const initialTalentHash=location.hash.match(/^#talent\/([^/]+)$/);
 const initialClientHash=location.hash.match(/^#client\/([^/]+)$/);
 if(initialTalentHash){current='talent-profile';selectedTalentId=initialTalentHash[1]}
 else if(initialClientHash){current='client-record';selectedClientId=initialClientHash[1]}
-else if(location.hash.slice(1) in data||['my-profile','client-talent-profile','talent-my-profile','talent-review','available-talent'].includes(location.hash.slice(1))){current=location.hash.slice(1)}
+else if(location.hash.slice(1) in data||['my-profile','client-talent-profile','client-candidate-review','client-shortlists','talent-my-profile','talent-review','available-talent'].includes(location.hash.slice(1))){current=location.hash.slice(1)}
 render();
 
 function displayTalentName(value){

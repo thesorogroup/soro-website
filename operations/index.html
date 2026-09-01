@@ -32,6 +32,7 @@
     <link rel="stylesheet" href="talent-time-off.css?v=20260829-talent-time-off" />
     <link rel="stylesheet" href="talent-review-queue.css?v=20260830-talent-review-queue" />
     <link rel="stylesheet" href="available-talent-bench.css?v=20260901-available-talent-bench" />
+    <link rel="stylesheet" href="client-shortlist-workflow.css?v=20260901-client-shortlists" />
   </head>
   <body>
     <section class="auth-checking" id="auth-checking" aria-live="polite">
@@ -89,11 +90,13 @@
         <a class="brand" href="#overview" aria-label="Soro Ops home"><img src="../assets/soro-ops-fox-command.svg" alt="Soro Ops" /></a>
         <nav id="main-nav">
           <button class="nav-link active" id="overview-nav" data-view="overview">Overview</button>
+          <button class="nav-link" id="client-candidate-review-nav" data-view="client-candidate-review" hidden>Candidate Review <b id="client-candidate-review-count" hidden>0</b></button>
           <button class="nav-link" id="talent-my-profile-nav" data-view="talent-my-profile" hidden>My Profile</button>
           <button class="nav-link" id="client-talent-profile-nav" data-view="client-talent-profile" hidden>Talent Profile</button>
           <button class="nav-link" id="client-account-settings-nav" data-view="my-profile" hidden>Account Settings</button>
           <button class="nav-link" id="my-tasks-nav" data-view="tasks">My Tasks <b id="my-tasks-count" hidden>0</b></button>
           <button class="nav-link" data-view="clients">Clients</button>
+          <button class="nav-link" id="client-shortlists-nav" data-view="client-shortlists" hidden>Shortlists <b id="client-shortlists-count" hidden>0</b></button>
           <button class="nav-link" data-view="vas">Talent</button>
           <button class="nav-link" id="available-talent-nav" data-view="available-talent" hidden>Available Talent</button>
           <button class="nav-link" id="talent-review-nav" data-view="talent-review" hidden><span>Talent Review Queue</span><b id="talent-review-count" hidden>0</b></button>
@@ -134,7 +137,8 @@
     <script src="task-center.js?v=20260831-live-tasks"></script>
     <script src="global-search.js?v=20260901-global-search"></script>
     <script src="available-talent-bench.js?v=20260901-available-talent-bench"></script>
-    <script src="operations.js?v=20260901-available-talent-bench"></script>
+    <script src="client-shortlist-workflow.js?v=20260901-client-shortlists"></script>
+    <script src="operations.js?v=20260901-client-shortlists"></script>
     <script src="talent-directory-filters.js?v=20260828-skill-disclosure"></script>
     <script src="admin-skill-library.js?v=20260817-skill-library"></script>
     <script src="screening-presentation.js?v=20260829-speed-meter-fix"></script>
