@@ -187,3 +187,49 @@ test('Production cards retain required practice-score and reference-tier wording
   assert.match(source, /connectionMeterTrack\('Upload', 'internetUpload'/);
   assert.match(source, /not clinical diagnoses or measures of job performance/);
 });
+
+test('Profile documents surface resumes and route unclassified legacy assessments safely', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'operations', 'operations-enhancements.js'), 'utf8');
+  const baseSource = fs.readFileSync(path.join(__dirname, '..', 'operations', 'operations.js'), 'utf8');
+  const migration = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', '20260831_032_legacy_talent_document_classification.sql'), 'utf8');
+  const sourceMap = source.slice(source.indexOf('const screeningSourceMap'), source.indexOf('function numericValues'));
+  const legacyHelpersSource = source.slice(source.indexOf('function strictLegacyAssessmentType'), source.indexOf('function screeningDocumentType'));
+  const strictLegacyAssessmentType = new Function(`${legacyHelpersSource}; return strictLegacyAssessmentType;`)();
+  const categoryHelper = source.slice(source.indexOf('function sourceCategoryLabel'), source.indexOf('function secureSourceButton'));
+
+  assert.match(sourceMap, /personality:\s*\['disc_assessment', 'enneagram_assessment', 'mbti_assessment', 'assessment'\]/);
+  assert.match(source, /data-profile-resume/);
+  assert.match(source, /classifyDocument\(document\) === 'resume' && document\.storage_path/);
+  assert.match(source, /renderProfileResumeLinks\(all, applicant\)/);
+  assert.match(source, /Original application résumé/);
+  assert.match(source, /\['drive\.google\.com', 'docs\.google\.com'\]/);
+  assert.match(source, /viewer\.opener = null;/);
+  assert.match(source, /viewer\.location\.href = url;/);
+  assert.match(source, /select\('id,file_name,document_type,status,created_at,storage_path'\)/);
+  assert.doesNotMatch(source, /select\('id,file_name,document_type,status,created_at,storage_path,external_url'\)/);
+  assert.match(source, /Legacy assessments? · needs classification/);
+  assert.match(categoryHelper, /type === 'assessment'/);
+  assert.doesNotMatch(categoryHelper, /DISC|Enneagram|MBTI/);
+  assert.match(source, /screening-source-button open-private-document/);
+  assert.match(source, /querySelectorAll\('\.screening-source-button\.open-private-document'\)/);
+  assert.doesNotMatch(source, /querySelectorAll\('\.screening-source-button'\)/);
+  assert.match(source, /Open securely/);
+  assert.match(baseSource, /viewer\.opener=null;viewer\.document\.title='Opening secure Soro document/);
+
+  assert.equal(strictLegacyAssessmentType({ document_type: 'assessment', file_name: 'DISC results.png' }), 'disc_assessment');
+  assert.equal(strictLegacyAssessmentType({ document_type: 'assessment', file_name: 'Enneagram Type 2.pdf' }), 'enneagram_assessment');
+  assert.equal(strictLegacyAssessmentType({ document_type: 'assessment', file_name: 'MBTI-INFP.png' }), 'mbti_assessment');
+  assert.equal(strictLegacyAssessmentType({ document_type: 'assessment', file_name: '16 Personalities result.png' }), 'mbti_assessment');
+  assert.equal(strictLegacyAssessmentType({ document_type: 'assessment', file_name: 'DISC and Enneagram summary.png' }), '');
+  assert.equal(strictLegacyAssessmentType({ document_type: 'assessment', file_name: 'Screenshot 2026-06-19.png' }), '');
+  assert.equal(strictLegacyAssessmentType({ document_type: 'disc_assessment', file_name: 'Enneagram.png' }), '');
+
+  assert.match(migration, /btrim\(document\.external_url\) = btrim\(applicant\.resume_url\)/);
+  assert.match(migration, /document_type = 'resume'/);
+  assert.match(migration, /document\.file_name ~\* '\(\^\|\[\^a-z0-9\]\)disc/);
+  assert.match(migration, /candidate\.inferred_type is not null/);
+  assert.match(migration, /Legacy assessment type inferred from one explicit filename token/);
+  assert.match(migration, /storage object unchanged/);
+  assert.doesNotMatch(migration, /delete\s+from\s+(?:public\.)?documents/i);
+  assert.doesNotMatch(migration, /storage\.objects\s+(?:set|delete|insert)/i);
+});

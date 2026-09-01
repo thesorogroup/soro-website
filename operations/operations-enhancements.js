@@ -295,7 +295,7 @@
 
   const screeningSourceMap = {
     english: ['english_proof'],
-    personality: ['disc_assessment', 'enneagram_assessment', 'mbti_assessment'],
+    personality: ['disc_assessment', 'enneagram_assessment', 'mbti_assessment', 'assessment'],
     computer: ['equipment_proof'],
     internet: ['internet_proof']
   };
@@ -450,23 +450,87 @@
         ${list(applicant.self_reported_skills, 'No skills were reported for the selected work areas.')}
       </div>
     </section>`;
-    return markup.replace('<section class="panel profile-section profile-documents-section">', `${skillReview}<section class="panel profile-section profile-documents-section">`);
+    const resumeAccess = '<div class="screening-source-links profile-resume-access" data-profile-resume><span>Résumé</span><span class="screening-source-missing">Checking for an attached résumé…</span></div>';
+    return markup
+      .replace('</dl></section>', `</dl>${resumeAccess}</section>`)
+      .replace('<section class="panel profile-section profile-documents-section">', `${skillReview}<section class="panel profile-section profile-documents-section">`);
   };
 
   function supportPage() {
     return `<main class="page support-page"><div class="page-heading"><div><p class="eyebrow">Soro Ops support</p><h1>Help & Support</h1><p class="eyebrow" style="margin-top:9px">Report a technical issue or ask for help using Soro Ops.</p></div></div><div class="support-grid"><section class="panel"><div class="panel-head"><div><p class="eyebrow">Technical support ticket</p><h2>Tell us what happened</h2></div></div><form id="help-ticket-form" class="support-form"><label>What do you need help with?<input name="subject" required maxlength="120" placeholder="Example: I cannot open a Talent document" /></label><label>Area<select name="area"><option>Sign-in and account access</option><option>Talent profiles and documents</option><option>Client records and placements</option><option>Tasks and notifications</option><option>Other technical issue</option></select></label><label>What happened?<textarea name="details" required placeholder="Include what you were trying to do, what you expected, and any message you saw."></textarea></label><small>Do not include passwords, payment details, or other sensitive information in a ticket.</small><button class="button primary" type="submit">Submit support ticket</button><div id="ticket-confirmation" aria-live="polite"></div></form></section><aside class="panel support-contact"><div><p class="eyebrow">Before submitting</p><h2>Quick checks</h2></div><article><h3>Document will not open?</h3><p>Allow pop-ups for Soro Ops, then select the file’s View button again.</p></article><article><h3>Can’t sign in?</h3><p>Use Forgot password on the sign-in screen. Admin and Talent Management can also send a secure reset link.</p></article><article><h3>Need an urgent workaround?</h3><p>Include the Talent or client name and the action that is blocked so the team can triage it quickly.</p></article></aside></div></main>`;
   }
 
+  function strictLegacyAssessmentType(source) {
+    if (String(source?.document_type || '').trim().toLowerCase() !== 'assessment') return '';
+    const value = `${source?.file_name || ''} ${source?.storage_path || ''}`.toLowerCase();
+    const matches = [
+      /(^|[^a-z0-9])disc([^a-z0-9]|$)/.test(value) ? 'disc_assessment' : '',
+      /(^|[^a-z0-9])enneagram([^a-z0-9]|$)/.test(value) ? 'enneagram_assessment' : '',
+      /(^|[^a-z0-9])mbti([^a-z0-9]|$)|16[ _-]?personalit/.test(value) ? 'mbti_assessment' : ''
+    ].filter(Boolean);
+    return matches.length === 1 ? matches[0] : '';
+  }
+
+  function screeningDocumentType(source) {
+    const classified = classifyDocument(source);
+    return classified === 'assessment' ? strictLegacyAssessmentType(source) || 'assessment' : classified;
+  }
+
+  function sourceCategoryLabel(source) {
+    const type = screeningDocumentType(source);
+    return type === 'assessment'
+      ? 'Legacy assessment · needs classification'
+      : documentLabels[type] || titleCase(type);
+  }
+
+  function secureSourceButton(source) {
+    const category = sourceCategoryLabel(source);
+    return `<button class="screening-source-button open-private-document" type="button" data-storage-path="${escapeHtml(source.storage_path)}"><span class="screening-source-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h6m-6 4h4"/></svg></span><span class="screening-source-file-copy"><small>${escapeHtml(category)}</small><strong>${escapeHtml(source.file_name || category)}</strong></span><span class="screening-source-open">Open securely</span></button>`;
+  }
+
+  function trustedLegacyResumeUrl(value) {
+    try {
+      const url = new URL(String(value || '').trim());
+      return url.protocol === 'https:' && ['drive.google.com', 'docs.google.com'].includes(url.hostname.toLowerCase()) ? url.href : '';
+    } catch {
+      return '';
+    }
+  }
+
+  function openLegacyResume(value) {
+    if (!canVerifyTalentSkills()) return;
+    const url = trustedLegacyResumeUrl(value);
+    if (!url) { toast('This legacy résumé needs to be uploaded again.'); return; }
+    const viewer = window.open('', '_blank');
+    if (!viewer) { toast('Allow pop-ups for Soro to open the original résumé.'); return; }
+    viewer.opener = null;
+    viewer.location.href = url;
+  }
+
+  function renderProfileResumeLinks(documents, applicant) {
+    const target = document.querySelector('[data-profile-resume]');
+    if (!target) return;
+    const resumes = documents.filter(document => classifyDocument(document) === 'resume' && document.storage_path);
+    const legacyResumeUrl = !resumes.length && canVerifyTalentSkills() ? trustedLegacyResumeUrl(applicant?.resume_url) : '';
+    if (resumes.length) {
+      target.innerHTML = `<span>Attached résumé${resumes.length === 1 ? '' : 's'}</span><div class="screening-source-file-list">${resumes.map(source => secureSourceButton(source)).join('')}</div>`;
+    } else if (legacyResumeUrl) {
+      target.innerHTML = '<span>Résumé</span><div class="screening-source-file-list"><button class="screening-source-button open-legacy-resume" type="button"><span class="screening-source-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h6m-6 4h4"/></svg></span><span class="screening-source-file-copy"><small>Original application résumé</small><strong>Legacy Google Drive file</strong></span><span class="screening-source-open">Open original</span></button></div>';
+      target.querySelector('.open-legacy-resume')?.addEventListener('click', () => openLegacyResume(applicant.resume_url));
+    } else if (canVerifyTalentSkills() && applicant?.resume_url) {
+      target.innerHTML = '<span>Résumé</span><span class="screening-source-missing">Legacy résumé needs re-upload</span>';
+    } else {
+      target.innerHTML = '<span>Résumé</span><span class="screening-source-missing">Résumé not attached</span>';
+    }
+  }
+
   function renderScreeningSourceLinks(documents) {
     Object.entries(screeningSourceMap).forEach(([key, types]) => {
       const target = document.querySelector(`[data-screening-sources="${key}"]`);
       if (!target) return;
-      const sources = documents.filter(document => types.includes(classifyDocument(document)) && document.storage_path);
+      const sources = documents.filter(document => types.includes(screeningDocumentType(document)) && document.storage_path);
       target.innerHTML = sources.length
-        ? `<span>Source ${sources.length === 1 ? 'file' : 'files'}</span><div class="screening-source-file-list">${sources.map(source => {
-          const category = documentLabels[classifyDocument(source)] || titleCase(classifyDocument(source));
-          return `<button class="screening-source-button open-private-document" type="button" data-storage-path="${escapeHtml(source.storage_path)}"><span class="screening-source-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h6m-6 4h4"/></svg></span><span class="screening-source-file-copy"><small>${escapeHtml(category)}</small><strong>${escapeHtml(source.file_name || category)}</strong></span><span class="screening-source-open">Open securely</span></button>`;
-        }).join('')}</div>`
+        ? `<span>Source ${sources.length === 1 ? 'file' : 'files'}</span><div class="screening-source-file-list">${sources.map(source => secureSourceButton(source)).join('')}</div>`
         : '<span class="screening-source-missing">Source file not available</span>';
     });
   }
@@ -621,11 +685,12 @@
       if (signed?.signedUrl) { const h = document.getElementById('talent-headshot'); if (h) h.innerHTML = `<img src="${escapeHtml(signed.signedUrl)}" alt="${escapeHtml(applicant.full_name)} headshot" />`; }
     }
     const groups = new Map();
-    all.filter(d => classifyDocument(d) !== 'profile_photo').forEach(d => { const type = classifyDocument(d); if (!groups.has(type)) groups.set(type, []); groups.get(type).push(d); });
-    target.innerHTML = groups.size ? [...groups.entries()].map(([type, items]) => `<section class="document-group"><h3>${escapeHtml(documentLabels[type] || titleCase(type))}<span>${items.length}</span></h3>${items.map(d => `<article class="document-item"><span class="document-icon">${type === 'resume' ? '▤' : type === 'english_proof' ? 'A' : type === 'internet_proof' ? '⌁' : type === 'equipment_proof' ? '▣' : type === 'introduction_video' ? '▶' : '◫'}</span><span><strong>${escapeHtml(d.file_name)}</strong><small>${escapeHtml(titleCase(d.status || 'uploaded'))} · ${d.created_at ? escapeHtml(new Date(d.created_at).toLocaleDateString()) : 'Date not recorded'}</small></span>${d.storage_path ? `<button class="text-button file-view-button open-private-document" data-storage-path="${escapeHtml(d.storage_path)}">${type === 'introduction_video' ? 'Play video' : 'View file'}</button>` : '<span class="file-pending">File pending</span>'}</article>`).join('')}</section>`).join('') : '<div class="documents-empty"><strong>No documents attached yet</strong><p>Imported application files and new uploads will appear here.</p></div>';
+    all.filter(d => classifyDocument(d) !== 'profile_photo').forEach(d => { const type = screeningDocumentType(d); if (!groups.has(type)) groups.set(type, []); groups.get(type).push(d); });
+    target.innerHTML = groups.size ? [...groups.entries()].map(([type, items]) => `<section class="document-group"><h3>${escapeHtml(type === 'assessment' ? 'Legacy assessments · needs classification' : documentLabels[type] || titleCase(type))}<span>${items.length}</span></h3>${items.map(d => `<article class="document-item"><span class="document-icon">${type === 'resume' ? '▤' : type === 'english_proof' ? 'A' : type === 'internet_proof' ? '⌁' : type === 'equipment_proof' ? '▣' : type === 'introduction_video' ? '▶' : '◫'}</span><span><strong>${escapeHtml(d.file_name)}</strong><small>${escapeHtml(titleCase(d.status || 'uploaded'))} · ${d.created_at ? escapeHtml(new Date(d.created_at).toLocaleDateString()) : 'Date not recorded'}</small></span>${d.storage_path ? `<button class="text-button file-view-button open-private-document" data-storage-path="${escapeHtml(d.storage_path)}">${type === 'introduction_video' ? 'Play video' : 'View file'}</button>` : '<span class="file-pending">File pending</span>'}</article>`).join('')}</section>`).join('') : '<div class="documents-empty"><strong>No documents attached yet</strong><p>Imported application files and new uploads will appear here.</p></div>';
+    renderProfileResumeLinks(all, applicant);
     renderScreeningSourceLinks(all);
     target.querySelectorAll('.open-private-document').forEach(b => b.addEventListener('click', () => openPrivateDocument(b.dataset.storagePath)));
-    document.querySelectorAll('.screening-source-button').forEach(button => button.addEventListener('click', () => openPrivateDocument(button.dataset.storagePath)));
+    document.querySelectorAll('.screening-source-button.open-private-document').forEach(button => button.addEventListener('click', () => openPrivateDocument(button.dataset.storagePath)));
   };
 
   function bindScreeningResultsEditor() {

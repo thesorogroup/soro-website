@@ -150,7 +150,7 @@ test('Client Talent assets load before routing and include desktop/mobile safegu
   assert.match(html, /talent-profile-visuals\.js\?v=20260829-production-visuals/);
   assert.match(html, /client-talent-profile\.js\?v=20260829-production-visuals/);
   assert.ok(html.indexOf('talent-profile-visuals.js?v=20260829-production-visuals') < html.indexOf('client-talent-profile.js?v=20260829-production-visuals'));
-  assert.ok(html.indexOf('client-talent-profile.js?v=20260829-production-visuals') < html.indexOf('operations.js?v=20260831-live-task-center'));
+  assert.ok(html.indexOf('client-talent-profile.js?v=20260829-production-visuals') < html.indexOf('operations.js?v=20260831-legacy-files'));
   assert.match(css, /grid-template-columns:\s*230px minmax\(0, 1fr\) minmax\(280px, 350px\)/);
   assert.match(css, /@media \(min-width: 1101px\)[\s\S]*\.client-talent-folder-art/);
   assert.match(css, /\.client-talent-folder-front-seam[\s\S]*stroke:\s*rgba\(144, 125, 91, \.24\)/);
