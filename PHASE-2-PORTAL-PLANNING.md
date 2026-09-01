@@ -65,6 +65,8 @@ Each candidate record has three separate ownership fields:
 
 When Talent Operations manually marks a VA as Bench Ready, the VA enters a Sales-visible open claim queue. The working label for this queue is **Available VA Bench**.
 
+Implementation status (September 1, 2026): built locally and awaiting production approval. The release adds the Available Talent navigation view, Sales self-claiming, Administrator and Talent Management assignment controls, stale-claim collision protection, organization-scoped audit history, and per-Sales capacity settings. It has not been deployed yet.
+
 Sales employees may claim an available VA. Once claimed, the VA leaves the open queue and appears in that salesperson's caseload as the Sales Owner. The claim experience must:
 
 - Enforce the salesperson's configurable caseload capacity.
@@ -75,7 +77,7 @@ Sales employees may claim an available VA. Once claimed, the VA leaves the open 
 
 The system may recommend suitable available VAs or Sales owners using specialty and capacity, but assignments remain human-controlled initially. Full automation may be added later.
 
-Initial Sales caseload target: 30–50 VAs, subject to later refinement by candidate stage, placement status, and support intensity.
+Initial Sales caseload default: 40 active claims per Sales employee. Administrators may configure an individual limit. The count includes Bench Ready, Shortlisted, Interviewing, and Client Review records, and capacity is released at Placement Confirmed, Onboarding, Active, or a terminal outcome. This remains subject to later refinement by support intensity.
 
 ## VA profile development and experience
 
