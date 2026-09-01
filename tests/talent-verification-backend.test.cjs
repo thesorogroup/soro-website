@@ -97,10 +97,25 @@ test('GET accepts only applicantId and derives organization and role from the au
   });
   assert.equal(result.headers['Cache-Control'], 'no-store');
 
+  const duplicatedByNetlify = await backend.handler(event({
+    multiValueQueryStringParameters: { applicantId: [applicantId] }
+  }));
+  assert.equal(duplicatedByNetlify.statusCode, 200);
+
+  const multiOnly = await backend.handler(event({
+    queryStringParameters: {},
+    multiValueQueryStringParameters: { applicantId: [applicantId] }
+  }));
+  assert.equal(multiOnly.statusCode, 200);
+
   for (const invalid of [
     event({ queryStringParameters: { applicantId, organizationId: userId } }),
     event({ queryStringParameters: { applicantId, role: 'admin' } }),
-    event({ multiValueQueryStringParameters: { applicantId: [applicantId] } }),
+    event({ multiValueQueryStringParameters: { applicantId: [applicantId, applicantId] } }),
+    event({ multiValueQueryStringParameters: { applicantId: [userId] } }),
+    event({ multiValueQueryStringParameters: { applicantId: [applicantId], role: ['admin'] } }),
+    event({ rawQueryString: `applicantId=${applicantId}&applicantId=${applicantId}` }),
+    event({ rawQueryString: `applicantId=${applicantId}&role=admin` }),
     event({ queryStringParameters: { applicantId: 'not-a-uuid' } }),
     event({ body: '{}' })
   ]) {

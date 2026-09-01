@@ -109,13 +109,54 @@ function parseBody(event) {
 function getApplicantId(event) {
   const query = event.queryStringParameters || {};
   const multi = event.multiValueQueryStringParameters || {};
-  if (Object.keys(query).some(key => key !== 'applicantId') || Object.keys(multi).length > 0) {
+  const rawQuery = String(event.rawQueryString || '').trim();
+  const queryKeys = Object.keys(query);
+  const multiKeys = Object.keys(multi);
+  if (
+    queryKeys.some(key => key !== 'applicantId')
+    || multiKeys.some(key => key !== 'applicantId')
+  ) {
     throw httpError(400, 'unsupported_scope', 'Only a Talent application can be selected.');
   }
-  const applicantId = query.applicantId;
-  if (!validUuid(applicantId)) throw httpError(400, 'invalid_request', 'Choose a valid Talent application.');
+
+  const applicantIds = [];
+  if (Object.prototype.hasOwnProperty.call(query, 'applicantId')) {
+    if (Array.isArray(query.applicantId)) {
+      throw httpError(400, 'unsupported_scope', 'Only one Talent application can be selected.');
+    }
+    applicantIds.push(query.applicantId);
+  }
+  if (Object.prototype.hasOwnProperty.call(multi, 'applicantId')) {
+    if (!Array.isArray(multi.applicantId) || multi.applicantId.length !== 1) {
+      throw httpError(400, 'unsupported_scope', 'Only one Talent application can be selected.');
+    }
+    applicantIds.push(multi.applicantId[0]);
+  }
+  if (rawQuery) {
+    const rawParams = new URLSearchParams(rawQuery);
+    const rawKeys = [...rawParams.keys()];
+    if (rawKeys.some(key => key !== 'applicantId')) {
+      throw httpError(400, 'unsupported_scope', 'Only a Talent application can be selected.');
+    }
+    const rawApplicantIds = rawParams.getAll('applicantId');
+    if (rawApplicantIds.length !== 1) {
+      throw httpError(400, 'unsupported_scope', 'Only one Talent application can be selected.');
+    }
+    applicantIds.push(rawApplicantIds[0]);
+  }
+
+  const normalizedApplicantIds = applicantIds.map(value => String(value || '').trim().toLowerCase());
+  if (
+    normalizedApplicantIds.length === 0
+    || normalizedApplicantIds.some(value => !validUuid(value))
+  ) {
+    throw httpError(400, 'invalid_request', 'Choose a valid Talent application.');
+  }
+  if (new Set(normalizedApplicantIds).size !== 1) {
+    throw httpError(400, 'unsupported_scope', 'Only one Talent application can be selected.');
+  }
   if (String(event.body || '').trim()) throw httpError(400, 'unsupported_scope', 'GET requests cannot include a body.');
-  return String(applicantId).trim().toLowerCase();
+  return normalizedApplicantIds[0];
 }
 
 function rejectPostQuery(event) {
