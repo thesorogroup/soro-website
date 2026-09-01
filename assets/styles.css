@@ -8499,6 +8499,12 @@ button.soro-btn {
 	font-size: 9.5px;
 }
 
+.soro-footer-social-link .soro-instagram-icon svg {
+	display: block;
+	width: 15px;
+	height: 15px;
+}
+
 .soro-footer .soro-footer-social-link.is-placeholder {
 	opacity: 1;
 }
