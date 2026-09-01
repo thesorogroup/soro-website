@@ -226,6 +226,23 @@
 .talent-review-resume:hover:not(:disabled) { border-color: #6f9bc4; background: #eaf3fb; }
 .talent-review-resume svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 .talent-review-resume:disabled { border-color: #dce3ea; background: #f7f8fa; color: #8795a5; cursor: not-allowed; opacity: 1; }
+.talent-review-verification {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border-color: #adc8df;
+  background: #f1f7fc;
+  color: var(--navy);
+  text-align: left;
+}
+.talent-review-verification:hover { border-color: #6f9bc4; background: #e7f1f9; }
+.talent-review-verification.is-ready { border-color: #a8d9c8; background: #edf9f5; color: #125f4b; }
+.talent-review-verification svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.talent-review-verification span,
+.talent-review-verification strong,
+.talent-review-verification small { display: block; }
+.talent-review-verification strong { font-size: 12px; }
+.talent-review-verification small { margin-top: 1px; color: #667b90; font-size: 9px; font-weight: 650; }
 .talent-review-action-divider { width: 1px; height: 25px; margin: 0 2px; background: #dce4ec; }
 .talent-review-action { padding: 8px 11px; font-size: 12px; }
 .talent-review-action:disabled { opacity: .52; cursor: not-allowed; filter: grayscale(.25); }
@@ -292,6 +309,154 @@
 .talent-review-confirm-guarded { border-color: #b74637; background: #b74637; color: #fff; }
 .talent-review-dialog-status { min-height: 18px; margin-top: 9px; color: #9b3f2b; font-size: 12px; }
 
+.talent-verification-dialog {
+  width: min(920px, 100vw);
+  max-width: none;
+  height: 100dvh;
+  max-height: 100dvh;
+  margin: 0 0 0 auto;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 20px 0 0 20px;
+  background: #f7f9fb;
+  color: var(--ink);
+  box-shadow: -18px 0 60px rgba(8,45,92,.22);
+}
+.talent-verification-dialog::backdrop { background: rgba(7,25,49,.62); }
+.talent-verification-shell { display: grid; grid-template-rows: auto minmax(0,1fr); height: 100%; }
+.talent-verification-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 24px 28px 20px;
+  border-bottom: 1px solid #dce5ee;
+  background: #fff;
+}
+.talent-verification-header h2 { margin: 1px 0 5px; color: var(--navy); font: 400 29px/1.1 Georgia,"Times New Roman",serif; }
+.talent-verification-header p:last-child { max-width: 650px; margin: 0; color: #60758b; font-size: 13px; line-height: 1.5; }
+.talent-verification-header > button { align-self: flex-start; width: 38px; height: 38px; border: 1px solid #d3dee8; border-radius: 10px; background: #fff; color: var(--navy); font-size: 25px; line-height: 1; cursor: pointer; }
+.talent-verification-header > button:hover { background: #eef4f9; }
+.talent-verification-body { overflow-y: auto; padding: 22px 28px 34px; }
+.talent-verification-loading,
+.talent-verification-error { padding: 70px 20px; text-align: center; color: #61758b; }
+.talent-verification-error strong { display: block; color: var(--navy); font-size: 18px; }
+.talent-verification-error p { margin: 7px 0 16px; }
+.talent-verification-feedback { margin-bottom: 14px; padding: 10px 13px; border: 1px solid #b9dfd1; border-radius: 10px; background: #edf9f5; color: #155e4b; font-size: 13px; }
+.talent-verification-feedback.is-error { border-color: #efc4ba; background: #fff3ef; color: #963b2a; }
+
+.talent-verification-gate {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(220px,.8fr);
+  gap: 22px;
+  align-items: center;
+  margin-bottom: 15px;
+  padding: 18px 20px;
+  border: 1px solid #e4d4b8;
+  border-radius: 14px;
+  background: #fffaf1;
+}
+.talent-verification-gate.is-ready { border-color: #b9ddcf; background: #effaf6; }
+.talent-verification-gate h3 { margin: 2px 0 5px; color: var(--navy); font-size: 18px; }
+.talent-verification-gate p:last-child { margin: 0; color: #60748a; font-size: 12px; line-height: 1.5; }
+.talent-verification-gate ul { margin: 0; padding: 0; list-style: none; }
+.talent-verification-gate li { position: relative; margin: 5px 0; padding-left: 17px; color: #7a501a; font-size: 12px; line-height: 1.4; }
+.talent-verification-gate li::before { position: absolute; left: 0; content: "•"; color: #e27b24; }
+.talent-verification-ready-mark { justify-self: end; display: grid; place-items: center; width: 42px; height: 42px; border-radius: 50%; background: #d3efe5; color: #12634e; font-size: 24px; }
+
+.talent-verification-section {
+  margin-top: 15px;
+  padding: 20px;
+  border: 1px solid #dce5ee;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 8px 22px rgba(8,45,92,.035);
+}
+.talent-verification-section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 15px; }
+.talent-verification-section-heading h3 { margin: 2px 0 0; color: var(--navy); font-size: 19px; }
+.talent-verification-state { padding: 5px 8px; border-radius: 999px; background: #fff1dc; color: #855517; font-size: 10px; font-weight: 800; white-space: nowrap; }
+.talent-verification-state.is-completed,
+.talent-verification-state.is-waived { background: #e3f4ed; color: #12614d; }
+.talent-verification-state.is-cancelled,
+.talent-verification-state.is-no_show { background: #f0f2f5; color: #58687a; }
+.talent-verification-interview-summary { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.talent-verification-interview-summary > div { padding: 11px 12px; border: 1px solid #e2e9f0; border-radius: 10px; background: #f8fafc; }
+.talent-verification-interview-summary small,
+.talent-verification-interview-summary strong { display: block; }
+.talent-verification-interview-summary small { margin-bottom: 4px; color: #6a7c90; font-size: 9px; text-transform: uppercase; letter-spacing: .04em; }
+.talent-verification-interview-summary strong { color: #29435e; font-size: 12px; }
+
+.talent-verification-calendar { display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 10px; align-items: center; padding: 12px; border: 1px solid #dce5ed; border-radius: 11px; background: #f7fafc; }
+.talent-verification-calendar-dot { width: 10px; height: 10px; border-radius: 50%; background: #8796a7; }
+.talent-verification-calendar.is-synced .talent-verification-calendar-dot { background: #15936e; }
+.talent-verification-calendar.is-pending .talent-verification-calendar-dot { background: #dea125; }
+.talent-verification-calendar.is-sync_failed .talent-verification-calendar-dot,
+.talent-verification-calendar.is-connection_required .talent-verification-calendar-dot { background: #d66748; }
+.talent-verification-calendar strong { display: block; color: #29435e; font-size: 12px; }
+.talent-verification-calendar p { margin: 3px 0 0; color: #65788d; font-size: 11px; line-height: 1.4; }
+.talent-verification-calendar-actions { display: flex; flex-wrap: wrap; gap: 7px; justify-content: flex-end; }
+.talent-verification-calendar-actions .button { font-size: 11px; }
+.talent-verification-scorecard { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 8px; margin: 12px 0 0; }
+.talent-verification-scorecard div { padding: 9px 10px; border-radius: 9px; background: #eef4f9; }
+.talent-verification-scorecard dt { color: #6b7d91; font-size: 9px; text-transform: uppercase; }
+.talent-verification-scorecard dd { margin: 4px 0 0; color: var(--navy); font-size: 14px; font-weight: 800; }
+.talent-verification-private-note,
+.talent-verification-reference-note { margin-top: 12px; padding: 10px 12px; border-left: 3px solid #8faac3; background: #f5f8fb; color: #536980; font-size: 12px; line-height: 1.5; }
+.talent-verification-private-note p { margin: 4px 0 0; white-space: pre-wrap; }
+.talent-verification-complete-copy { margin: 13px 0 0; color: #536c81; font-size: 12px; }
+
+.talent-verification-control-grid,
+.talent-verification-reference-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+.talent-verification-control-grid > details,
+.talent-verification-reference-actions > details,
+.talent-verification-add-reference { flex: 1 1 180px; border: 1px solid #d9e3ec; border-radius: 10px; background: #fbfcfd; }
+.talent-verification-control-grid summary,
+.talent-verification-reference-actions summary,
+.talent-verification-add-reference summary { padding: 10px 12px; color: #34516e; font-size: 12px; font-weight: 750; cursor: pointer; }
+.talent-verification-control-grid details[open] > summary,
+.talent-verification-reference-actions details[open] > summary,
+.talent-verification-add-reference[open] > summary { border-bottom: 1px solid #e0e8ef; }
+.talent-verification-form { display: grid; gap: 12px; padding: 13px; }
+.talent-verification-schedule-form { margin-top: 10px; border: 1px solid #dbe5ee; border-radius: 11px; background: #fbfcfd; }
+.talent-verification-form h4 { margin: 0; color: var(--navy); font-size: 14px; }
+.talent-verification-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+.talent-verification-form label { display: grid; gap: 5px; color: #40566e; font-size: 11px; font-weight: 700; }
+.talent-verification-form label > span { color: #4f647b; }
+.talent-verification-form input,
+.talent-verification-form select,
+.talent-verification-form textarea { width: 100%; min-height: 40px; padding: 9px 10px; border: 1px solid #cbd8e4; border-radius: 8px; background: #fff; color: var(--ink); font: inherit; }
+.talent-verification-form textarea { min-height: 82px; resize: vertical; }
+.talent-verification-field-wide { grid-column: 1 / -1; }
+.talent-verification-form .button { justify-self: end; }
+.talent-verification-form-note { margin: 0; color: #687c90; font-size: 10px; line-height: 1.45; }
+.talent-verification-inline-error { margin: 0; color: #9c3d2c; font-size: 12px; }
+.talent-verification-assignee { grid-column: 1 / -1; margin: 0; padding: 9px 10px; border-radius: 8px; background: #eef4f9; color: #536a80; font-size: 11px; }
+.talent-verification-assignee strong { color: #274761; }
+.talent-verification-integration-note { padding: 10px 12px; border: 1px solid #efd5ae; border-radius: 9px; background: #fff9ee; color: #77511e; font-size: 11px; line-height: 1.45; }
+.talent-verification-integration-note.is-connected { border-color: #c1e0d4; background: #eff9f5; color: #1a6250; }
+
+.talent-verification-reference-list { display: grid; gap: 10px; }
+.talent-verification-reference { padding: 14px; border: 1px solid #dce5ed; border-radius: 11px; background: #fbfcfd; }
+.talent-verification-reference > header { display: flex; justify-content: space-between; gap: 14px; }
+.talent-verification-reference h4 { margin: 0; color: var(--navy); font-size: 14px; }
+.talent-verification-reference header p { margin: 3px 0 0; color: #687b90; font-size: 11px; }
+.talent-verification-reference-outcome { align-self: flex-start; padding: 4px 7px; border-radius: 999px; background: #fff0d9; color: #855316; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.talent-verification-reference-outcome.is-verified { background: #def2e9; color: #12604c; }
+.talent-verification-reference-outcome.is-discrepancy { background: #fff0e8; color: #9a3d28; }
+.talent-verification-reference-outcome.is-unable_to_reach,
+.talent-verification-reference-outcome.is-not_provided { background: #edf0f4; color: #566679; }
+.talent-verification-reference-contact { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 11px; color: #3f5870; font-size: 11px; }
+.talent-verification-reference-contact span { overflow-wrap: anywhere; }
+.talent-verification-reference-contact small { display: block; margin-bottom: 3px; color: #75879a; font-size: 8px; text-transform: uppercase; }
+.talent-verification-attempt-history { margin-top: 10px; color: #50677d; font-size: 11px; }
+.talent-verification-attempt-history summary { cursor: pointer; font-weight: 700; }
+.talent-verification-attempt-history ol { display: grid; gap: 7px; margin: 8px 0 0; padding-left: 19px; }
+.talent-verification-attempt-history li span { display: block; color: #76889a; font-size: 9px; }
+.talent-verification-attempt-history li p { margin: 3px 0 0; white-space: pre-wrap; }
+.talent-verification-text-button { align-self: flex-start; padding: 10px 6px; border: 0; background: transparent; color: #526b82; font: inherit; font-size: 11px; font-weight: 700; cursor: pointer; }
+.talent-verification-text-button.is-danger { color: #a13d30; }
+.talent-verification-add-reference { margin-top: 12px; }
+
 @media (max-width: 1050px) {
   .talent-review-summary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
@@ -313,6 +478,18 @@
   .talent-review-action-divider { display: none; }
   .talent-review-action { flex: 1; }
   .talent-review-secondary { align-self: flex-end; }
+  .talent-verification-dialog { width: 100vw; border-radius: 0; }
+  .talent-verification-header { padding: 20px 18px 16px; }
+  .talent-verification-body { padding: 16px 14px 28px; }
+  .talent-verification-gate { grid-template-columns: 1fr; }
+  .talent-verification-ready-mark { justify-self: start; }
+  .talent-verification-interview-summary { grid-template-columns: 1fr; }
+  .talent-verification-calendar { grid-template-columns: auto minmax(0,1fr); }
+  .talent-verification-calendar-actions { grid-column: 1 / -1; justify-content: stretch; }
+  .talent-verification-calendar-actions .button { flex: 1; text-align: center; }
+  .talent-verification-scorecard { grid-template-columns: 1fr 1fr; }
+  .talent-verification-form-grid { grid-template-columns: 1fr; }
+  .talent-verification-field-wide { grid-column: auto; }
 }
 
 @media (max-width: 430px) {
@@ -325,4 +502,9 @@
   .talent-review-card-actions { padding-left: 14px; padding-right: 14px; }
   .talent-review-checklist li { width: 100%; }
   .talent-review-checklist li small { margin-left: auto; }
+  .talent-review-verification { flex: 1 1 100%; }
+  .talent-verification-section { padding: 15px; }
+  .talent-verification-section-heading { align-items: flex-start; }
+  .talent-verification-reference > header { flex-direction: column; }
+  .talent-verification-scorecard { grid-template-columns: 1fr 1fr; }
 }

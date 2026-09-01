@@ -187,6 +187,9 @@ function rpcError(status, payload) {
   if (databaseCode === 'P0001' && databaseMessage === 'Required review sources are still missing.') {
     return httpError(409, 'review_incomplete', 'Complete the missing review items before marking this Talent Bench Ready.');
   }
+  if (databaseCode === 'P0001' && databaseMessage === 'Interview and employment references must be addressed before Bench Ready.') {
+    return httpError(409, 'verification_incomplete', 'Complete the internal interview and employment-reference checks before marking this Talent Bench Ready.');
+  }
   if (databaseCode === 'P0001' || databaseCode === '23514' || databaseCode === '23505') {
     return httpError(409, 'review_transition_conflict', 'This review action is not available in the application’s current stage.');
   }
