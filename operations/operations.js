@@ -1,13 +1,13 @@
 const data={overview:{title:'Admin Panel',caption:'Here is what needs your attention.',metrics:[['Tasks needing attention','—','Loading your assigned tasks…',''],['Client pipeline','18','4 ready for matching',''],['Active Talent today','—','Loading live attendance…',''],['Talent Review Queue','—','Loading live applications…','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Soro at a glance'},tasks:{title:'My Tasks',caption:'Your active work, in priority order.',table:['Task','Related to','Due','Owner'],rows:[]},clients:{title:'Client Pipeline',caption:'Every client, lead, and next action in one place.',table:['Client','Stage','Next action','Owner'],rows:[['Haven & Co.','Placement onboarding','Sign agreement','Morgan Lee'],['Northstar Legal','Discovery','Complete required checklist','Matt Johnson'],['Brightlane Medical','Ready for matching','Build shortlist','Morgan Lee'],['Urban Ledger','New inquiry','Claim or assign','Unassigned']]},vas:{title:'Talent Directory',caption:'Search, filter, and open a complete Talent profile from any row.',table:['Talent','Application status','Work status','Location & time zone','Readiness','Owner'],rows:[]},placements:{title:'Placement Journey',caption:'Client and Talent readiness, side by side.',table:['Client','Talent','Status','Next action'],rows:[['Haven & Co.','Mariel Santos','Onboarding','Client agreement'],['Brightlane Medical','Arielle Tan','Interviewing','Confirm interview'],['Urban Ledger','—','Discovery','Complete role requirements']]},documents:{title:'Document Center',caption:'Assigned forms, uploads, and signed agreements.',table:['Document','Related to','Status','Action'],rows:[['Soro client agreement','Haven & Co.','Awaiting signature','Send reminder'],['Contractor agreement','Mariel Santos','Signed','View'],['HIPAA acknowledgment','Brightlane Medical','Needs review','Review upload']]},reports:{title:'Reports',caption:'Saved reports and quick builds, only for data you are authorized to see.',table:['Report','Last run','Owner','Action'],rows:[['Sales Pipeline Health','Today','Sales Management','Open'],['Active Talent Attendance','Today','Talent Management','Open'],['Payout History','Aug 14','Billing','Open'],['Client Feedback Trends','Aug 12','Admin','Open']]}};
-let current='overview',role='admin',liveApplicants=[],selectedTalentId=null,talentSearch='',talentStatus='all',ownTalentProfile=null,ownTalentProfileState='idle',ownTalentProfileRequest=0;
+let current='overview',role='admin',liveApplicants=[],selectedTalentId=null,selectedClientId=null,talentSearch='',talentStatus='all',ownTalentProfile=null,ownTalentProfileState='idle',ownTalentProfileRequest=0;
 const roleConfig={admin:{label:'The Founder',person:'Matt',className:'role-admin'},sales:{label:'Sales Associate',person:'Morgan Lee',className:'role-sales'},talent:{label:'Talent Management',person:'Jordan Reed',className:'role-talent'},client:{label:'Client Administrator',person:'Avery Parker',className:'role-client'},va:{label:'Talent',person:'Mariel Santos',className:'role-va'}};
 const roleDashboards={sales:{title:'Sales Panel',caption:'Your priority client work is ready.',metrics:[['Tasks needing attention','—','Loading your assigned tasks…',''],['My client pipeline','18','4 ready for matching',''],['Open hiring requests','7','3 awaiting shortlist',''],['My available Talent','14','6 available now','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Pipeline movement'},talent:{title:'Talent Management Panel',caption:'Your Talent readiness and support work is ready.',metrics:[['Talent actions needing attention','—','Loading your assigned tasks…',''],['Active Talent today','—','Loading live attendance…',''],['Talent Review Queue','—','Loading live applications…',''],['Upcoming reviews','4','2 this week','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Talent readiness'},client:{title:'Client Portal',caption:'Your active Talent support and Soro actions are all in one place.',metrics:[['Action needed','2','1 document is awaiting your signature','alert'],['Your current Talent','3','All active placements',''],['Open hiring requests','1','Next review tomorrow',''],['Invoices','1','Due this Friday','warning']],primary:'Action needed',items:[],emptyMessage:'No actions are assigned right now.',secondary:'Your current Talent'},va:{title:'Talent Portal',caption:'Your workday, progress, and support are all here.',metrics:[['Today’s work','—','Current placement status will appear here',''],['Dream Pathway','1 next step','Review education options',''],['Next payout','Friday','Current pay period',''],['Documents','1 action','Update Wise recipient verification','warning']],primary:'Action needed',items:[],emptyMessage:'No actions are assigned right now.',secondary:'Your progress'}};
 const root=document.getElementById('view-root'),nav=document.getElementById('main-nav');
 const authenticatedEmployeeViews=Object.freeze({
   admin:new Set(['overview','tasks','clients','vas','talent-review','talent-profile','placements','documents','reports','employees','payroll','help']),
   talent_management:new Set(['overview','tasks','clients','vas','talent-review','talent-profile','placements','documents','reports','talent-payout-review','help']),
-  sales:new Set(['overview','tasks','clients','placements','reports','help']),
-  sales_management:new Set(['overview','tasks','clients','placements','reports','help']),
+  sales:new Set(['overview','tasks','clients','talent-profile','placements','reports','help']),
+  sales_management:new Set(['overview','tasks','clients','talent-profile','placements','reports','help']),
   billing:new Set(['overview','tasks','clients','placements','documents','reports','help']),
   client_admin:new Set(['overview','client-talent-profile','my-profile','help']),
   client_reviewer:new Set(['overview','client-talent-profile','my-profile','help']),
@@ -93,6 +93,7 @@ function talentSelfProfileStatusMarkup(){
 function viewAllowedForAuthenticatedRole(view){
   const accessRole=currentAuthenticatedRole();
   const allowed=authenticatedEmployeeViews[accessRole];
+  if(view==='client-record')return Boolean(allowed?.has('clients'));
   return Boolean(allowed?.has(view));
 }
 function dataAllowedForAuthenticatedRole(view,viewData){
@@ -132,8 +133,8 @@ function syncAuthorizedNavigation(access=window.soroCurrentAccess){
   if(globalSearch)globalSearch.hidden=clientPortal||accessRole==='virtual_assistant';
   const overviewNav=document.getElementById('overview-nav');
   if(overviewNav)overviewNav.textContent=clientPortal||accessRole==='virtual_assistant'?'Dashboard':'Overview';
-  if(!allowed.has(current)){
-    current='overview';selectedTalentId=null;
+  if(!allowed.has(current==='client-record'?'clients':current)){
+    current='overview';selectedTalentId=null;selectedClientId=null;
     history.replaceState({},'',`${location.pathname}#overview`);
   }
   setActive();
@@ -203,12 +204,25 @@ function render(){
   if(!viewAllowedForAuthenticatedRole(current)){
     const allowed=authenticatedEmployeeViews[currentAuthenticatedRole()];
     if(!allowed?.has('overview')){root.replaceChildren();return}
-    current='overview';selectedTalentId=null;
+    current='overview';selectedTalentId=null;selectedClientId=null;
     history.replaceState({},'',`${location.pathname}#overview`);
     setActive();
   }
   if(current!=='client-talent-profile')window.SoroClientTalentProfile?.unmount?.();
+  if(current!=='client-record')window.SoroInternalClientProfile?.unmount?.();
+  if(current!=='talent-profile')window.SoroReadOnlyTalentProfile?.reset?.();
   if(current!=='talent-review')window.soroTalentReviewQueue?.unmount?.();
+  if(current==='client-record'){
+    if(!selectedClientId||!window.SoroInternalClientProfile?.load){
+      root.innerHTML='<main class="page"><button class="text-button back-to-clients">← Back to Clients</button><section class="panel profile-missing"><h1>Client profile unavailable</h1><p>This profile could not be opened right now.</p></section></main>';
+      root.querySelector('.back-to-clients')?.addEventListener('click',goToClientDirectory);
+      setActive();
+      return;
+    }
+    window.SoroInternalClientProfile.load(root,{id:selectedClientId,onBack:goToClientDirectory});
+    setActive();
+    return;
+  }
   if(current==='my-profile'){
     if(isAdminWorkspacePreview('client')){
       renderClientAccountWorkspacePreview();
@@ -261,6 +275,15 @@ function render(){
     return;
   }
   if(current==='talent-profile'){
+    const accessRole=currentAuthenticatedRole();
+    if(['sales','sales_management'].includes(accessRole)){
+      if(window.SoroReadOnlyTalentProfile?.canOpenForRole?.(accessRole)){
+        window.SoroReadOnlyTalentProfile.mount(root,{id:selectedTalentId,onBack:()=>window.soroGoBackFromReadOnlyTalentProfile?.()});
+      }else{
+        root.innerHTML='<main class="page talent-profile-page"><section class="panel profile-missing" role="alert"><p class="eyebrow">Talent profile</p><h1>Talent profile unavailable</h1><p>The secure read-only profile is still loading. Refresh and try again.</p></section></main>';
+      }
+      return;
+    }
     root.innerHTML=profilePage(liveApplicants.find(a=>a.id===selectedTalentId));
     bindView();
     loadTalentProfileDocuments();
@@ -295,7 +318,9 @@ function render(){
   const managementTimeOffAction=role==='admin'||role==='talent'
     ? window.soroTalentTimeOff?.managementActionMarkup({currentView:current,actualRole:actualAuthenticatedRole()})||''
     : '';
-  const standardHeadingActions=`${managementTimeOffAction}<button class="button primary" id="add-task">${primaryAction}</button>${current==='overview'||current==='clients'?`<button class="button" id="new-record">+ ${newAction}</button>`:''}${importAction}<button class="button">Customize</button>`;
+  const canCreateClient=['admin','sales','sales_management'].includes(currentAuthenticatedRole());
+  const showNewRecord=current==='overview'||(current==='clients'&&canCreateClient);
+  const standardHeadingActions=`${managementTimeOffAction}<button class="button primary" id="add-task">${primaryAction}</button>${showNewRecord?`<button class="button" id="new-record">+ ${newAction}</button>`:''}${importAction}<button class="button">Customize</button>`;
   const talentPortalActions=`${talentWorkdayAction}${talentTimeOffAction}`;
   const headingActions=clientPortal||role==='va'
     ? (talentPortalActions?`<div class="heading-actions">${talentPortalActions}</div>`:'')
@@ -305,23 +330,31 @@ function render(){
 }
 function bindView(){window.soroTalentWorkday?.bindDashboardAction(root);window.soroActiveTalentToday?.bindDashboardMetric(root,{currentView:current,actualRole:actualAuthenticatedRole()});window.soroTalentReviewQueue?.bindDashboardMetric?.(root,{currentView:current,actualRole:actualAuthenticatedRole()});window.soroTaskCenter?.bindDashboardMetric?.(root,current);window.soroTalentTimeOff?.bindDashboardActions(root,{currentView:current,actualRole:actualAuthenticatedRole()});document.getElementById('add-task')?.addEventListener('click',()=>{if(role==='client')toast('Your hiring request form is the next portal step.');else document.getElementById('task-dialog').showModal()});document.getElementById('new-record')?.addEventListener('click',()=>toast(`${role==='talent'?'New Talent':role==='client'?'Request another Talent':'New Client'} form is the next build step.`));document.getElementById('import-drive')?.addEventListener('click',importDriveFiles);document.getElementById('talent-search')?.addEventListener('input',e=>{talentSearch=e.target.value;render();document.getElementById('talent-search')?.focus()});document.getElementById('talent-status-filter')?.addEventListener('change',e=>{talentStatus=e.target.value;render()});document.querySelectorAll('.talent-row').forEach(row=>{const open=()=>openTalentProfile(row.dataset.talentId);row.addEventListener('click',open);row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}})});document.querySelectorAll('.back-to-directory').forEach(b=>b.addEventListener('click',goToTalentDirectory));document.getElementById('profile-add-task')?.addEventListener('click',()=>{const related=document.getElementById('task-related');if(related)related.value=currentTalentProfileApplicant()?.full_name||'';document.getElementById('task-dialog').showModal()});document.getElementById('headshot-input')?.addEventListener('change',e=>uploadHeadshot(e.target.files?.[0]));document.querySelectorAll('[data-metric]').forEach(el=>el.addEventListener('click',()=>{const dashboard=viewDataForAuthenticatedRole('overview',role==='admin'?data.overview:roleDashboards[role]),m=dashboard.metrics[+el.dataset.metric];document.getElementById('detail-title').textContent=m[0];document.getElementById('detail-list').innerHTML=authenticatedClientRoles.has(currentAuthenticatedRole())?`<p class="empty">${escapeHtml(m[2])}</p>`:list([['red',m[2],'Open the detailed queue to continue','Action needed'],['','View recent activity','All related changes are logged','History']])}));document.getElementById('view-all')?.addEventListener('click',()=>{current='tasks';setActive();render()})}
 function setActive(){
-  const active=current==='talent-profile'?'vas':current;
+  const active=current==='talent-profile'?'vas':current==='client-record'?'clients':current;
   document.querySelectorAll('.nav-link').forEach(x=>x.classList.toggle('active',x.dataset.view===active));
   const profileButton=document.getElementById('role-switcher');
   if(profileButton?.dataset.accountAction==='my-profile')profileButton.classList.toggle('active',current==='my-profile');
   const mobileProfile=document.getElementById('client-mobile-profile');
   if(mobileProfile)mobileProfile.setAttribute('aria-current',current==='my-profile'?'page':'false');
 }
-function goToMyProfile(){if(!viewAllowedForAuthenticatedRole('my-profile'))return;current='my-profile';selectedTalentId=null;history.pushState({},'',`${location.pathname}#my-profile`);setActive();render();document.querySelector('.sidebar')?.classList.remove('open')}
-function goToClientTalentProfile(){if(!viewAllowedForAuthenticatedRole('client-talent-profile'))return;current='client-talent-profile';selectedTalentId=null;history.pushState({},'',`${location.pathname}#client-talent-profile`);setActive();render();document.querySelector('.sidebar')?.classList.remove('open')}
-function goToTalentDirectory(){if(!viewAllowedForAuthenticatedRole('vas'))return;current='vas';selectedTalentId=null;history.pushState({},'',`${location.pathname}#talent`);setActive();render()}
-function openTalentProfile(id){if(!viewAllowedForAuthenticatedRole('talent-profile'))return;selectedTalentId=id;current='talent-profile';history.pushState({talentId:id},'',`${location.pathname}#talent/${id}`);setActive();render()}
-nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(!b||!viewAllowedForAuthenticatedRole(b.dataset.view))return;current=b.dataset.view;selectedTalentId=null;history.pushState({},'',`${location.pathname}#${current}`);setActive();render();document.querySelector('.sidebar').classList.remove('open')});window.addEventListener('popstate',()=>{const m=location.hash.match(/^#talent\/([^/]+)$/);if(m){selectedTalentId=m[1];current='talent-profile'}else{current=location.hash.slice(1)||'overview';selectedTalentId=null}if(!viewAllowedForAuthenticatedRole(current)){current='overview';selectedTalentId=null;history.replaceState({},'',`${location.pathname}#overview`)}setActive();render()});document.getElementById('mobile-menu').addEventListener('click',()=>document.querySelector('.sidebar').classList.toggle('open'));document.getElementById('client-mobile-profile')?.addEventListener('click',goToMyProfile);document.querySelectorAll('dialog').forEach(dialog=>{dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close('cancel')});dialog.querySelector('.modal-close')?.addEventListener('click',()=>dialog.close('cancel'));dialog.querySelector('.modal-cancel')?.addEventListener('click',()=>dialog.close('cancel'))});
+function goToMyProfile(){if(!viewAllowedForAuthenticatedRole('my-profile'))return;current='my-profile';selectedTalentId=null;selectedClientId=null;history.pushState({},'',`${location.pathname}#my-profile`);setActive();render();document.querySelector('.sidebar')?.classList.remove('open')}
+function goToClientTalentProfile(){if(!viewAllowedForAuthenticatedRole('client-talent-profile'))return;current='client-talent-profile';selectedTalentId=null;selectedClientId=null;history.pushState({},'',`${location.pathname}#client-talent-profile`);setActive();render();document.querySelector('.sidebar')?.classList.remove('open')}
+function goToClientDirectory(){if(!viewAllowedForAuthenticatedRole('clients'))return;current='clients';selectedTalentId=null;selectedClientId=null;history.pushState({},'',`${location.pathname}#clients`);setActive();render();document.querySelector('.sidebar')?.classList.remove('open')}
+function goToTalentDirectory(){if(!viewAllowedForAuthenticatedRole('vas'))return;current='vas';selectedTalentId=null;selectedClientId=null;history.pushState({},'',`${location.pathname}#talent`);setActive();render()}
+function openClientProfile(id){if(!viewAllowedForAuthenticatedRole('client-record')||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(id||'')))return;selectedClientId=id;selectedTalentId=null;current='client-record';history.pushState({clientId:id},'',`${location.pathname}#client/${id}`);setActive();render()}
+let talentProfileReturnView='overview';
+function openTalentProfile(id){if(!viewAllowedForAuthenticatedRole('talent-profile'))return;const previous=current;if(previous!=='talent-profile'&&viewAllowedForAuthenticatedRole(previous))talentProfileReturnView=previous;selectedTalentId=id;selectedClientId=null;current='talent-profile';history.pushState({talentId:id},'',`${location.pathname}#talent/${id}`);setActive();render()}
+function goBackFromReadOnlyTalentProfile(){const destination=viewAllowedForAuthenticatedRole(talentProfileReturnView)?talentProfileReturnView:'overview';current=destination;selectedTalentId=null;selectedClientId=null;history.pushState({},'',`${location.pathname}#${destination}`);setActive();render()}
+window.soroOpenClientProfile=openClientProfile;
+window.soroOpenTalentProfile=openTalentProfile;
+window.soroGoBackFromReadOnlyTalentProfile=goBackFromReadOnlyTalentProfile;
+nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(!b||!viewAllowedForAuthenticatedRole(b.dataset.view))return;current=b.dataset.view;selectedTalentId=null;selectedClientId=null;history.pushState({},'',`${location.pathname}#${current}`);setActive();render();document.querySelector('.sidebar').classList.remove('open')});window.addEventListener('popstate',()=>{const talentMatch=location.hash.match(/^#talent\/([^/]+)$/),clientMatch=location.hash.match(/^#client\/([^/]+)$/);if(talentMatch){selectedTalentId=talentMatch[1];selectedClientId=null;current='talent-profile'}else if(clientMatch){selectedClientId=clientMatch[1];selectedTalentId=null;current='client-record'}else{current=location.hash.slice(1)||'overview';selectedTalentId=null;selectedClientId=null}if(!viewAllowedForAuthenticatedRole(current)){current='overview';selectedTalentId=null;selectedClientId=null;history.replaceState({},'',`${location.pathname}#overview`)}setActive();render()});document.getElementById('mobile-menu').addEventListener('click',()=>document.querySelector('.sidebar').classList.toggle('open'));document.getElementById('client-mobile-profile')?.addEventListener('click',goToMyProfile);document.querySelectorAll('dialog').forEach(dialog=>{dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close('cancel')});dialog.querySelector('.modal-close')?.addEventListener('click',()=>dialog.close('cancel'));dialog.querySelector('.modal-cancel')?.addEventListener('click',()=>dialog.close('cancel'))});
 function applyRole(nextRole){
   if(actualAuthenticatedRole()!=='admin'||!roleConfig[nextRole])return;
   role=nextRole;
   current='overview';
   selectedTalentId=null;
+  selectedClientId=null;
   const c=roleConfig[role];
   const profileButton=document.getElementById('role-switcher');
   const label=role==='admin'?(profileButton?.dataset.authenticatedRoleLabel||c.label):c.label;
@@ -331,11 +364,47 @@ function applyRole(nextRole){
   document.body.className=c.className;
   history.replaceState({},'',`${location.pathname}#overview`);
   syncAuthorizedNavigation();
+  window.SoroGlobalSearch?.refreshRole?.();
   render();
   const workspaceName={admin:'Admin Panel',sales:'Sales Panel',talent:'Talent Management Panel',client:'Client Portal',va:'Talent Portal'}[role];
   toast(`${workspaceName} preview is active.`);
 }
-document.getElementById('role-switcher').addEventListener('click',event=>{if(event.currentTarget.dataset.accountAction==='my-profile'){goToMyProfile();return}if(event.currentTarget.dataset.accountAction==='workspace-preview'||actualAuthenticatedRole()==='admin')document.getElementById('role-dialog').showModal()});document.getElementById('role-dialog').addEventListener('close',e=>{if(roleConfig[e.target.returnValue])applyRole(e.target.returnValue)});document.getElementById('global-search').addEventListener('keydown',e=>{if(e.key!=='Enter')return;if(authenticatedClientRoles.has(currentAuthenticatedRole())){if(!viewAllowedForAuthenticatedRole(current)){current='overview';history.replaceState({},'',`${location.pathname}#overview`);setActive();render()}toast('Client Portal search is not connected yet.');e.target.blur();return}if(viewAllowedForAuthenticatedRole('vas')){talentSearch=e.target.value;current='vas'}else if(viewAllowedForAuthenticatedRole('clients'))current='clients';else current='overview';setActive();render();e.target.blur()});
+document.getElementById('role-switcher').addEventListener('click',event=>{if(event.currentTarget.dataset.accountAction==='my-profile'){goToMyProfile();return}if(event.currentTarget.dataset.accountAction==='workspace-preview'||actualAuthenticatedRole()==='admin')document.getElementById('role-dialog').showModal()});document.getElementById('role-dialog').addEventListener('close',e=>{if(roleConfig[e.target.returnValue])applyRole(e.target.returnValue)});
+async function searchOperationsRecords({query,types,signal}={}){
+  if(!window.soroSupabase?.auth?.getSession)throw new Error('Search is unavailable until the secure session is ready.');
+  const {data,error}=await window.soroSupabase.auth.getSession();
+  const token=data?.session?.access_token;
+  if(error||!token)throw new Error('Sign in again to search Soro records.');
+  const response=await fetch(`/.netlify/functions/global-search?q=${encodeURIComponent(String(query||'').trim())}`,{
+    method:'GET',
+    headers:{Accept:'application/json',Authorization:`Bearer ${token}`},
+    cache:'no-store',
+    signal
+  });
+  const payload=await response.json().catch(()=>null);
+  if(!response.ok||!payload||typeof payload!=='object'||Array.isArray(payload))throw new Error('Search is temporarily unavailable.');
+  const visibleTypes=new Set(Array.isArray(types)?types:[]);
+  return{
+    query:String(payload.query||query||''),
+    clients:visibleTypes.has('client')&&Array.isArray(payload.clients)?payload.clients:[],
+    talent:visibleTypes.has('talent')&&Array.isArray(payload.talent)?payload.talent:[]
+  };
+}
+function navigateGlobalSearchResult(result){
+  if(!result||typeof result!=='object')return;
+  if(result.kind==='record'&&result.entityType==='client'){openClientProfile(result.id);return}
+  if(result.kind==='record'&&result.entityType==='talent'){openTalentProfile(result.id);return}
+  if(result.kind==='view-all'&&result.entityType==='talent'&&viewAllowedForAuthenticatedRole('vas')){
+    talentSearch=String(result.query||'').trim();
+    current='vas';selectedTalentId=null;selectedClientId=null;
+    history.pushState({},'',`${location.pathname}#talent`);setActive();render();
+  }else if(result.kind==='view-all'&&result.entityType==='client')goToClientDirectory();
+}
+window.SoroGlobalSearch?.init?.({
+  searchRecords:searchOperationsRecords,
+  navigateResult:navigateGlobalSearchResult,
+  getEffectiveRole:currentAuthenticatedRole
+});
 async function loadLiveApplicants(){if(!window.soroSupabase||!viewAllowedForAuthenticatedRole('vas')){liveApplicants=[];return}const {data:applicants,error}=await window.soroSupabase.from('applicants').select(talentProfileSelectFields).is('archived_at',null).order('application_received_at',{ascending:false});if(error){liveApplicants=[];return}liveApplicants=applicants||[];if(current==='vas'||current==='talent-profile')render()}
 async function loadOwnTalentProfile(){
   const access=window.soroCurrentAccess||{};
@@ -440,6 +509,7 @@ window.addEventListener('soro:task-center-open-tasks',()=>{
   if(!viewAllowedForAuthenticatedRole('tasks'))return;
   current='tasks';
   selectedTalentId=null;
+  selectedClientId=null;
   history.pushState({},'',`${location.pathname}#tasks`);
   setActive();
   render();
@@ -455,8 +525,10 @@ window.addEventListener('soro-auth-changed',event=>{
   else{ownTalentProfileRequest+=1;ownTalentProfile=null;ownTalentProfileState='idle'}
   render();
 });
-const initialHash=location.hash.match(/^#talent\/([^/]+)$/);
-if(initialHash){current='talent-profile';selectedTalentId=initialHash[1]}
+const initialTalentHash=location.hash.match(/^#talent\/([^/]+)$/);
+const initialClientHash=location.hash.match(/^#client\/([^/]+)$/);
+if(initialTalentHash){current='talent-profile';selectedTalentId=initialTalentHash[1]}
+else if(initialClientHash){current='client-record';selectedClientId=initialClientHash[1]}
 else if(location.hash.slice(1) in data||['my-profile','client-talent-profile','talent-my-profile','talent-review'].includes(location.hash.slice(1))){current=location.hash.slice(1)}
 render();
 

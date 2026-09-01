@@ -657,6 +657,21 @@
       return;
     }
     if (current === 'talent-profile') {
+      const accessRole = typeof currentAuthenticatedRole === 'function'
+        ? currentAuthenticatedRole()
+        : currentAccessRole();
+      if (['sales', 'sales_management'].includes(accessRole)) {
+        if (window.SoroReadOnlyTalentProfile?.canOpenForRole?.(accessRole)) {
+          window.SoroReadOnlyTalentProfile.mount(root, {
+            id: selectedTalentId,
+            onBack: () => window.soroGoBackFromReadOnlyTalentProfile?.()
+          });
+        } else {
+          root.innerHTML = '<main class="page talent-profile-page"><section class="panel profile-missing" role="alert"><p class="eyebrow">Talent profile</p><h1>Talent profile unavailable</h1><p>The secure read-only profile is still loading. Refresh and try again.</p></section></main>';
+        }
+        return;
+      }
+      window.SoroReadOnlyTalentProfile?.reset?.();
       root.innerHTML = profilePage(selectedProfileApplicant());
       bindView();
       bindPrivateProfileDetailsEditor();

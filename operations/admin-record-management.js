@@ -7,8 +7,12 @@
   let authorizedRole = null;
   let organizationId = null;
   const currentAccessRole = () => String(window.soroCurrentAccess?.role || authorizedRole || '').toLowerCase();
-  const canManageTalent = () => ['admin', 'talent_management'].includes(currentAccessRole());
-  const canManageClients = () => currentAccessRole() === 'admin';
+  const effectiveAccessRole = () => typeof currentAuthenticatedRole === 'function'
+    ? String(currentAuthenticatedRole() || '').toLowerCase()
+    : currentAccessRole();
+  const canManageTalent = () => ['admin', 'talent_management'].includes(currentAccessRole())
+    && ['admin', 'talent_management'].includes(effectiveAccessRole());
+  const canManageClients = () => currentAccessRole() === 'admin' && effectiveAccessRole() === 'admin';
   const database = () => window.soroSupabase;
   const $ = (selector, parent = document) => parent.querySelector(selector);
   const escapeHtml = (value = '') => String(value).replace(/[&<>"]/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[char]));

@@ -107,9 +107,12 @@
     }
     const globalSearch = document.getElementById('global-search');
     if (globalSearch) {
-      globalSearch.placeholder = 'Search clients, Talent, tasks…';
+      const searchEnabled = ['admin', 'talent_management', 'sales_management', 'sales', 'billing'].includes(access.role);
+      globalSearch.placeholder = ['admin', 'talent_management', 'sales_management', 'sales'].includes(access.role)
+        ? 'Search clients and Talent…'
+        : 'Search clients…';
       const searchShell = globalSearch.closest('.global-search');
-      if (searchShell) searchShell.hidden = clientProfileAvailable;
+      if (searchShell) searchShell.hidden = !searchEnabled;
     }
   }
 

@@ -60,8 +60,8 @@ test('the page loads cache-busted profile assets before routing and authenticati
   const html = read('operations/index.html');
   assert.match(html, /client-profile\.css\?v=20260829-client-profile/);
   assert.match(html, /client-profile\.js\?v=20260829-client-profile/);
-  assert.ok(html.indexOf('client-profile.js?v=20260829-client-profile') < html.indexOf('operations.js?v=20260831-legacy-files'));
-  assert.match(html, /auth\.js\?v=20260831-founder-identity/);
+  assert.ok(html.indexOf('client-profile.js?v=20260829-client-profile') < html.indexOf('operations.js?v=20260901-global-search'));
+  assert.match(html, /auth\.js\?v=20260901-role-view-access/);
 });
 
 test('the pure preview renderer is network-free and preserves field authority', () => {
@@ -122,8 +122,9 @@ test('loading, retry, save feedback, and stale-account protection are accessible
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
 });
 
-test('authenticated client placeholders are neutral and global search stays on a safe route', () => {
+test('authenticated client placeholders are neutral and global search stays unavailable to Client portal roles', () => {
   const source = read('operations/operations.js');
+  const globalSearch = read('operations/global-search.js');
   const safeStart = source.indexOf('const clientSafeViewData=');
   const safeEnd = source.indexOf('\n});', safeStart) + 4;
   assert.ok(safeStart >= 0 && safeEnd > safeStart, 'Client-safe view data must be declared.');
@@ -133,10 +134,9 @@ test('authenticated client placeholders are neutral and global search stays on a
   });
   assert.match(safeData, /reports:\{[\s\S]*rows:\[\]/);
   assert.match(source, /notificationsButton\.hidden=clientPortal/);
-  assert.match(source, /authenticatedClientRoles\.has\(currentAuthenticatedRole\(\)\)[\s\S]*Client Portal search is not connected yet/);
-  const searchGuard = source.lastIndexOf('if(authenticatedClientRoles.has(currentAuthenticatedRole()))');
-  const guardReturn = source.indexOf('return}', searchGuard);
-  const internalClientRoute = source.indexOf("current='clients'", searchGuard);
-  assert.ok(searchGuard >= 0 && guardReturn > searchGuard, 'Global search must explicitly short-circuit authenticated client roles.');
-  assert.ok(internalClientRoute < 0 || guardReturn < internalClientRoute, 'Client search must return before any internal Clients route can be selected.');
+  assert.match(source, /globalSearch\)globalSearch\.hidden=clientPortal\|\|accessRole==='virtual_assistant'/);
+  assert.match(globalSearch, /const ROLE_TYPES = Object\.freeze\(\{[\s\S]*admin:[\s\S]*talent_management:[\s\S]*sales:[\s\S]*billing:/);
+  assert.doesNotMatch(globalSearch, /\bclient_(?:admin|reviewer|billing)\s*:/);
+  assert.doesNotMatch(globalSearch, /\bvirtual_assistant\s*:/);
+  assert.doesNotMatch(source, /Client Portal search is not connected yet/);
 });

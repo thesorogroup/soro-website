@@ -1,0 +1,185 @@
+.soro-global-search-host {
+  position: relative;
+  display: block;
+  padding: 0;
+  overflow: visible;
+  z-index: 20;
+}
+
+.soro-global-search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 9px 12px;
+  color: var(--muted);
+  cursor: text;
+}
+
+.soro-global-search-field:focus-within {
+  border-radius: 9px;
+  box-shadow: 0 0 0 3px rgba(30, 87, 142, .18);
+}
+
+.soro-global-search-popup {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(560px, calc(100vw - 32px));
+  max-height: min(560px, calc(100vh - 105px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 8px;
+  border: 1px solid #d8e2ed;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 18px 45px rgba(8, 37, 80, .2);
+}
+
+.soro-global-search-popup[hidden] {
+  display: none !important;
+}
+
+.soro-global-search-popup[aria-busy="true"] {
+  cursor: progress;
+}
+
+.soro-global-search-group + .soro-global-search-group {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px solid #e6edf5;
+}
+
+.soro-global-search-group h3 {
+  margin: 0;
+  padding: 7px 10px 5px;
+  color: #627287;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.soro-global-search-option {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 11px;
+  min-height: 52px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #172033;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.soro-global-search-option:hover,
+.soro-global-search-option.is-active,
+.soro-global-search-option[aria-selected="true"] {
+  background: #edf5fc;
+}
+
+.soro-global-search-option:focus-visible {
+  outline: 3px solid rgba(244, 90, 31, .28);
+  outline-offset: -3px;
+}
+
+.soro-global-search-type {
+  display: grid;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 9px;
+  background: #e8f0f9;
+  color: #173f6c;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.soro-global-search-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.soro-global-search-copy strong,
+.soro-global-search-copy small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.soro-global-search-copy strong {
+  color: #102f55;
+  font-size: 14px;
+}
+
+.soro-global-search-copy small {
+  margin-top: 3px;
+  color: #66768a;
+  font-size: 12px;
+}
+
+.soro-global-search-view-all {
+  justify-content: space-between;
+  min-height: 42px;
+  color: #164f83;
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.soro-global-search-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 76px;
+  padding: 16px;
+  color: #66768a;
+  font-size: 13px;
+  text-align: center;
+}
+
+.soro-global-search-state--error {
+  color: #9f351c;
+}
+
+.soro-global-search-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #cbd9e8;
+  border-top-color: #1e578e;
+  border-radius: 50%;
+  animation: soro-global-search-spin .7s linear infinite;
+}
+
+@keyframes soro-global-search-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 520px) {
+  .soro-global-search-host {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .soro-global-search-popup {
+    position: fixed;
+    top: 66px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-height: calc(100dvh - 78px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .soro-global-search-spinner {
+    animation-duration: 1.4s;
+  }
+}

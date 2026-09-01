@@ -39,7 +39,7 @@ test('paused and failed-delivery states have usable recovery actions', () => {
 
 test('portal controls and accessible mobile styles are loaded by Soro Ops', () => {
   assert.match(page, /talent-portal-access\.css\?v=20260828-va-portal-access/);
-  assert.match(page, /talent-portal-access\.js\?v=20260828-va-portal-access/);
+  assert.match(page, /talent-portal-access\.js\?v=20260901-role-view-access/);
   assert.match(styles, /@media \(max-width: 640px\)/);
   assert.match(source, /aria-live=\"polite\"/);
   assert.match(source, /aria-busy/);

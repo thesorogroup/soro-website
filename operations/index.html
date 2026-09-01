@@ -22,6 +22,8 @@
     <link rel="stylesheet" href="admin-record-management.css?v=20260822-identity-preferences" />
     <link rel="stylesheet" href="talent-portal-access.css?v=20260828-va-portal-access" />
     <link rel="stylesheet" href="client-profile.css?v=20260829-client-profile" />
+    <link rel="stylesheet" href="internal-client-profile.css?v=20260901-global-search" />
+    <link rel="stylesheet" href="global-search.css?v=20260901-global-search" />
     <link rel="stylesheet" href="client-talent-profile.css?v=20260829-production-visuals" />
     <link rel="stylesheet" href="admin-permanent-deletion.css?v=20260820-record-security" />
     <link rel="stylesheet" href="admin-employee-management.css?v=20260831-founder-directory" />
@@ -105,7 +107,7 @@
       <section class="content">
         <header class="topbar">
           <button class="mobile-menu" id="mobile-menu" aria-label="Open menu">☰</button>
-          <label class="global-search"><span>⌕</span><input id="global-search" placeholder="Search clients, Talent, tasks…" /></label>
+          <label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" autocomplete="off" placeholder="Search clients and Talent…" aria-label="Search clients and Talent" /></label>
           <div class="top-actions"><button class="icon-button client-mobile-profile" id="client-mobile-profile" type="button" aria-label="Open Account Settings" title="Account Settings" hidden><span class="avatar">CP</span></button><button class="text-button" id="sign-out" type="button">Sign out</button><button class="icon-button notification-button" id="notifications-button" aria-label="No notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><em id="notifications-count" hidden>0</em></button><button class="help" id="help-button" type="button" aria-label="Help and support">?</button></div>
         </header>
         <div id="view-root"></div>
@@ -121,28 +123,31 @@
     <script src="supabase-config.js?v=20260817-loom"></script>
     <script src="talent-profile-visuals.js?v=20260829-production-visuals"></script>
     <script src="client-profile.js?v=20260829-client-profile"></script>
+    <script src="internal-client-profile.js?v=20260901-global-search"></script>
     <script src="client-talent-profile.js?v=20260829-production-visuals"></script>
     <script src="talent-workday.js?v=20260829-manual-workday"></script>
     <script src="active-talent-today.js?v=20260829-active-talent-today"></script>
     <script src="talent-time-off.js?v=20260829-talent-time-off"></script>
     <script src="talent-review-queue.js?v=20260831-review-badge"></script>
     <script src="task-center.js?v=20260831-live-tasks"></script>
-    <script src="operations.js?v=20260831-legacy-files"></script>
+    <script src="global-search.js?v=20260901-global-search"></script>
+    <script src="operations.js?v=20260901-global-search"></script>
     <script src="talent-directory-filters.js?v=20260828-skill-disclosure"></script>
     <script src="admin-skill-library.js?v=20260817-skill-library"></script>
     <script src="screening-presentation.js?v=20260829-speed-meter-fix"></script>
     <script src="profile-details.js?v=20260822-private-profile-details"></script>
-    <script src="operations-enhancements.js?v=20260831-legacy-files"></script>
+    <script src="operations-enhancements.js?v=20260901-role-view-access"></script>
     <script src="inline-intro-video.js?v=20260829-talent-self-profile"></script>
     <script src="talent-profile-privacy.js?v=20260822-timezone-screening"></script>
-    <script src="talent-file-tabs.js?v=20260829-manual-workday"></script>
+    <script src="talent-file-tabs.js?v=20260901-role-view-access"></script>
+    <script src="read-only-talent-profile.js?v=20260901-role-view-access"></script>
     <script src="task-modal-behavior.js?v=20260817-task-modal"></script>
     <script src="employee-payroll-readiness.js?v=20260831-founder-readiness"></script>
     <script src="admin-employee-management.js?v=20260831-founder-directory"></script>
     <script src="admin-payroll.js?v=20260830-payroll-payouts"></script>
-    <script src="auth.js?v=20260831-founder-identity"></script>
-    <script src="admin-record-management.js?v=20260822-identity-preferences"></script>
-    <script src="talent-portal-access.js?v=20260828-va-portal-access"></script>
-    <script src="admin-permanent-deletion.js?v=20260821-concept-match"></script>
+    <script src="auth.js?v=20260901-role-view-access"></script>
+    <script src="admin-record-management.js?v=20260901-role-view-access"></script>
+    <script src="talent-portal-access.js?v=20260901-role-view-access"></script>
+    <script src="admin-permanent-deletion.js?v=20260901-role-view-access"></script>
   </body>
 </html>

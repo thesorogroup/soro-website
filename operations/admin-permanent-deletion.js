@@ -3,7 +3,11 @@
   const observer = new MutationObserver(() => requestAnimationFrame(addDeleteControls));
 
   function isAdministrator() {
-    return window.soroCurrentAccess?.role === 'admin';
+    const authenticated = String(window.soroCurrentAccess?.role || '').toLowerCase();
+    const effective = typeof currentAuthenticatedRole === 'function'
+      ? String(currentAuthenticatedRole() || '').toLowerCase()
+      : authenticated;
+    return authenticated === 'admin' && effective === 'admin';
   }
 
   function addButton(actions, type, id, name, archived) {

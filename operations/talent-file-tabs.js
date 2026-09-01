@@ -10,13 +10,28 @@
   let folderHeightObserver = null;
   let folderHeightFallback = null;
 
+  function effectiveProfileRole() {
+    if (typeof currentAuthenticatedRole === 'function') {
+      return String(currentAuthenticatedRole() || '').toLowerCase();
+    }
+    return String(window.soroCurrentAccess?.role || '').toLowerCase();
+  }
+
+  function isReadOnlySalesProfile() {
+    return typeof current !== 'undefined'
+      && current === 'talent-profile'
+      && ['sales', 'sales_management'].includes(effectiveProfileRole());
+  }
+
   function canViewBenefits() {
-    return !(typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView())
+    return !isReadOnlySalesProfile()
+      && !(typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView())
       && benefitsRoles.has(String(window.soroCurrentAccess?.role || '').toLowerCase());
   }
 
   function canViewPay() {
-    return !(typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView())
+    return !isReadOnlySalesProfile()
+      && !(typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView())
       && payRoles.has(String(window.soroCurrentAccess?.role || '').toLowerCase());
   }
 
@@ -205,6 +220,7 @@
   profilePage = function (applicant) {
     const markup = originalProfilePage(applicant);
     if (!applicant) return markup;
+    const readOnlySales = isReadOnlySalesProfile();
     lastTalentId = applicant.id;
     activeTab = 'profile';
 
@@ -236,8 +252,14 @@
 
     const shell = document.createElement('section');
     shell.className = 'talent-file-shell';
-    const initialTabCount = benefitsAvailable ? 4 : 3;
-    shell.innerHTML = `${folderArtwork(initialTabCount)}<div class="talent-file-tabs" role="tablist" aria-label="Talent file sections">${tabButton('profile', 'Profile')}${benefitsAvailable ? tabButton('benefits', 'Benefits', '<span class="tab-lock" aria-hidden="true"></span>') : ''}${tabButton('attendance', 'Attendance')}${tabButton('documents', 'Documents')}</div><div class="talent-file-body"></div><div class="talent-file-panels">${panel('profile', '', 'talent-file-profile-panel')}${benefitsAvailable ? panel('benefits', benefitsPanel(applicant)) : ''}${panel('attendance', attendancePanel())}${panel('documents', '', 'talent-file-documents-panel')}</div>`;
+    const initialTabCount = readOnlySales ? 1 : benefitsAvailable ? 4 : 3;
+    const tabMarkup = readOnlySales
+      ? tabButton('profile', 'Profile')
+      : `${tabButton('profile', 'Profile')}${benefitsAvailable ? tabButton('benefits', 'Benefits', '<span class="tab-lock" aria-hidden="true"></span>') : ''}${tabButton('attendance', 'Attendance')}${tabButton('documents', 'Documents')}`;
+    const panelMarkup = readOnlySales
+      ? panel('profile', '', 'talent-file-profile-panel')
+      : `${panel('profile', '', 'talent-file-profile-panel')}${benefitsAvailable ? panel('benefits', benefitsPanel(applicant)) : ''}${panel('attendance', attendancePanel())}${panel('documents', '', 'talent-file-documents-panel')}`;
+    shell.innerHTML = `${folderArtwork(initialTabCount)}<div class="talent-file-tabs" role="tablist" aria-label="Talent file sections">${tabMarkup}</div><div class="talent-file-body"></div><div class="talent-file-panels">${panelMarkup}</div>`;
     syncFolderArt(shell);
 
     const firstDialog = main.querySelector('dialog');
@@ -249,12 +271,14 @@
     if (headshot) headshot.insertAdjacentHTML('afterend', paperclipArtwork());
     const profilePanel = shell.querySelector('[data-talent-file-panel="profile"]');
     profilePanel.append(stats, layout);
-    const dangerZone = document.createElement('section');
-    dangerZone.className = 'talent-profile-danger-zone';
-    dangerZone.hidden = true;
-    dangerZone.innerHTML = '<div><p class="eyebrow">Administrator record controls</p><h2>Danger zone</h2><p>Permanent deletion is intentionally separated from everyday profile actions.</p></div><div class="talent-profile-danger-actions admin-record-actions"></div>';
-    profilePanel.append(dangerZone);
-    shell.querySelector('[data-talent-file-panel="documents"]').append(documents);
+    if (!readOnlySales) {
+      const dangerZone = document.createElement('section');
+      dangerZone.className = 'talent-profile-danger-zone';
+      dangerZone.hidden = true;
+      dangerZone.innerHTML = '<div><p class="eyebrow">Administrator record controls</p><h2>Danger zone</h2><p>Permanent deletion is intentionally separated from everyday profile actions.</p></div><div class="talent-profile-danger-actions admin-record-actions"></div>';
+      profilePanel.append(dangerZone);
+      shell.querySelector('[data-talent-file-panel="documents"]')?.append(documents);
+    }
     if (firstDialog && firstDialog.parentElement !== main) main.append(firstDialog);
     activateTab(activeTab, shell);
     scheduleFolderHeightSync();
@@ -324,6 +348,10 @@
   }
 
   loadTalentProfileDocuments = async function () {
+    if (isReadOnlySalesProfile()) {
+      watchFolderHeight(document.querySelector('.talent-file-shell'));
+      return;
+    }
     await originalLoadTalentProfileDocuments();
     watchFolderHeight(document.querySelector('.talent-file-shell'));
     const applicant = typeof currentTalentProfileApplicant === 'function'

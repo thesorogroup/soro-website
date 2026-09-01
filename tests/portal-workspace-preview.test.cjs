@@ -49,7 +49,7 @@ test('Admin workspace previews map all five choices to the real role navigation'
   }
 
   assert.deepEqual(roleViews(source, 'admin'), ['overview', 'tasks', 'clients', 'vas', 'talent-review', 'talent-profile', 'placements', 'documents', 'reports', 'employees', 'payroll', 'help']);
-  assert.deepEqual(roleViews(source, 'sales'), ['overview', 'tasks', 'clients', 'placements', 'reports', 'help']);
+  assert.deepEqual(roleViews(source, 'sales'), ['overview', 'tasks', 'clients', 'talent-profile', 'placements', 'reports', 'help']);
   assert.deepEqual(roleViews(source, 'talent_management'), ['overview', 'tasks', 'clients', 'vas', 'talent-review', 'talent-profile', 'placements', 'documents', 'reports', 'talent-payout-review', 'help']);
   assert.deepEqual(roleViews(source, 'client_admin'), ['overview', 'client-talent-profile', 'my-profile', 'help']);
   assert.deepEqual(roleViews(source, 'virtual_assistant'), ['overview', 'talent-my-profile', 'documents', 'help']);

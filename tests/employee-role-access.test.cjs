@@ -146,7 +146,7 @@ test('private Talent editing and the skill library ignore the mutable workspace 
   assert.doesNotMatch(skillGuard, /typeof\s+role|\broleConfig\b/);
 });
 
-test('Sales navigation excludes raw Talent, Documents, and Employees views', () => {
+test('Sales navigation permits safe Talent profiles while excluding the raw directory, Documents, and Employees', () => {
   const navigationSource = `${read('operations/operations.js')}\n${read('operations/auth.js')}`;
   const accessNavigation = namedDeclaration(navigationSource, [
     'ACCESS_NAVIGATION',
@@ -160,7 +160,8 @@ test('Sales navigation excludes raw Talent, Documents, and Employees views', () 
 
   assert.ok(salesViews.includes('overview'));
   assert.ok(salesViews.includes('clients'));
-  ['vas', 'talent-profile', 'documents', 'employees'].forEach(view => {
+  assert.ok(salesViews.includes('talent-profile'));
+  ['vas', 'documents', 'employees'].forEach(view => {
     assert.equal(salesViews.includes(view), false, `Sales must not expose the ${view} view.`);
   });
   assert.match(navigationSource, /window\.soroCurrentAccess/);

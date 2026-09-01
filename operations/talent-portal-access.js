@@ -75,8 +75,14 @@
     return String(window.soroCurrentAccess?.role || '').trim().toLowerCase();
   }
 
+  function effectiveManagerRole() {
+    return typeof currentAuthenticatedRole === 'function'
+      ? String(currentAuthenticatedRole() || '').trim().toLowerCase()
+      : managerRole();
+  }
+
   function canManageTalentAccess() {
-    return MANAGER_ROLES.has(managerRole());
+    return MANAGER_ROLES.has(managerRole()) && MANAGER_ROLES.has(effectiveManagerRole());
   }
 
   function currentApplicant() {
