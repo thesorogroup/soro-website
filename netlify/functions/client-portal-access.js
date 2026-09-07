@@ -666,6 +666,29 @@ async function patchMembership(manager, userId, values) {
   }
 }
 
+async function mutateAccountLink(manager, input, operation, userId, mutation) {
+  const response = await serviceRequest('/rest/v1/rpc/mutate_client_portal_account_link', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      p_actor_user_id: manager.user.id,
+      p_request_id: input.requestId,
+      p_client_contact_id: input.contactId,
+      p_request_fingerprint: operation.fingerprint,
+      p_lease_token: operation.leaseToken,
+      p_user_id: userId,
+      p_mutation: mutation
+    })
+  });
+  const result = await response.json().catch(() => null);
+  if (!hasExactKeys(result, new Set(['userId', 'linked', 'cleanupAllowed']))
+    || result.userId !== userId
+    || result.linked !== (mutation === 'link')
+    || result.cleanupAllowed !== (mutation === 'cleanup')) {
+    throw reconciliationError('The Client account link update could not be verified. Administrator review is required.');
+  }
+  return result;
+}
+
 function operationFingerprint(input) {
   return crypto.createHash('sha256').update(JSON.stringify({
     action: input.action, contactId: input.contactId, email: input.email, portalRole: input.portalRole
@@ -687,7 +710,7 @@ async function beginOperation(manager, input) {
     })
   });
   const claim = await response.json();
-  if (!isPlainObject(claim) || !['claimed', 'completed', 'failed', 'busy', 'reconciliation_required'].includes(claim.state)) {
+  if (!isPlainObject(claim) || !['claimed', 'completed', 'failed', 'busy', 'reconciliation_required', 'cleanup_required'].includes(claim.state)) {
     throw httpError(502, 'access_service_error', 'The Client access operation returned an invalid claim.');
   }
   if (claim.state === 'completed') {
@@ -701,6 +724,9 @@ async function beginOperation(manager, input) {
   }
   if (claim.state === 'reconciliation_required') {
     throw httpError(409, 'access_needs_reconciliation', 'Finish reconciling the earlier Client access action before starting another one.');
+  }
+  if (claim.state === 'cleanup_required') {
+    throw reconciliationError('The earlier Client account cleanup needs Administrator review before activation can be retried.');
   }
   if (claim.state === 'failed') {
     throw httpError(409, 'access_action_failed', 'That Client access attempt ended and cannot be replayed. Start the action again.');
@@ -827,8 +853,6 @@ async function activate(manager, input, bundle, operation) {
   let userId = '';
   let recoveredAuthUser = false;
   let existingPlatformUser = null;
-  let platformWriteAttempted = false;
-  let membershipWriteAttempted = false;
   let linked = false;
   try {
     if (operation?.resumed) {
@@ -850,7 +874,6 @@ async function activate(manager, input, bundle, operation) {
       recoveredAuthUser = createdAuthUser.recovered;
     }
     if (!existingPlatformUser) {
-      platformWriteAttempted = true;
       try {
         await serviceRequest('/rest/v1/platform_users', {
           method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
@@ -874,16 +897,12 @@ async function activate(manager, input, bundle, operation) {
         existingPlatformUser = reconciledPlatformUser;
       }
     }
-    membershipWriteAttempted = true;
     try {
-      await serviceRequest('/rest/v1/client_portal_memberships', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({
-          user_id: userId, organization_id: manager.access.organization_id,
-          client_id: bundle.client.id, client_contact_id: bundle.contact.id, active: true
-        })
-      });
+      await mutateAccountLink(manager, input, operation, userId, 'link');
     } catch (error) {
+      // Only an uncertain transport outcome may be reconciled by reading the
+      // committed membership. A rejected or malformed RPC must not be bypassed.
+      if (error?.code === 'access_needs_reconciliation' || !operationOutcomeIsAmbiguous(error)) throw error;
       let reconciledMembership;
       try { reconciledMembership = await fetchMembership(manager, bundle.contact.id); } catch {
         throw reconciliationError('Client account membership needs Administrator review before it can continue.', error);
@@ -920,24 +939,20 @@ async function activate(manager, input, bundle, operation) {
       if (error?.code === 'access_needs_reconciliation') throw error;
       throw reconciliationError('Client account provisioning needs Administrator review before it can continue.', error);
     } else if (!linked) {
-      const cleanup = [];
-      if (membershipWriteAttempted) cleanup.push(
-        serviceRequest(`/rest/v1/client_portal_memberships?user_id=eq.${encodeURIComponent(userId)}&organization_id=eq.${encodeURIComponent(manager.access.organization_id)}&client_id=eq.${encodeURIComponent(bundle.client.id)}&client_contact_id=eq.${encodeURIComponent(bundle.contact.id)}`, { method: 'DELETE' })
-      );
-      if (platformWriteAttempted) cleanup.push(
-        serviceRequest(`/rest/v1/platform_users?id=eq.${encodeURIComponent(userId)}&organization_id=eq.${encodeURIComponent(manager.access.organization_id)}`, { method: 'DELETE' })
-      );
-      if (userId && !recoveredAuthUser) cleanup.push(deleteAuthUser(userId));
-      cleanup.push(patchContact(manager, bundle.contact.id, {
-        portal_login_email: bundle.contact.portal_login_email,
-        portal_access_status: bundle.contact.portal_access_status,
-        portal_invite_sent_at: bundle.contact.portal_invite_sent_at
-      }));
-      const cleanupResults = await Promise.allSettled(cleanup);
-      if (cleanupResults.some(result => result.status === 'rejected')) {
+      try {
+        if (userId && !recoveredAuthUser) {
+          // The server checks the live lease, request provenance and unfinished
+          // account before removing its rows and authorizing Auth cleanup.
+          await mutateAccountLink(manager, input, operation, userId, 'cleanup');
+          await deleteAuthUser(userId);
+        }
+        // No successful contact update precedes this branch. Do not overwrite
+        // contact metadata from the earlier snapshot after cleanup releases its lock.
+        error.operationCompensated = true;
+      } catch (cleanupError) {
         await patchContact(manager, bundle.contact.id, { portal_access_status: 'needs_reconciliation' }).catch(() => {});
-        throw reconciliationError('Client account cleanup could not be confirmed and needs Administrator review.', error);
-      } else error.operationCompensated = true;
+        throw reconciliationError('Client account cleanup could not be confirmed and needs Administrator review.', cleanupError);
+      }
     } else if (!operationOutcomeIsAmbiguous(error)) {
       await patchContact(manager, bundle.contact.id, { portal_access_status: 'delivery_failed' }).catch(() => {});
     }

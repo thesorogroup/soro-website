@@ -504,6 +504,35 @@ test('an active per-contact lease rejects another action before mutable contact 
   assert.equal(calls.some(call => call.target.includes('/rest/v1/client_contacts?')), false);
 });
 
+for (const requestId of [IDS.operation, IDS.operation2]) {
+  test(`a cleanup-marked activation cannot resume or recreate Auth using request ${requestId}`, async t => {
+    const originalFetch = global.fetch;
+    const calls = [];
+    global.fetch = async (url, options = {}) => {
+      const target = String(url);
+      calls.push({ target, options });
+      if (target.endsWith('/auth/v1/user')) return jsonResponse({ id: IDS.actor });
+      if (target.includes('/rest/v1/platform_users?id=eq.') && target.includes('&select=id,organization_id,role,active,must_change_password&')) return jsonResponse([managerAccess()]);
+      if (target.endsWith('/rest/v1/rpc/reserve_client_portal_access_operation')) {
+        return jsonResponse({ state: 'cleanup_required', effectiveRequestId: IDS.operation });
+      }
+      throw new Error(`Unexpected fetch ${target}`);
+    };
+    t.after(() => { global.fetch = originalFetch; });
+    const result = await service.handler(postEvent({
+      action: 'activate', requestId, contactId: IDS.contact,
+      email: 'client@example.test', portalRole: 'client_admin'
+    }));
+    assert.equal(result.statusCode, 502);
+    assert.equal(JSON.parse(result.body).code, 'access_needs_reconciliation');
+    assert.equal(calls.length, 3, 'a cleanup-marked operation stops immediately after reservation');
+    assert.equal(calls.some(call => call.target.includes('/auth/v1/admin/')), false);
+    assert.equal(calls.some(call => call.target.includes('/rest/v1/client_contacts')), false);
+    assert.equal(calls.some(call => call.target.endsWith('/rest/v1/rpc/mutate_client_portal_account_link')), false);
+    assert.equal(calls.some(call => call.target.endsWith('/rest/v1/rpc/finalize_client_portal_access_operation')), false);
+  });
+}
+
 test('a zero-row scoped access PATCH remains pending and is never finalized completed', async t => {
   const originalFetch = global.fetch;
   const calls = [];
@@ -605,7 +634,9 @@ test('activate creates scoped membership, generates recovery link, sends email, 
     if (target.includes('/client_contacts?portal_login_email=eq.')) return jsonResponse([]);
     if (target.endsWith('/auth/v1/admin/users') && method === 'POST') return jsonResponse({ id: IDS.auth }, 201);
     if (target.endsWith('/rest/v1/platform_users') && method === 'POST') return emptyResponse(201);
-    if (target.endsWith('/rest/v1/client_portal_memberships') && method === 'POST') return emptyResponse(201);
+    if (target.endsWith('/rest/v1/rpc/mutate_client_portal_account_link')) {
+      return jsonResponse({ userId: IDS.auth, linked: true, cleanupAllowed: false });
+    }
     if (target.includes('/rest/v1/client_contacts?id=eq.') && method === 'PATCH') {
       const update = JSON.parse(options.body);
       contactState = { ...contactState, ...update };
@@ -637,11 +668,16 @@ test('activate creates scoped membership, generates recovery link, sends email, 
   const authBody = JSON.parse(authCreate.options.body);
   assert.ok(authBody.password.length >= 64);
   assert.equal(output.includes(authBody.password), false);
-  const membership = calls.find(call => call.target.endsWith('/rest/v1/client_portal_memberships') && call.method === 'POST');
+  const membership = calls.find(call => call.target.endsWith('/rest/v1/rpc/mutate_client_portal_account_link'));
   assert.deepEqual(JSON.parse(membership.options.body), {
-    user_id: IDS.auth, organization_id: IDS.org, client_id: IDS.client,
-    client_contact_id: IDS.contact, active: true
+    p_actor_user_id: IDS.actor, p_request_id: IDS.operation,
+    p_client_contact_id: IDS.contact,
+    p_request_fingerprint: service.operationFingerprint({
+      action: 'activate', contactId: IDS.contact, email: 'client@example.test', portalRole: 'client_reviewer'
+    }),
+    p_lease_token: IDS.lease, p_user_id: IDS.auth, p_mutation: 'link'
   });
+  assert.equal(calls.some(call => call.target.endsWith('/rest/v1/client_portal_memberships') && call.method === 'POST'), false);
   const delivery = calls.find(call => call.target === 'https://api.resend.com/emails');
   assert.ok(delivery);
   assert.equal(delivery.options.headers['Idempotency-Key'], `soro-client-access-${IDS.operation}`);
@@ -684,9 +720,9 @@ test('a stale same-intent activation reuses its original Auth and platform rows 
     if (target.includes('/rest/v1/platform_users?id=eq.') && target.includes('initial_password_issued_at') && method === 'GET') {
       return jsonResponse([{ id: IDS.auth, organization_id: IDS.org, role: 'client_reviewer', active: true, must_change_password: true, initial_password_issued_at: UPDATED, password_changed_at: null }]);
     }
-    if (target.endsWith('/rest/v1/client_portal_memberships') && method === 'POST') {
+    if (target.endsWith('/rest/v1/rpc/mutate_client_portal_account_link')) {
       membershipLinked = true;
-      return emptyResponse(201);
+      return jsonResponse({ userId: IDS.auth, linked: true, cleanupAllowed: false });
     }
     if (target.includes('/rest/v1/client_contacts?id=eq.') && method === 'PATCH') {
       contactState = { ...contactState, ...JSON.parse(options.body) };
@@ -712,6 +748,8 @@ test('a stale same-intent activation reuses its original Auth and platform rows 
   assert.equal(calls.some(call => call.target.endsWith('/rest/v1/platform_users') && call.method === 'POST'), false);
   assert.equal(calls.some(call => call.target.includes(`/auth/v1/admin/users/${IDS.auth}`) && call.method === 'DELETE'), false);
   assert.equal(calls.some(call => call.target.includes('/rest/v1/platform_users?id=eq.') && call.method === 'DELETE'), false);
+  const membership = calls.find(call => call.target.endsWith('/rest/v1/rpc/mutate_client_portal_account_link'));
+  assert.equal(JSON.parse(membership.options.body).p_request_id, IDS.operation);
   const delivery = calls.find(call => call.target === 'https://api.resend.com/emails');
   assert.equal(delivery.options.headers['Idempotency-Key'], `soro-client-access-${IDS.operation}`);
   const finalization = calls.find(call => call.target.endsWith('/rest/v1/rpc/finalize_client_portal_access_operation'));
@@ -791,8 +829,8 @@ for (const action of ['activate', 'change_email']) {
   });
 }
 
-for (const ambiguousStage of ['platform user', 'membership']) {
-  test(`activation reconciles a ${ambiguousStage} POST that committed before its response was lost`, async t => {
+for (const ambiguousStage of ['platform user', 'membership RPC']) {
+  test(`activation reconciles a ${ambiguousStage} that committed before its response was lost`, async t => {
     const originalFetch = global.fetch;
     const calls = [];
     let contactState = contact();
@@ -826,10 +864,10 @@ for (const ambiguousStage of ['platform user', 'membership']) {
       if (target.includes('/rest/v1/platform_users?id=eq.') && target.includes('initial_password_issued_at') && method === 'GET') {
         return jsonResponse(platformExists ? [{ id: IDS.auth, organization_id: IDS.org, role: 'client_reviewer', active: true, must_change_password: true, initial_password_issued_at: UPDATED, password_changed_at: null }] : []);
       }
-      if (target.endsWith('/rest/v1/client_portal_memberships') && method === 'POST') {
+      if (target.endsWith('/rest/v1/rpc/mutate_client_portal_account_link')) {
         membershipExists = true;
-        if (ambiguousStage === 'membership') throw new TypeError('Connection closed after membership commit.');
-        return emptyResponse(201);
+        if (ambiguousStage === 'membership RPC') throw new TypeError('Connection closed after membership commit.');
+        return jsonResponse({ userId: IDS.auth, linked: true, cleanupAllowed: false });
       }
       if (target.includes('/rest/v1/client_contacts?id=eq.') && method === 'PATCH') {
         contactState = { ...contactState, ...JSON.parse(options.body) };
@@ -1204,45 +1242,100 @@ test('an Auth identity recovered after an ambiguous create is never deleted by d
   assert.equal(calls.some(call => call.target.endsWith('/rest/v1/rpc/finalize_client_portal_access_operation')), false);
 });
 
-test('definitively rejected database linking compensates by deleting the created Auth account', async t => {
-  const originalFetch = global.fetch;
-  const calls = [];
-  global.fetch = async (url, options = {}) => {
-    const target = String(url);
-    const method = String(options.method || 'GET').toUpperCase();
-    calls.push({ target, method, options });
-    if (target.endsWith('/auth/v1/user')) return jsonResponse({ id: IDS.actor });
-    if (target.includes('/rest/v1/platform_users?id=eq.') && target.includes('&select=id,organization_id,role,active,must_change_password&')) return jsonResponse([managerAccess()]);
-    if (target.includes('/rest/v1/client_contacts?id=eq.') && method === 'GET') return jsonResponse([contact()]);
-    if (target.includes('/rest/v1/clients?id=eq.')) return jsonResponse([client()]);
-    if (target.includes('/rest/v1/client_portal_memberships?client_contact_id=eq.')) return jsonResponse([]);
-    if (target.endsWith('/rest/v1/rpc/reserve_client_portal_access_operation')) return jsonResponse({
-      state: 'claimed', effectiveRequestId: IDS.operation, leaseToken: IDS.lease, auditEventId: IDS.audit,
-      resumed: false, operationCreatedAt: UPDATED, deliveryPayload: null
-    });
-    if (target.endsWith('/rest/v1/audit_events?select=id') && method === 'POST') return jsonResponse([{ id: IDS.audit }], 201);
-    if (target.includes('/client_contacts?portal_login_email=eq.')) return jsonResponse([]);
-    if (target.endsWith('/auth/v1/admin/users') && method === 'POST') return jsonResponse({ id: IDS.auth }, 201);
-    if (target.endsWith('/rest/v1/platform_users') && method === 'POST') return emptyResponse(201);
-    if (target.endsWith('/rest/v1/client_portal_memberships') && method === 'POST') return jsonResponse({ message: 'link failed' }, 400);
-    if (target.includes('/rest/v1/client_portal_memberships?user_id=eq.') && method === 'DELETE') return emptyResponse();
-    if (target.includes('/rest/v1/platform_users?id=eq.') && method === 'DELETE') return emptyResponse();
-    if (target.includes(`/auth/v1/admin/users/${IDS.auth}`) && method === 'DELETE') return emptyResponse();
-    if (target.includes('/rest/v1/client_contacts?id=eq.') && method === 'PATCH') return jsonResponse([{ id: IDS.contact }]);
-    if (target.includes('/rest/v1/audit_events?id=eq.') && method === 'PATCH') return emptyResponse();
-    if (target.endsWith('/rest/v1/rpc/finalize_client_portal_access_operation')) return jsonResponse({});
-    throw new Error(`Unexpected fetch ${method} ${target}`);
-  };
-  t.after(() => { global.fetch = originalFetch; });
+const confirmedCleanup = () => jsonResponse({ userId: IDS.auth, linked: false, cleanupAllowed: true });
 
-  const result = await service.handler({
-    httpMethod: 'POST', headers: { authorization: 'Bearer token' }, queryStringParameters: {},
-    body: JSON.stringify({
+for (const scenario of [
+  { name: 'a definitively rejected link is cleaned up', cleanup: confirmedCleanup, authDelete: true, finalized: true },
+  { name: 'a permission-denied link is cleaned up only after server confirmation', rejectionStatus: 403, cleanup: confirmedCleanup, authDelete: true, finalized: true },
+  { name: 'a permission-denied platform insert is cleaned up only after server confirmation', platformRejected: true, rejectionStatus: 403, cleanup: confirmedCleanup, authDelete: true, finalized: true },
+  { name: 'cleanup permission denial preserves Auth and the pending operation', cleanup: () => jsonResponse({ message: 'permission denied' }, 403) },
+  { name: 'cleanup server failure preserves Auth and the pending operation', cleanup: () => jsonResponse({ message: 'internal error' }, 500) },
+  { name: 'cleanup response loss preserves Auth and the pending operation', cleanup: () => { throw new TypeError('Cleanup response lost after commit'); } },
+  { name: 'cleanup invalid JSON preserves Auth and the pending operation', cleanup: () => ({ ...jsonResponse(null), json: async () => { throw new SyntaxError('Invalid JSON'); } }) },
+  { name: 'cleanup null response preserves Auth and the pending operation', cleanup: () => jsonResponse(null) },
+  { name: 'cleanup empty response preserves Auth and the pending operation', cleanup: () => jsonResponse({}) },
+  { name: 'cleanup row-array response preserves Auth and the pending operation', cleanup: () => jsonResponse([{ userId: IDS.auth, linked: false, cleanupAllowed: true }]) },
+  { name: 'cleanup mismatched user preserves Auth and the pending operation', cleanup: () => jsonResponse({ userId: IDS.actor, linked: false, cleanupAllowed: true }) },
+  { name: 'cleanup still-linked response preserves Auth and the pending operation', cleanup: () => jsonResponse({ userId: IDS.auth, linked: true, cleanupAllowed: true }) },
+  { name: 'cleanup explicit refusal preserves Auth and the pending operation', cleanup: () => jsonResponse({ userId: IDS.auth, linked: false, cleanupAllowed: false }) },
+  { name: 'cleanup string permission preserves Auth and the pending operation', cleanup: () => jsonResponse({ userId: IDS.auth, linked: false, cleanupAllowed: 'true' }) },
+  { name: 'cleanup unexpected field preserves Auth and the pending operation', cleanup: () => jsonResponse({ userId: IDS.auth, linked: false, cleanupAllowed: true, extra: true }) },
+  { name: 'Auth deletion response loss keeps the operation pending', cleanup: confirmedCleanup, authDelete: true, authDeleteFails: true },
+  { name: 'a malformed successful link response cannot authorize cleanup', link: () => jsonResponse({ userId: IDS.auth, linked: true, cleanupAllowed: true }), cleanupNotAttempted: true },
+  { name: 'an unconfirmed lost link response cannot authorize cleanup', link: () => { throw new TypeError('Link response lost'); }, cleanupNotAttempted: true }
+]) {
+  test(scenario.name, async t => {
+    const originalFetch = global.fetch;
+    const calls = [];
+    let contactState = contact();
+    global.fetch = async (url, options = {}) => {
+      const target = String(url);
+      const method = String(options.method || 'GET').toUpperCase();
+      calls.push({ target, method, options });
+      if (target.endsWith('/auth/v1/user')) return jsonResponse({ id: IDS.actor });
+      if (target.includes('/rest/v1/platform_users?id=eq.') && target.includes('&select=id,organization_id,role,active,must_change_password&')) return jsonResponse([managerAccess()]);
+      if (target.includes('/rest/v1/platform_users?id=eq.') && target.includes('initial_password_issued_at') && method === 'GET') return jsonResponse([]);
+      if (target.includes('/rest/v1/client_contacts?id=eq.') && method === 'GET') return jsonResponse([contactState]);
+      if (target.includes('/rest/v1/clients?id=eq.')) return jsonResponse([client()]);
+      if (target.includes('/rest/v1/client_portal_memberships?client_contact_id=eq.') && method === 'GET') return jsonResponse([]);
+      if (target.endsWith('/rest/v1/rpc/reserve_client_portal_access_operation')) return jsonResponse({
+        state: 'claimed', effectiveRequestId: IDS.operation, leaseToken: IDS.lease, auditEventId: IDS.audit,
+        resumed: false, operationCreatedAt: UPDATED, deliveryPayload: null
+      });
+      if (target.includes('/client_contacts?portal_login_email=eq.')) return jsonResponse([]);
+      if (target.endsWith('/auth/v1/admin/users') && method === 'POST') return jsonResponse({ id: IDS.auth }, 201);
+      if (target.endsWith('/rest/v1/platform_users') && method === 'POST') {
+        return scenario.platformRejected
+          ? jsonResponse({ message: 'permission denied for platform_users' }, scenario.rejectionStatus)
+          : emptyResponse(201);
+      }
+      if (target.endsWith('/rest/v1/rpc/mutate_client_portal_account_link')) {
+        if (JSON.parse(options.body).p_mutation === 'cleanup') return scenario.cleanup();
+        return scenario.link ? scenario.link() : jsonResponse({ message: 'link rejected' }, scenario.rejectionStatus || 400);
+      }
+      if (target.includes(`/auth/v1/admin/users/${IDS.auth}`) && method === 'DELETE') {
+        if (scenario.authDeleteFails) throw new TypeError('Auth deletion response lost after commit');
+        return emptyResponse();
+      }
+      if (target.includes('/rest/v1/client_contacts?id=eq.') && method === 'PATCH') {
+        contactState = { ...contactState, ...JSON.parse(options.body) };
+        return jsonResponse([{ id: IDS.contact }]);
+      }
+      if (target.endsWith('/rest/v1/rpc/finalize_client_portal_access_operation')) return jsonResponse({});
+      throw new Error(`Unexpected fetch ${method} ${target}`);
+    };
+    t.after(() => { global.fetch = originalFetch; });
+
+    const input = {
       action: 'activate', requestId: IDS.operation, contactId: IDS.contact,
       email: 'client@example.test', portalRole: 'client_admin'
-    })
+    };
+    const result = await service.handler(postEvent(input));
+    assert.equal(result.statusCode, scenario.finalized ? scenario.rejectionStatus || 400 : 502);
+    assert.equal(JSON.parse(result.body).code, scenario.finalized ? 'access_action_failed' : 'access_needs_reconciliation');
+    assert.equal(contactState.portal_access_status, scenario.finalized ? 'not_invited' : 'needs_reconciliation');
+    const cleanupIndex = calls.findIndex(call => call.target.endsWith('/rest/v1/rpc/mutate_client_portal_account_link')
+      && JSON.parse(call.options.body).p_mutation === 'cleanup');
+    assert.equal(cleanupIndex >= 0, !scenario.cleanupNotAttempted);
+    if (cleanupIndex >= 0) {
+      assert.deepEqual(JSON.parse(calls[cleanupIndex].options.body), {
+        p_actor_user_id: IDS.actor, p_request_id: IDS.operation, p_client_contact_id: IDS.contact,
+        p_request_fingerprint: service.operationFingerprint(input), p_lease_token: IDS.lease,
+        p_user_id: IDS.auth, p_mutation: 'cleanup'
+      });
+    }
+    const deleteIndex = calls.findIndex(call => call.target.includes(`/auth/v1/admin/users/${IDS.auth}`) && call.method === 'DELETE');
+    assert.equal(deleteIndex >= 0, Boolean(scenario.authDelete));
+    if (scenario.authDelete) assert.ok(deleteIndex > cleanupIndex, 'Auth cleanup must follow the confirmed database cleanup');
+    if (scenario.finalized) {
+      assert.equal(calls.some(call => call.target.includes('/rest/v1/client_contacts?id=eq.') && call.method === 'PATCH'), false,
+        'successful cleanup must not overwrite contact metadata from an earlier snapshot');
+    }
+    assert.equal(calls.some(call => call.target.includes('/rest/v1/client_portal_memberships') && call.method !== 'GET'), false);
+    assert.equal(calls.some(call => call.target.includes('/rest/v1/platform_users') && call.method === 'DELETE'), false);
+    assert.equal(calls.some(call => call.target === 'https://api.resend.com/emails' || call.target.includes('/auth/v1/admin/generate_link')), false);
+    const finalization = calls.find(call => call.target.endsWith('/rest/v1/rpc/finalize_client_portal_access_operation'));
+    assert.equal(Boolean(finalization), Boolean(scenario.finalized));
+    if (finalization) assert.equal(JSON.parse(finalization.options.body).p_outcome, 'failed');
   });
-  assert.equal(result.statusCode, 400);
-  assert.ok(calls.some(call => call.target.includes(`/auth/v1/admin/users/${IDS.auth}`) && call.method === 'DELETE'));
-  assert.ok(calls.some(call => call.target.includes('/rest/v1/platform_users?id=eq.') && call.method === 'DELETE'));
-});
+}
