@@ -643,6 +643,10 @@
 
   render = function () {
     if (typeof viewAllowedForAuthenticatedRole === 'function' && !viewAllowedForAuthenticatedRole(current)) {
+      // Auth has not established workspace access yet. Keep any invitation or
+      // recovery callback intact until Supabase consumes it; baseRender keeps
+      // the workspace empty instead of replacing the callback with #overview.
+      if (!viewAllowedForAuthenticatedRole('overview')) return baseRender();
       current = 'overview';
       selectedTalentId = null;
       history.replaceState({}, '', `${location.pathname}#overview`);
