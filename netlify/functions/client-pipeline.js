@@ -377,7 +377,9 @@ function rpcError(status, payload) {
   if (code === '23505') return httpError(409, 'duplicate_request', 'This request was already used or the Client data conflicts with an existing record.');
   if (code === '23503' || code === '23514') return httpError(409, 'client_conflict', 'The Client data conflicts with another active record.');
   if (code === 'P0001') return httpError(409, 'stale_client', 'The Client changed. Reload it and try again.');
-  if (code === 'PGRST202' || status === 404) return httpError(503, 'service_unavailable', 'Client management is not configured yet.');
+  // PostgreSQL undefined-function errors also use HTTP 404. Only a missing
+  // RPC (or a bare missing endpoint) means the Client workflow is unconfigured.
+  if (code === 'PGRST202' || (status === 404 && !code)) return httpError(503, 'service_unavailable', 'Client management is not configured yet.');
   return httpError(500, 'client_service_error', 'Client management is temporarily unavailable.');
 }
 

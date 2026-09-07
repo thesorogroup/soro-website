@@ -324,3 +324,26 @@ test('raw database failures are absent from the Client response and logs', async
   assert.equal(serialized.includes(privateDetail), false);
   assert.equal(serialized.includes('private-client@example.test'), false);
 });
+
+test('an undefined database helper is not mistaken for an undeployed Client RPC', async t => {
+  const originalFetch = global.fetch;
+  const originalConsoleError = console.error;
+  let databaseCode = '42883';
+  const privateDetail = 'function digest(private_client_payload, unknown) does not exist';
+  const logs = [];
+  global.fetch = async url => String(url).endsWith('/auth/v1/user')
+    ? { ok: true, status: 200, json: async () => ({ id: IDS.actor }) }
+    : { ok: false, status: 404, text: async () => JSON.stringify({ code: databaseCode, message: privateDetail }) };
+  console.error = (...values) => { logs.push(values); };
+  t.after(() => { global.fetch = originalFetch; console.error = originalConsoleError; });
+  const event = { httpMethod: 'GET', headers: { authorization: 'Bearer token' }, queryStringParameters: {} };
+  const helperFailure = await service.handler(event);
+  assert.equal(helperFailure.statusCode, 500);
+  assert.equal(JSON.parse(helperFailure.body).code, 'client_service_error');
+  assert.doesNotMatch(helperFailure.body, /not configured|digest|private_client_payload/);
+  databaseCode = 'PGRST202';
+  const missingRpc = await service.handler(event);
+  assert.equal(missingRpc.statusCode, 503);
+  assert.match(missingRpc.body, /not configured/);
+  assert.doesNotMatch(JSON.stringify(logs), /digest|private_client_payload/);
+});
