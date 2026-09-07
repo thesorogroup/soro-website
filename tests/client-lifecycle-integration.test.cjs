@@ -11,7 +11,7 @@ function read(relativePath) {
 
 test('the Operations shell loads every Client lifecycle module before its controller', () => {
   const html = read('operations/index.html');
-  const controller = html.indexOf('operations.js?v=20260901-client-lifecycle');
+  const controller = html.indexOf('src="operations.js?');
   ['available-talent-bench.js', 'client-shortlist-workflow.js', 'client-workflow.js', 'client-placement-workflow.js'].forEach(file => {
     assert.ok(html.indexOf(file) > -1, `${file} must be loaded.`);
     assert.ok(html.indexOf(file) < controller, `${file} must load before operations.js.`);

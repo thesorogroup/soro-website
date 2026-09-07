@@ -537,7 +537,7 @@ test('the Operations shell loads and routes the workflow before the main control
   assert.match(html, /client-workflow\.js\?v=/);
   assert.ok(html.indexOf('client-workflow.js') < html.indexOf('operations.js'));
   assert.match(operations, /current==='clients'[\s\S]*SoroClientWorkflow\?\.canOpenForRole/);
-  assert.match(operations, /SoroClientWorkflow\.mount\(root,clientWorkflowMountOptions\(accessRole\)\)/);
+  assert.match(operations, /const options=clientWorkflowMountOptions\(accessRole\);[\s\S]*SoroClientWorkflow\.mount\(root,options\)/);
   assert.match(operations, /id="new-record"[\s\S]*SoroClientWorkflow\?\.canEditForRole/);
   assert.match(operations, /const options=clientWorkflowMountOptions\(currentAuthenticatedRole\(\)\);options\.start='create'[\s\S]*SoroClientWorkflow\.mount\(root,options\)/);
 });

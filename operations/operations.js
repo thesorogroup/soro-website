@@ -112,9 +112,46 @@ function createAvailableTalentApprovalAdapter(viewerRole){
   return Object.freeze({kind:'approval',loader,submitter});
 }
 function adminPreviewingNonAdminWorkspace(){return actualAuthenticatedRole()==='admin'&&currentAuthenticatedRole()!=='admin'}
+function salesTrackerPreviewWorkspace(){
+  return {generatedAt:new Date().toISOString(),viewerRole:'sales',rows:[{
+    clientId:lifecyclePreviewIds.client,clientName:'Brightlane Medical',requestId:lifecyclePreviewIds.request,
+    roleTitle:'Medical Virtual Assistant',ownerId:lifecyclePreviewIds.salesOwner,ownerName:'Morgan Lee',
+    status:'shortlisting',stage:'matching',candidateCount:1,interviewCount:0,placementCount:0,seatCount:1,activePlacementCount:0,onboardingCount:0,
+    targetStartDate:'2026-09-15',lastActivityAt:'2026-09-01T15:30:00.000Z',nextInterviewAt:null,
+    attentionCode:null,nextAction:'review_shortlist',responsibleRole:'sales'
+  }]};
+}
+function openSalesTrackerAction(row){
+  if(!row||!['sales','sales_management'].includes(currentAuthenticatedRole()))return;
+  if(row.nextAction==='client_setup'){openSalesTrackerClient(row);return}
+  const action=({find_candidates:'find_talent',review_shortlist:'shortlist',manage_interviews:'interview',
+    review_selection:'selection',prepare_handoff:'placement',view_onboarding:'onboarding',view_placement:'placement'})[row.nextAction];
+  if(action)window.dispatchEvent(new CustomEvent('soro:client-workflow-action',{detail:{action,requestId:row.requestId}}));
+}
+function openSalesTrackerClient(row){
+  if(!['sales','sales_management'].includes(currentAuthenticatedRole())||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(row?.clientId||'')))return;
+  current='clients';selectedClientId=row.clientId;selectedTalentId=null;
+  history.pushState({clientHubId:row.clientId},'',`${location.pathname}#clients`);setActive();render();
+}
+function mountSalesTracker(){
+  if(current!=='overview'||role!=='sales'||!['sales','sales_management'].includes(currentAuthenticatedRole()))return;
+  const target=root.querySelector('#sales-lifecycle-tracker'),tracker=window.SoroSalesLifecycleTracker;
+  if(!target||!tracker)return;
+  const options={role:currentAuthenticatedRole(),onAction:openSalesTrackerAction,onOpenClient:openSalesTrackerClient,preserveFilters:true};
+  if(adminPreviewingNonAdminWorkspace()){options.loader=async()=>salesTrackerPreviewWorkspace();options.preview=true}
+  tracker.mount(target,options);
+}
+function salesOverview(d){
+  const taskItems=d.items.length?list(d.items):`<p class="empty">${escapeHtml(d.emptyMessage||'No assigned tasks need attention.')}</p>`;
+  return `${adminPreviewingNonAdminWorkspace()?'<p class="eyebrow">Sales workspace preview · sample client data</p>':''}<div id="sales-lifecycle-tracker"></div><div class="sales-dashboard-support">${metricCard(d.metrics[0],0)}<section class="panel"><div class="panel-head"><h2 id="detail-title">${d.primary}</h2><button class="text-button" id="view-all">View all tasks</button></div><div id="detail-list">${taskItems}</div></section></div>`;
+}
 function clientWorkflowMountOptions(accessRole){
   const options={role:accessRole};
-  if(adminPreviewingNonAdminWorkspace())options.adapter=window.SoroClientWorkflow.createApprovalAdapter(window.SoroClientWorkflow.defaultSeed?.(accessRole));
+  if(adminPreviewingNonAdminWorkspace()){
+    const seed=window.SoroClientWorkflow.defaultSeed?.(accessRole)||[];
+    if(seed[0])seed[0]={...seed[0],id:lifecyclePreviewIds.client};
+    options.adapter=window.SoroClientWorkflow.createApprovalAdapter(seed);
+  }
   return options;
 }
 function clientShortlistMountOptions(accessRole,mode,requestId=''){
@@ -269,6 +306,7 @@ function talentDirectory(){const query=talentSearch.trim().toLowerCase();const a
 function table(d){const body=d.rows.length?d.rows.map(r=>`<tr>${r.map((x,i)=>`<td>${i===1&&current==='clients'?`<span class="tag">${escapeHtml(x)}</span>`:escapeHtml(x)}</td>`).join('')}</tr>`).join(''):`<tr><td class="empty" colspan="${d.table.length}">No authorized records are available yet.</td></tr>`;return `<div class="panel table-wrap"><table class="data-table"><thead><tr>${d.table.map(x=>`<th>${escapeHtml(x)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`}function overview(d){const clientPortal=authenticatedClientRoles.has(currentAuthenticatedRole()),primaryContent=d.items.length?list(d.items):`<p class="empty">${escapeHtml(d.emptyMessage||'No authorized records are available yet.')}</p>`,secondaryContent=d.secondaryMessage?`<p class="empty">${escapeHtml(d.secondaryMessage)}</p>`:`${chart()}<p class="eyebrow" style="margin-top:28px">Active placements this week</p>`;return `<div class="card-grid">${d.metrics.map(metricCard).join('')}</div><div class="dashboard-grid"><section class="panel"><div class="panel-head"><h2 id="detail-title">${d.primary}</h2>${clientPortal?'':'<button class="text-button" id="view-all">View all</button>'}</div><div id="detail-list">${primaryContent}</div></section><section class="panel"><div class="panel-head"><h2>${d.secondary}</h2>${d.secondaryMessage?'':'<button class="text-button">Open report</button>'}</div>${secondaryContent}</section></div>`}
 function profilePage(a){if(!a)return `<main class="page"><button class="text-button back-to-directory">← Back to Talent Directory</button><section class="panel profile-missing"><h1>Talent profile not found</h1><p>This profile may have been removed or you may no longer have access.</p></section></main>`;const contact=[a.email,a.phone].filter(Boolean).join(' · ')||'Contact information not recorded';return `<main class="page talent-profile-page"><button class="text-button back-to-directory">← Back to Talent Directory</button><section class="talent-profile-hero"><div class="headshot-wrap"><div class="talent-headshot" id="talent-headshot"><span>${escapeHtml(initials(a.full_name))}</span></div><label class="button headshot-upload">Upload headshot<input type="file" id="headshot-input" accept="image/jpeg,image/png,image/webp" hidden /></label><small>JPG, PNG, or WebP · up to 5 MB</small></div><div class="profile-identity"><p class="eyebrow">Talent profile</p><h1>${escapeHtml(a.full_name)}</h1><p>${escapeHtml(contact)}</p><div class="profile-tags"><span class="tag">${escapeHtml(titleCase(a.status))}</span><span class="tag neutral">${escapeHtml(titleCase(a.work_status))}</span></div></div><div class="profile-actions"><button class="button" id="profile-add-task">+ Add task</button></div></section><section class="profile-stat-grid"><article><p>Location & time zone</p><strong>${escapeHtml(formatTalentLocationTimeZone(a.location,recordedTalentTimeZone(a)))}</strong></article><article><p>Availability</p><strong>${escapeHtml(a.availability_note||a.dedicated_workspace||'Availability to review')}</strong></article><article><p>Application received</p><strong>${a.application_received_at?escapeHtml(new Date(a.application_received_at).toLocaleDateString()):'Not recorded'}</strong></article><article><p>Profile owner</p><strong>${a.talent_review_owner_id?'Assigned':'Unassigned'}</strong></article></section><div class="profile-layout"><section class="panel profile-section"><div class="panel-head"><div><p class="eyebrow">At a glance</p><h2>Profile details</h2></div></div><dl class="profile-details"><div><dt>Work status</dt><dd>${escapeHtml(titleCase(a.work_status))}</dd></div><div><dt>Expected rate</dt><dd>${escapeHtml(a.expected_hourly_rate_text||a.expected_hourly_rate||'Not recorded')}</dd></div><div><dt>English</dt><dd>${escapeHtml(a.english_proficiency||'Not recorded')}</dd></div><div><dt>Equipment</dt><dd>${escapeHtml(a.equipment_summary||'Not recorded')}</dd></div><div><dt>Internet</dt><dd>${escapeHtml(a.internet_summary||'Not recorded')}</dd></div><div><dt>Dream / goal</dt><dd>${escapeHtml(a.greatest_dream||'To be discussed in the Talent interview')}</dd></div></dl></section><section class="panel profile-section profile-documents-section"><div class="panel-head"><div><p class="eyebrow">Private files</p><h2>Documents & assessments</h2></div><span class="tag">Secure</span></div><div id="profile-documents"><p class="eyebrow">Loading documents…</p></div></section></div></main>`}
 function render(){
+  window.SoroSalesLifecycleTracker?.unmount?.({clear:false});
   if(!viewAllowedForAuthenticatedRole(current)){
     const allowed=authenticatedEmployeeViews[currentAuthenticatedRole()];
     if(!allowed?.has('overview')){root.replaceChildren();return}
@@ -401,7 +439,9 @@ function render(){
   }
   if(current==='clients'&&window.SoroClientWorkflow?.canOpenForRole?.(currentAuthenticatedRole())){
     const accessRole=currentAuthenticatedRole();
-    window.SoroClientWorkflow.mount(root,clientWorkflowMountOptions(accessRole));
+    const options=clientWorkflowMountOptions(accessRole);
+    if(selectedClientId||history.state?.clientHubId)options.clientId=selectedClientId||history.state.clientHubId;
+    window.SoroClientWorkflow.mount(root,options);
     setActive();
     return;
   }
@@ -457,13 +497,14 @@ function render(){
     : '';
   const canCreateClient=['admin','sales','sales_management'].includes(currentAuthenticatedRole());
   const showNewRecord=current==='overview'||(current==='clients'&&canCreateClient);
-  const standardHeadingActions=`${managementTimeOffAction}<button class="button primary" id="add-task">${primaryAction}</button>${showNewRecord?`<button class="button" id="new-record">+ ${newAction}</button>`:''}${importAction}<button class="button">Customize</button>`;
+  const standardHeadingActions=`${managementTimeOffAction}<button class="button primary" id="add-task">${primaryAction}</button>${showNewRecord?`<button class="button" id="new-record">+ ${newAction}</button>`:''}${importAction}${role==='sales'?'':'<button class="button">Customize</button>'}`;
   const talentPortalActions=`${talentWorkdayAction}${talentTimeOffAction}`;
   const headingActions=clientPortal||role==='va'
     ? (talentPortalActions?`<div class="heading-actions">${talentPortalActions}</div>`:'')
     : `<div class="heading-actions">${standardHeadingActions}</div>`;
-  root.innerHTML=`<main class="page"><div class="page-heading"><div><p class="eyebrow">${clientPortal?'Client Portal':'Soro Operations'}</p><h1>${d.title}</h1><p class="eyebrow" style="margin-top:9px">${d.caption}</p></div>${headingActions}</div>${current==='overview'?overview(d):current==='vas'?talentDirectory():table(d)}</main>`;
+  root.innerHTML=`<main class="page"><div class="page-heading"><div><p class="eyebrow">${clientPortal?'Client Portal':'Soro Operations'}</p><h1>${d.title}</h1><p class="eyebrow" style="margin-top:9px">${d.caption}</p></div>${headingActions}</div>${current==='overview'?(role==='sales'?salesOverview(d):overview(d)):current==='vas'?talentDirectory():table(d)}</main>`;
   bindView();
+  if(current==='overview'&&role==='sales')mountSalesTracker();
 }
 function bindView(){window.soroTalentWorkday?.bindDashboardAction(root);window.soroActiveTalentToday?.bindDashboardMetric(root,{currentView:current,actualRole:actualAuthenticatedRole()});window.soroTalentReviewQueue?.bindDashboardMetric?.(root,{currentView:current,actualRole:actualAuthenticatedRole()});window.soroTaskCenter?.bindDashboardMetric?.(root,current);window.soroTalentTimeOff?.bindDashboardActions(root,{currentView:current,actualRole:actualAuthenticatedRole()});document.getElementById('add-task')?.addEventListener('click',()=>{if(role==='client')toast('Your hiring request form is the next portal step.');else document.getElementById('task-dialog').showModal()});document.getElementById('new-record')?.addEventListener('click',()=>{if(window.SoroClientWorkflow?.canEditForRole?.(currentAuthenticatedRole())){const options=clientWorkflowMountOptions(currentAuthenticatedRole());options.start='create';current='clients';selectedClientId=null;selectedTalentId=null;history.pushState({},'',`${location.pathname}#clients`);setActive();window.SoroClientWorkflow.mount(root,options);return}toast(`${role==='talent'?'New Talent':role==='client'?'Request another Talent':'New Client'} form is the next build step.`)});document.getElementById('import-drive')?.addEventListener('click',importDriveFiles);document.getElementById('talent-search')?.addEventListener('input',e=>{talentSearch=e.target.value;render();document.getElementById('talent-search')?.focus()});document.getElementById('talent-status-filter')?.addEventListener('change',e=>{talentStatus=e.target.value;render()});document.querySelectorAll('.talent-row').forEach(row=>{const open=()=>openTalentProfile(row.dataset.talentId);row.addEventListener('click',open);row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}})});document.querySelectorAll('.back-to-directory').forEach(b=>b.addEventListener('click',goToTalentDirectory));document.getElementById('profile-add-task')?.addEventListener('click',()=>{const related=document.getElementById('task-related');if(related)related.value=currentTalentProfileApplicant()?.full_name||'';document.getElementById('task-dialog').showModal()});document.getElementById('headshot-input')?.addEventListener('change',e=>uploadHeadshot(e.target.files?.[0]));document.querySelectorAll('[data-metric]').forEach(el=>el.addEventListener('click',()=>{const dashboard=viewDataForAuthenticatedRole('overview',role==='admin'?data.overview:roleDashboards[role]),m=dashboard.metrics[+el.dataset.metric];document.getElementById('detail-title').textContent=m[0];document.getElementById('detail-list').innerHTML=authenticatedClientRoles.has(currentAuthenticatedRole())?`<p class="empty">${escapeHtml(m[2])}</p>`:list([['red',m[2],'Open the detailed queue to continue','Action needed'],['','View recent activity','All related changes are logged','History']])}));document.getElementById('view-all')?.addEventListener('click',()=>{current='tasks';setActive();render()})}
 function setActive(){

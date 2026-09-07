@@ -191,7 +191,7 @@ Stage history must retain the previous stage, new stage, actor, date, reason, an
 
 ## Client creation through active placement
 
-Implementation status (September 1, 2026): the connected workflow is built locally and awaiting approval before its database migrations and application release are deployed.
+Implementation status (September 7, 2026): the connected Client workflow was deployed in release `3b6758d`, including migrations 036–039. The Sales lifecycle tracker below is approved for production release; migration 040 has been applied and its read-only execution and service-only access verified against the production database.
 
 Use one Client record and one hiring-request identifier from intake through placement so employees never have to reselect or re-enter the Client and role at each step:
 
@@ -202,7 +202,9 @@ Use one Client record and one hiring-request identifier from intake through plac
 5. Sales schedules requested interviews through the shared Microsoft 365 interview calendar, records outcomes, and prepares the selected candidate's placement terms.
 6. Administrators or Talent Management confirm the placement, complete the required onboarding checklist, and activate the placement on or after the start date.
 
-Future refinement: retain the approved lifecycle demo as the design reference for a lighter Sales tracker. The tracker should summarize each owned Client request's current stage, responsible person, blockers, and next action in one compact view, then link into the existing role-specific workflow rather than duplicate its forms or permissions.
+Sales tracker approved release (September 7, 2026): retain the original lifecycle demo unchanged and local. The Sales dashboard now has a compact implementation showing each owned hiring request's stage, candidate/interview progress, Sales owner, responsible team, last activity, target start, recorded attention flag, and one next-action button. Stage counts, search, stage and attention filters, and Sales Management owner filtering reuse the existing Client Hub, shortlist, interview, placement, and onboarding workflows. No new forms or mutation permissions are introduced.
+
+The tracker reads one service-only aggregate RPC through an authenticated Netlify endpoint. Sales is restricted to owned Clients; Administrators and Sales Management use organization-wide scope. Billing-only Client access does not count as candidate-review access. Interview-outcome reminders use recorded interview end times, and passed target-start dates use the Central Time calendar date. No inactivity deadline is invented. Production verification of migration 040 confirmed successful execution and denied direct anonymous/authenticated RPC access while allowing service-role access. The private review page `work/sales-lifecycle-tracker-approval/index.html` uses labeled sample data and no live writes, and is excluded from deployment.
 
 Access boundaries:
 
