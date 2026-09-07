@@ -15,6 +15,7 @@ const MAX_SHORTLISTS = 500;
 const MAX_ITEMS_PER_SHORTLIST = 500;
 const MAX_NOTIFICATIONS = 200;
 const MAX_SKILLS = 250;
+const SAFE_HTTP_ERROR = Symbol('safeHttpError');
 
 const INTERNAL_ROLES = new Set(['admin', 'sales_management', 'sales']);
 const CLIENT_REVIEW_ROLES = new Set(['client_admin', 'client_reviewer']);
@@ -25,7 +26,8 @@ const ACTIONS = new Set([
   'send_shortlist',
   'respond_candidate'
 ]);
-const RESPONSES = new Set(['request_interview', 'interested', 'not_a_fit']);
+const RESPONSES = new Set(['request_interview', 'interested']);
+const STORED_RESPONSES = new Set([...RESPONSES, 'not_a_fit']);
 const SHORTLIST_STATUSES = new Set(['draft', 'sent']);
 const OPEN_REQUEST_STATUSES = new Set([
   'discovery',
@@ -82,6 +84,7 @@ function httpError(status, code, message) {
   const error = new Error(message);
   error.status = status;
   error.code = code;
+  error[SAFE_HTTP_ERROR] = true;
   return error;
 }
 
@@ -186,7 +189,7 @@ function inputActionBody(body) {
     input.shortlistItemId = inputUuid(body.shortlistItemId, 'shortlist candidate');
     input.response = String(body.response || '').trim().toLowerCase();
     if (!RESPONSES.has(input.response)) {
-      throw httpError(400, 'invalid_response', 'Choose Request interview, Interested, or Not a fit.');
+      throw httpError(400, 'invalid_response', 'Choose Request interview or Interested. Final pass decisions are recorded by a Client Administrator.');
     }
   }
   return input;
@@ -435,7 +438,7 @@ function publicShortlistItem(value, viewerRole, shortlistStatus) {
   const response = value.response === null || value.response === undefined
     ? null
     : requiredText(value.response, 40);
-  if (response !== null && !RESPONSES.has(response)) {
+  if (response !== null && !STORED_RESPONSES.has(response)) {
     throw httpError(502, 'shortlist_service_error', 'Client shortlists returned an invalid response.');
   }
   const canRemove = requiredBoolean(value.canRemove);
@@ -621,20 +624,25 @@ async function handler(event) {
   try {
     return method === 'GET' ? await getWorkspace(event) : await changeWorkspace(event);
   } catch (error) {
-    console.error('Client shortlist operation failed.', {
-      method,
-      status: error.status,
-      code: error.code,
-      message: error.message
-    });
-    const status = Number.isInteger(error.status) && error.status >= 400 && error.status < 600
+    const status = Number.isInteger(error?.status) && error.status >= 400 && error.status < 600
       ? error.status
       : 500;
+    const normalizedCode = String(error?.code || '').trim().toLowerCase();
+    const hasSafeCode = error?.[SAFE_HTTP_ERROR] === true
+      && /^[a-z][a-z0-9_]{2,64}$/.test(normalizedCode);
+    const code = hasSafeCode ? normalizedCode : 'shortlist_service_error';
+    console.error('Client shortlist operation failed.', {
+      method,
+      status,
+      code
+    });
     return json(status, {
-      code: error.code || 'shortlist_service_error',
-      message: status >= 500 && error.code !== 'service_unavailable'
-        ? 'Client shortlists are temporarily unavailable. Please try again.'
-        : error.message
+      code,
+      message: hasSafeCode && (status < 500 || code === 'service_unavailable')
+        ? error.message
+        : status >= 500
+          ? 'Client shortlists are temporarily unavailable. Please try again.'
+          : 'The Client shortlist request could not be completed. Please try again.'
     });
   }
 }

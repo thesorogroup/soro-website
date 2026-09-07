@@ -11,7 +11,8 @@
   const SALES_ROLES = new Set(['admin', 'sales_management', 'sales']);
   const CLIENT_ROLES = new Set(['client_admin', 'client_reviewer']);
   const AUTHORIZED_ROLES = new Set([...SALES_ROLES, ...CLIENT_ROLES]);
-  const RESPONSE_VALUES = new Set(['request_interview', 'interested', 'not_a_fit']);
+  const RESPONSE_VALUES = new Set(['request_interview', 'interested']);
+  const STORED_RESPONSE_VALUES = new Set([...RESPONSE_VALUES, 'not_a_fit']);
   const SUBMITTED_STATUSES = new Set(['client_review', 'submitted', 'sent']);
   const OPEN_REQUEST_STATUSES = new Set(['discovery', 'qualified', 'open', 'active', 'recruiting', 'ready_for_matching', 'matching', 'shortlisting']);
   const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -110,6 +111,11 @@
     return RESPONSE_VALUES.has(response) ? response : '';
   }
 
+  function normalizeStoredResponse(value) {
+    const response = text(typeof value === 'object' ? value?.value || value?.response : value, 40).toLowerCase();
+    return STORED_RESPONSE_VALUES.has(response) ? response : '';
+  }
+
   function normalizeCandidate(source) {
     if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
     const profile = source.candidate || source.talent || source.applicant || source.profile || source;
@@ -117,7 +123,7 @@
     const applicantId = validUuid(source.applicantId || source.applicant_id || profile.applicantId || profile.id);
     const fullName = text(profile.fullName || profile.full_name || profile.displayName || profile.display_name || profile.name, 160);
     if (!applicantId || !fullName) return null;
-    const response = normalizeResponse(source.response || source.clientResponse || source.client_response || source.decision);
+    const response = normalizeStoredResponse(source.response || source.clientResponse || source.client_response || source.decision);
     const responseAt = validTimestamp(source.responseAt || source.respondedAt || source.responded_at, { optional: true });
     const screeningSource = profile.screening && typeof profile.screening === 'object' && !Array.isArray(profile.screening) ? profile.screening : {};
     const visibleValue = source.visibleToClient ?? source.visible_to_client ?? source.clientVisible;
@@ -385,7 +391,7 @@
       : candidate.canRespond
         ? '<p class="shortlist-client-decision"><strong>What would you like to do?</strong><span>Your Soro team will follow up on your choice.</span></p>'
         : '<p class="shortlist-client-decision"><strong>Response unavailable</strong><span>Contact your Soro team if you need help with this candidate review.</span></p>';
-    const actions = !current && candidate.canRespond ? `<div class="shortlist-decision-actions" role="group" aria-label="Response for ${escapeHtml(candidate.fullName)}"><button type="button" class="button" aria-pressed="false" data-shortlist-response="request_interview" data-shortlist-item-id="${candidate.shortlistItemId}"${pendingAction === candidate.shortlistItemId ? ' disabled' : ''}>Request interview</button><button type="button" class="button" aria-pressed="false" data-shortlist-response="interested" data-shortlist-item-id="${candidate.shortlistItemId}"${pendingAction === candidate.shortlistItemId ? ' disabled' : ''}>Interested</button><button type="button" class="button shortlist-not-fit" aria-pressed="false" data-shortlist-response="not_a_fit" data-shortlist-item-id="${candidate.shortlistItemId}"${pendingAction === candidate.shortlistItemId ? ' disabled' : ''}>Not a fit</button></div>` : '';
+    const actions = !current && candidate.canRespond ? `<div class="shortlist-decision-actions" role="group" aria-label="Response for ${escapeHtml(candidate.fullName)}"><button type="button" class="button" aria-pressed="false" data-shortlist-response="request_interview" data-shortlist-item-id="${candidate.shortlistItemId}"${pendingAction === candidate.shortlistItemId ? ' disabled' : ''}>Request interview</button><button type="button" class="button" aria-pressed="false" data-shortlist-response="interested" data-shortlist-item-id="${candidate.shortlistItemId}"${pendingAction === candidate.shortlistItemId ? ' disabled' : ''}>Interested</button></div>` : '';
     return `<article class="shortlist-client-candidate" data-shortlist-item-id="${candidate.shortlistItemId}">
       <header><span class="shortlist-avatar" aria-hidden="true">${escapeHtml(initials(candidate.fullName))}</span><div><p class="eyebrow">Candidate for your review</p><h2>${escapeHtml(candidate.fullName)}</h2></div></header>
       <div class="shortlist-client-profile-grid"><section><small>Country &amp; time zone</small><strong>${escapeHtml(safeLocation(candidate))}</strong></section><section><small>Relevant experience</small><strong>${escapeHtml(candidate.experienceYears ? `${candidate.experienceYears} years` : 'Summary reviewed by Soro')}</strong></section><section><small>Education &amp; training</small><strong>${escapeHtml(candidate.educationAndTraining || 'Not recorded')}</strong></section></div>
@@ -437,15 +443,21 @@
       ${feedbackMarkup()}
       ${clientMode ? `<section class="shortlist-client-intro"><strong>${items.length} candidate${items.length === 1 ? '' : 's'} selected for you</strong><span>${responses}/${items.length} response${items.length === 1 ? '' : 's'} completed</span></section>` : ''}
       <section class="shortlist-candidate-list" aria-label="${clientMode ? 'Submitted candidates' : 'Shortlist candidates'}">${items.length ? items.map(candidate => clientMode ? clientCandidateMarkup(candidate) : salesCandidateMarkup(candidate, request)).join('') : (clientMode ? emptyClientMarkup() : emptyDraftMarkup())}</section>
-      ${!clientMode ? salesSendBarMarkup(request) : ''}
+      ${!clientMode ? salesSendBarMarkup(request) : clientContinueBarMarkup(request)}
       ${sendConfirmationId === request.id ? sendDialogMarkup(request) : ''}
     </main>`;
   }
 
   function salesSendBarMarkup(request) {
     const count = request.shortlist.items.length;
-    if (request.shortlist.status === 'client_review') return `<section class="shortlist-send-bar shortlist-send-bar--sent"><div><strong>Sent for client review</strong><span>Client responses appear on each candidate as they arrive.</span></div><span>${request.shortlist.items.filter(item => item.response).length}/${count} responded</span></section>`;
+    if (request.shortlist.status === 'client_review') return `<section class="shortlist-send-bar shortlist-send-bar--sent"><div><strong>Sent for client review</strong><span>Client responses appear on each candidate as they arrive.</span></div><div><span>${request.shortlist.items.filter(item => item.response).length}/${count} responded</span><button type="button" class="button" data-shortlist-placement="${request.id}">Interviews &amp; selection →</button></div></section>`;
     return `<section class="shortlist-send-bar"><div><strong>Ready to share this shortlist?</strong><span>Soro will send ${count} client-safe candidate profile${count === 1 ? '' : 's'} to ${escapeHtml(request.clientName)}.</span></div><button type="button" class="button primary" data-shortlist-send="${request.id}"${!count || !request.shortlist.id || !request.shortlist.updatedAt || !request.shortlist.canSend || pendingAction ? ' disabled' : ''}>Send for Client Review</button></section>`;
+  }
+
+  function clientContinueBarMarkup(request) {
+    const responded = request.shortlist.items.filter(item => item.response).length;
+    if (!responded) return '';
+    return `<section class="shortlist-send-bar shortlist-send-bar--sent"><div><strong>Continue this hiring decision</strong><span>View interview times and make the final selection when the requested interviews are complete.</span></div><button type="button" class="button primary" data-shortlist-placement="${request.id}">Interviews &amp; selection →</button></section>`;
   }
 
   function sendDialogMarkup(request) {
@@ -667,10 +679,12 @@
     entry.lastUsedAt = Date.now();
   }
 
-  async function executeMutation(body, { role = viewerRole, targetMode = mode, apply = null } = {}) {
+  async function executeMutation(body, { role = viewerRole, targetMode = mode, apply = null, submitter = null } = {}) {
     const attempt = prepareMutationAttempt(body);
     try {
-      const result = await invokeSubmitter({ ...body, requestId: attempt.requestId }, role, targetMode);
+      const result = typeof submitter === 'function'
+        ? await submitter({ ...body, requestId: attempt.requestId }, { role, mode: targetMode })
+        : await invokeSubmitter({ ...body, requestId: attempt.requestId }, role, targetMode);
       if (attempt.owner !== mutationRetryOwner) throw new Error('Your Soro account changed before this shortlist action finished. Review the current workspace and try again.');
       const applied = typeof apply === 'function' ? await apply(result) : result;
       settleMutationAttempt(attempt);
@@ -872,12 +886,21 @@
     return true;
   }
 
+  function openPlacementWorkflow(requestId) {
+    const id = validUuid(requestId);
+    if (!id || typeof root?.CustomEvent !== 'function') return false;
+    root.dispatchEvent(new root.CustomEvent('soro:client-placement-open', { detail: { requestId: id } }));
+    return true;
+  }
+
   function handleClick(event) {
     const open = event.target.closest?.('[data-shortlist-open]');
     if (open) { openRequest(open.dataset.shortlistOpen); return; }
     if (event.target.closest?.('[data-shortlist-back]')) { closeRequest(); return; }
     if (event.target.closest?.('[data-shortlist-retry]')) { refresh(); return; }
     if (event.target.closest?.('[data-shortlist-bench]')) { openAvailableTalent(); return; }
+    const placement = event.target.closest?.('[data-shortlist-placement]');
+    if (placement) { openPlacementWorkflow(placement.dataset.shortlistPlacement); return; }
     if (event.target.closest?.('[data-shortlist-dialog-close]')) { closeSendConfirmation(); return; }
     const send = event.target.closest?.('[data-shortlist-send]');
     if (send && !send.disabled) { openSendConfirmation(send.dataset.shortlistSend); return; }
@@ -929,6 +952,7 @@
     requestVersion += 1;
     activeController?.abort?.();
     activeController = null;
+    closeOverlay();
     if (mountedRoot) {
       mountedRoot.removeEventListener?.('click', handleClick);
       mountedRoot.removeEventListener?.('submit', handleSubmit);
@@ -966,7 +990,8 @@
     if (overlay.phase === 'error') return `<dialog class="shortlist-dialog shortlist-add-dialog" data-shortlist-add-dialog><div class="shortlist-overlay-state" role="alert"><button type="button" class="shortlist-dialog-x" data-shortlist-overlay-close aria-label="Close">×</button><strong>Hiring requests unavailable</strong><p>${escapeHtml(overlay.message)}</p><button type="button" class="button" data-shortlist-overlay-retry>Try again</button></div></dialog>`;
     if (overlay.phase === 'success') return `<dialog class="shortlist-dialog shortlist-add-dialog" data-shortlist-add-dialog><div class="shortlist-overlay-state shortlist-overlay-success" role="status"><span aria-hidden="true">✓</span><strong>Added to shortlist</strong><p>${escapeHtml(talent.fullName)} is now on the draft shortlist for <strong>${escapeHtml(overlay.request.clientName)} · ${escapeHtml(overlay.request.roleTitle)}</strong>.</p><footer><button type="button" class="button" data-shortlist-overlay-close>Keep browsing Talent</button><button type="button" class="button primary" data-shortlist-overlay-review="${overlay.request.id}">Review Shortlist</button></footer></div></dialog>`;
     const requests = eligibleAddRequests(talent, overlay.workspace);
-    return `<dialog class="shortlist-dialog shortlist-add-dialog" data-shortlist-add-dialog><form method="dialog" data-shortlist-add-form><header><div><p class="eyebrow">Client shortlist</p><h2>Add to Client Shortlist</h2></div><button type="button" data-shortlist-overlay-close aria-label="Close">×</button></header><p>Choose the specific open hiring request for <strong>${escapeHtml(talent.fullName)}</strong>.</p>${requests.length ? `<fieldset><legend>Open hiring requests</legend>${requests.map((request, index) => `<label class="shortlist-request-option"><input type="radio" name="hiringRequestId" value="${request.id}"${index === 0 ? ' checked' : ''}><span><strong>${escapeHtml(request.clientName)}</strong><b>${escapeHtml(request.roleTitle)}</b><small>${escapeHtml([request.workArea, request.schedule].filter(Boolean).join(' · ') || 'Open hiring request')} · ${request.shortlist.items.length} selected</small></span></label>`).join('')}</fieldset>` : `<div class="shortlist-overlay-empty"><strong>No eligible hiring requests</strong><p>This Talent is already selected for every open draft request you own, or no request is ready for matching.</p></div>`}<p class="shortlist-dialog-message${overlay.message ? ' is-error' : ''}" aria-live="polite">${escapeHtml(overlay.message)}</p><footer><button type="button" class="button" data-shortlist-overlay-close>Cancel</button><button type="submit" class="button primary"${!requests.length || overlay.pending ? ' disabled' : ''}>${overlay.pending ? 'Adding…' : 'Add to Shortlist'}</button></footer></form></dialog>`;
+    const preferredRequestId = requests.some(request => request.id === overlay.preferredRequestId) ? overlay.preferredRequestId : requests[0]?.id || '';
+    return `<dialog class="shortlist-dialog shortlist-add-dialog" data-shortlist-add-dialog><form method="dialog" data-shortlist-add-form><header><div><p class="eyebrow">Client shortlist</p><h2>Add to Client Shortlist</h2></div><button type="button" data-shortlist-overlay-close aria-label="Close">×</button></header><p>Choose the specific open hiring request for <strong>${escapeHtml(talent.fullName)}</strong>.</p>${requests.length ? `<fieldset><legend>Open hiring requests</legend>${requests.map(request => `<label class="shortlist-request-option"><input type="radio" name="hiringRequestId" value="${request.id}"${request.id === preferredRequestId ? ' checked' : ''}><span><strong>${escapeHtml(request.clientName)}</strong><b>${escapeHtml(request.roleTitle)}</b><small>${escapeHtml([request.workArea, request.schedule].filter(Boolean).join(' · ') || 'Open hiring request')} · ${request.shortlist.items.length} selected</small></span></label>`).join('')}</fieldset>` : `<div class="shortlist-overlay-empty"><strong>No eligible hiring requests</strong><p>This Talent is already selected for every open draft request you own, or no request is ready for matching.</p></div>`}<p class="shortlist-dialog-message${overlay.message ? ' is-error' : ''}" aria-live="polite">${escapeHtml(overlay.message)}</p><footer><button type="button" class="button" data-shortlist-overlay-close>Cancel</button><button type="submit" class="button primary"${!requests.length || overlay.pending ? ' disabled' : ''}>${overlay.pending ? 'Adding…' : 'Add to Shortlist'}</button></footer></form></dialog>`;
   }
 
   function renderOverlay() {
@@ -996,7 +1021,10 @@
     const context = overlay;
     if (!context) return false;
     try {
-      const result = await invokeLoader(context.role, 'sales');
+      if (context.usesLocalTransport && typeof context.loader !== 'function') throw new Error('This local approval preview could not load safely.');
+      const result = typeof context.loader === 'function'
+        ? await context.loader({ role: context.role, mode: 'sales' })
+        : await invokeLoader(context.role, 'sales');
       if (overlay !== context) return false;
       const nextWorkspace = normalizePayload(result?.workspace || result, context.role, 'sales');
       overlay = { ...context, phase: 'ready', workspace: nextWorkspace, message: '', pending: false };
@@ -1017,9 +1045,14 @@
     if (!talent || !SALES_ROLES.has(role) || !root?.document?.body) return false;
     syncMutationRetryOwner();
     overlayReturnFocus = options.returnFocus || root.document.activeElement;
-    if (typeof options.loader === 'function') configuredLoader = options.loader;
-    if (typeof options.submitter === 'function') configuredSubmitter = options.submitter;
-    overlay = { talent, role, owner: mutationRetryOwner, phase: 'loading', message: '', pending: false, workspace: emptyWorkspace(role), request: null };
+    overlay = {
+      talent, role, owner: mutationRetryOwner, phase: 'loading', message: '', pending: false,
+      workspace: emptyWorkspace(role), request: null,
+      preferredRequestId: validUuid(options.preferredRequestId || options.requestId, { optional: true }),
+      loader: typeof options.loader === 'function' ? options.loader : null,
+      submitter: typeof options.submitter === 'function' ? options.submitter : null,
+      usesLocalTransport: typeof options.loader === 'function' || typeof options.submitter === 'function'
+    };
     renderOverlay();
     loadOverlayWorkspace();
     return true;
@@ -1033,17 +1066,21 @@
     overlay = { ...context, pending: true, message: '' };
     renderOverlay();
     try {
+      if (context.usesLocalTransport && typeof context.submitter !== 'function') throw new Error('This local approval preview does not allow that action.');
       const ownedTalent = context.workspace.candidates.find(candidate => candidate.applicantId === context.talent.applicantId);
       if (!ownedTalent?.updatedAt) throw new Error('This Talent profile changed or is no longer in your Sales caseload. Refresh Available Talent and try again.');
       await executeMutation({ action: 'add_candidate', expectedUpdatedAt: ownedTalent.updatedAt, hiringRequestId: request.id, applicantId: context.talent.applicantId }, {
         role: context.role,
         targetMode: 'sales',
+        submitter: context.submitter,
         apply: async result => {
           if (!overlay || context.owner !== mutationRetryOwner) throw new Error('Your Soro account changed before this shortlist action finished.');
           let nextWorkspace = context.workspace;
           if (result?.workspace || result?.requests || result?.hiringRequests || result?.hiring_requests) nextWorkspace = normalizePayload(result?.workspace || result, context.role, 'sales');
           else {
-            const refreshed = await invokeLoader(context.role, 'sales');
+            const refreshed = typeof context.loader === 'function'
+              ? await context.loader({ role: context.role, mode: 'sales' })
+              : await invokeLoader(context.role, 'sales');
             nextWorkspace = normalizePayload(refreshed?.workspace || refreshed, context.role, 'sales');
           }
           workspace = nextWorkspace;
@@ -1092,7 +1129,7 @@
     const transportRole = normalizedRole(root?.soroCurrentAccess?.role) || role;
     const salesView = role === 'admin' || role === 'sales' || role === 'sales_management';
     scope.querySelectorAll('.shortlist-bench-add').forEach(button => {
-      if (!salesView) button.remove();
+      if (!salesView || button.closest?.('.bench-talent-card')?.querySelector?.('[data-bench-shortlist-add]')) button.remove();
     });
     if (!salesView) return false;
     scope.querySelectorAll('.bench-talent-card').forEach(card => {
@@ -1101,7 +1138,7 @@
       const owned = [...(actions?.querySelectorAll?.('.bench-owned-label') || [])].some(label => text(label.textContent, 60) === 'In my caseload')
         || (role === 'admin' && assignedOwner && assignedOwner !== 'Unassigned');
       const benchReady = text(card.dataset.benchStage, 40).toLowerCase() === 'bench_ready';
-      if (!actions || !owned || !benchReady || actions.querySelector('.shortlist-bench-add')) return;
+      if (!actions || !owned || !benchReady || actions.querySelector('.shortlist-bench-add,[data-bench-shortlist-add]')) return;
       const applicantId = validUuid(card.dataset.applicantId);
       const fullName = text(card.querySelector('.bench-profile-link')?.textContent, 160);
       if (!applicantId || !fullName) return;
@@ -1137,7 +1174,8 @@
   function handleAuthChanged(event) {
     const ownerChanged = syncMutationRetryOwner(event?.detail?.session ? event.detail.session?.user?.id : '');
     if (ownerChanged) closeOverlay();
-    const nextRole = normalizedRole(event?.detail?.access?.role);
+    const authenticatedRole = normalizedRole(event?.detail?.access?.role);
+    const nextRole = authenticatedRole === 'admin' ? effectiveRole() : authenticatedRole;
     if (!event?.detail?.session || !canOpenForRole(nextRole)) {
       if (mountedRoot) unmount();
       closeOverlay();

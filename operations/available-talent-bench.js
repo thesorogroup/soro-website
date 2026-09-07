@@ -23,8 +23,13 @@
   let requestVersion = 0;
   let assignmentContext = null;
   let limitContext = false;
+  let preferredHiringRequestId = '';
   let pendingApplicantId = '';
   let feedback = Object.freeze({ type: '', message: '' });
+  let activeLoader = null;
+  let activeSubmitter = null;
+  let shortlistLoader = null;
+  let shortlistSubmitter = null;
 
   function text(value, max = 200) {
     return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, max);
@@ -256,6 +261,13 @@
   }
 
   async function requestQueue({ body = null } = {}) {
+    const localTransport = body ? activeSubmitter : activeLoader;
+    const usesLocalTransport = typeof activeLoader === 'function' || typeof activeSubmitter === 'function';
+    if (usesLocalTransport) {
+      if (typeof localTransport !== 'function') throw new Error('This local approval preview does not allow that action.');
+      const payload = await localTransport(body, { role: effectiveRole() });
+      return normalizePayload(payload?.queue || payload, effectiveRole());
+    }
     const token = await sessionToken();
     const controller = typeof root?.AbortController === 'function' ? new root.AbortController() : null;
     abortRequest();
@@ -389,7 +401,7 @@
     const pending = pendingApplicantId === item.applicantId;
     if (VIEW_ONLY_ROLES.has(effectiveRole())) return '<span class="bench-owned-label">View only</span>';
     if (SALES_ROLES.has(effectiveRole())) {
-      if (item.owner.isCurrentUser || actionAllowed(item, 'release')) return `<span class="bench-owned-label">In my caseload</span>${actionAllowed(item, 'release') ? `<button type="button" class="text-button bench-release" data-bench-action="release" data-applicant-id="${item.applicantId}"${pending ? ' disabled' : ''}>Release</button>` : ''}`;
+      if (item.owner.isCurrentUser || actionAllowed(item, 'release')) return `<span class="bench-owned-label">In my caseload</span><button type="button" class="button bench-add-to-client" data-bench-shortlist-add="${item.applicantId}"${pending ? ' disabled' : ''}>Add to Client</button>${actionAllowed(item, 'release') ? `<button type="button" class="text-button bench-release" data-bench-action="release" data-applicant-id="${item.applicantId}"${pending ? ' disabled' : ''}>Release</button>` : ''}`;
       if (item.owner.id) return '<span class="bench-owned-label">Claimed</span>';
       return actionAllowed(item, 'claim')
         ? `<button type="button" class="button primary bench-claim" data-bench-action="claim" data-applicant-id="${item.applicantId}"${pending ? ' disabled' : ''}>${pending ? 'Claiming…' : 'Claim Talent'}</button>`
@@ -597,6 +609,20 @@
   function handleClick(event) {
     const profile = event.target.closest?.('[data-bench-profile]');
     if (profile) { openProfile(profile.dataset.benchProfile); return; }
+    const shortlistAdd = event.target.closest?.('[data-bench-shortlist-add]');
+    if (shortlistAdd && !shortlistAdd.disabled) {
+      const item = queue.items.find(candidate => candidate.applicantId === validUuid(shortlistAdd.dataset.benchShortlistAdd));
+      if (item?.owner?.isCurrentUser && root?.soroClientShortlistWorkflow?.openAddDialog) {
+        root.soroClientShortlistWorkflow.openAddDialog({ applicantId: item.applicantId, fullName: item.fullName, preferredName: item.preferredName }, {
+          role: effectiveRole(),
+          preferredRequestId: preferredHiringRequestId,
+          returnFocus: shortlistAdd,
+          loader: shortlistLoader,
+          submitter: shortlistSubmitter
+        });
+      }
+      return;
+    }
     if (event.target.closest?.('[data-bench-refresh]')) { refresh(); return; }
     if (event.target.closest?.('[data-bench-clear]')) { filters = emptyFilters(); render(); return; }
     if (event.target.closest?.('[data-bench-dialog-close]')) { closeAssignment(); return; }
@@ -658,7 +684,12 @@
     mountedRoot = null;
     assignmentContext = null;
     limitContext = false;
+    preferredHiringRequestId = '';
     pendingApplicantId = '';
+    activeLoader = null;
+    activeSubmitter = null;
+    shortlistLoader = null;
+    shortlistSubmitter = null;
     return true;
   }
 
@@ -668,6 +699,11 @@
     if (mountedRoot && mountedRoot !== target) unmount();
     mountedRoot = target;
     viewerRole = nextRole;
+    preferredHiringRequestId = validUuid(options.preferredRequestId || options.requestId, { optional: true });
+    activeLoader = typeof options.loader === 'function' ? options.loader : null;
+    activeSubmitter = typeof options.submitter === 'function' ? options.submitter : null;
+    shortlistLoader = typeof options.shortlistLoader === 'function' ? options.shortlistLoader : null;
+    shortlistSubmitter = typeof options.shortlistSubmitter === 'function' ? options.shortlistSubmitter : null;
     target.removeEventListener('click', handleClick);
     target.removeEventListener('input', handleInput);
     target.removeEventListener('change', handleChange);

@@ -13,6 +13,7 @@
   const canManageTalent = () => ['admin', 'talent_management'].includes(currentAccessRole())
     && ['admin', 'talent_management'].includes(effectiveAccessRole());
   const canManageClients = () => currentAccessRole() === 'admin' && effectiveAccessRole() === 'admin';
+  const canonicalClientWorkflowActive = () => Boolean(window.SoroClientWorkflow?.canOpenForRole?.(effectiveAccessRole()));
   const database = () => window.soroSupabase;
   const $ = (selector, parent = document) => parent.querySelector(selector);
   const escapeHtml = (value = '') => String(value).replace(/[&<>"]/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[char]));
@@ -541,6 +542,10 @@ Zimbabwe`.split('\n');
   }
 
   async function renderManagedClients() {
+    if (canonicalClientWorkflowActive()) {
+      $('#admin-managed-clients')?.remove();
+      return;
+    }
     if (current !== 'clients' || !canManageClients() || !database()) return;
     const page = $('.page'); if (!page || $('#admin-managed-clients', page)) return;
     const { data, error } = await database().from('clients').select('id,company_name,industry,lifecycle_stage,archived_at,client_contacts(id,full_name,email,phone,contact_role)').is('archived_at', null).order('created_at', { ascending: false }).limit(20);
@@ -586,7 +591,7 @@ Zimbabwe`.split('\n');
       const controls = document.createElement('span'); controls.className = 'admin-record-actions admin-directory-controls'; controls.innerHTML = '<button class="admin-record-button" data-new-talent>+ New Talent</button><button class="admin-record-button" data-archived-talent>Archived Talent</button>'; actions.prepend(controls);
       controls.addEventListener('click', event => { if (event.target.closest('[data-new-talent]')) editTalent(); if (event.target.closest('[data-archived-talent]')) showArchivedTalent(); });
     }
-    if (current === 'clients' && canManageClients()) {
+    if (current === 'clients' && canManageClients() && !canonicalClientWorkflowActive()) {
       const button = $('#new-record', actions);
       if (button && !button.dataset.adminClientControl) {
         button.dataset.adminClientControl = 'true';

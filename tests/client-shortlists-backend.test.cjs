@@ -149,8 +149,8 @@ test('POST actions require requestId and the expected record version', () => {
   }), /Only the fields/i);
 });
 
-test('Client responses accept only the three approved immutable decisions', () => {
-  for (const response of ['request_interview', 'interested', 'not_a_fit']) {
+test('Client shortlist responses stay nonfinal and accept only the two approved choices', () => {
+  for (const response of ['request_interview', 'interested']) {
     const input = shortlistService.inputActionBody({
       action: 'respond_candidate',
       requestId: IDS.requestOperation,
@@ -160,14 +160,14 @@ test('Client responses accept only the three approved immutable decisions', () =
     });
     assert.equal(input.response, response);
   }
-  for (const response of ['not_fit', 'approve', 'reject', 'maybe', 'hire']) {
+  for (const response of ['not_a_fit', 'not_fit', 'approve', 'reject', 'maybe', 'hire']) {
     assert.throws(() => shortlistService.inputActionBody({
       action: 'respond_candidate',
       requestId: IDS.requestOperation,
       expectedUpdatedAt: UPDATED_AT,
       shortlistItemId: IDS.item,
       response
-    }), /Request interview, Interested, or Not a fit/i);
+    }), /Request interview or Interested/i);
   }
 });
 
@@ -292,4 +292,44 @@ test('POST handler derives actor scope and passes only the exact RPC contract', 
     p_shortlist_item_id: null,
     p_response: null
   });
+});
+
+test('raw database errors are absent from shortlist responses and logs', async t => {
+  const originalFetch = global.fetch;
+  const originalConsoleError = console.error;
+  const rawMessage = 'P0001 private database detail: reviewer@example.test';
+  const logs = [];
+  global.fetch = async () => {
+    const error = new Error(rawMessage);
+    error.status = 409;
+    error.code = 'P0001';
+    throw error;
+  };
+  console.error = (...values) => { logs.push(values); };
+  t.after(() => {
+    global.fetch = originalFetch;
+    console.error = originalConsoleError;
+  });
+
+  const result = await shortlistService.handler({
+    httpMethod: 'POST',
+    headers: { authorization: 'Bearer user-token' },
+    body: JSON.stringify({
+      action: 'send_shortlist',
+      requestId: IDS.requestOperation,
+      expectedUpdatedAt: UPDATED_AT,
+      shortlistId: IDS.shortlist
+    })
+  });
+  const body = JSON.parse(result.body);
+
+  assert.equal(result.statusCode, 409);
+  assert.equal(body.code, 'shortlist_service_error');
+  assert.equal(body.message, 'The Client shortlist request could not be completed. Please try again.');
+  assert.equal(result.body.includes(rawMessage), false);
+  assert.equal(JSON.stringify(logs).includes(rawMessage), false);
+  assert.deepEqual(logs[0], [
+    'Client shortlist operation failed.',
+    { method: 'POST', status: 409, code: 'shortlist_service_error' }
+  ]);
 });

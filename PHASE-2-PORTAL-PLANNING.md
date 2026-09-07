@@ -1,6 +1,6 @@
 # Soro Operations Platform — Phase 2 Planning
 
-Last updated: August 29, 2026
+Last updated: September 1, 2026
 
 ## Product direction
 
@@ -65,7 +65,7 @@ Each candidate record has three separate ownership fields:
 
 When Talent Operations manually marks a VA as Bench Ready, the VA enters a Sales-visible open claim queue. The working label for this queue is **Available VA Bench**.
 
-Implementation status (September 1, 2026): built locally and awaiting production approval. The release adds the Available Talent navigation view, Sales self-claiming, Administrator and Talent Management assignment controls, stale-claim collision protection, organization-scoped audit history, and per-Sales capacity settings. It has not been deployed yet.
+Implementation status (September 1, 2026): live in production. The release adds the Available Talent navigation view, Sales self-claiming, Administrator and Talent Management assignment controls, stale-claim collision protection, organization-scoped audit history, and per-Sales capacity settings.
 
 Sales employees may claim an available VA. Once claimed, the VA leaves the open queue and appears in that salesperson's caseload as the Sales Owner. The claim experience must:
 
@@ -175,8 +175,8 @@ Sensitive health, counseling, family, or assistance matters must use restricted 
 4. Bench Ready / Available VA Bench
 5. Claimed / Assigned Sales Caseload
 6. Shortlisted
-7. Interviewing
-8. Client Review
+7. Client Review
+8. Interviewing
 9. Placement Confirmed / Talent Handoff
 10. Onboarding
 11. Active
@@ -188,6 +188,31 @@ Additional outcomes:
 - Archived
 
 Stage history must retain the previous stage, new stage, actor, date, reason, and relevant notes.
+
+## Client creation through active placement
+
+Implementation status (September 1, 2026): the connected workflow is built locally and awaiting approval before its database migrations and application release are deployed.
+
+Use one Client record and one hiring-request identifier from intake through placement so employees never have to reselect or re-enter the Client and role at each step:
+
+1. Sales creates the company, primary contact, assigned Sales owner, optional Client Portal invitation, and first hiring request in one guided submission.
+2. The Client Hub shows the company, contact, portal-access state, hiring requests, activity, and the next operational action.
+3. Sales opens the same request in Available Talent, claims or selects candidates, builds the shortlist, and sends client-safe profiles for review.
+4. A Client Administrator records candidate responses and the final selection. A Client Reviewer may review the same safe material but cannot make the final decision.
+5. Sales schedules requested interviews through the shared Microsoft 365 interview calendar, records outcomes, and prepares the selected candidate's placement terms.
+6. Administrators or Talent Management confirm the placement, complete the required onboarding checklist, and activate the placement on or after the start date.
+
+Future refinement: retain the approved lifecycle demo as the design reference for a lighter Sales tracker. The tracker should summarize each owned Client request's current stage, responsible person, blockers, and next action in one compact view, then link into the existing role-specific workflow rather than duplicate its forms or permissions.
+
+Access boundaries:
+
+- Sales can create and update only Clients assigned to that Sales account. Sales cannot search or open another salesperson's Client record.
+- Sales Management and Administrators retain organization-wide Client access and ownership controls.
+- Talent Management can view Client profiles but cannot edit Client business/contact records. Talent Management can confirm prepared placements and manage onboarding.
+- Client Portal views exclude Talent contact information, source documents, internal notes, internal rates, calendar-sync failures, and internal handoff details.
+- Client Billing does not receive candidate-review or placement-decision access.
+- Placement confirmation is atomic: capacity, Client, hiring request, shortlist, Talent stage, placement, and onboarding records either advance together or do not advance.
+- Soro records interview changes before attempting Microsoft 365 synchronization. Failed calendar delivery remains visibly retryable to authorized employees and never rolls back the durable Soro workflow.
 
 ## Mandatory activity history
 

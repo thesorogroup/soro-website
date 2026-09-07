@@ -148,7 +148,7 @@ test('handler exports only the approved roles, actions, and Client responses', (
   assert.deepEqual([...backend.ACTIONS].sort(), [
     'add_candidate', 'remove_candidate', 'respond_candidate', 'send_shortlist'
   ]);
-  assert.deepEqual([...backend.RESPONSES].sort(), ['interested', 'not_a_fit', 'request_interview']);
+  assert.deepEqual([...backend.RESPONSES].sort(), ['interested', 'request_interview']);
   for (const role of ['talent_management', 'billing', 'client_billing', 'virtual_assistant']) {
     assert.equal(backend.VIEWER_ROLES.has(role), false);
   }
@@ -192,6 +192,10 @@ test('each action accepts its exact shape and requires a request id plus current
   assert.throws(() => backend.inputActionBody({
     action: 'respond_candidate', requestId, expectedUpdatedAt: updatedAt,
     shortlistItemId, response: 'approve'
+  }), error => error.code === 'invalid_response');
+  assert.throws(() => backend.inputActionBody({
+    action: 'respond_candidate', requestId, expectedUpdatedAt: updatedAt,
+    shortlistItemId, response: 'not_a_fit'
   }), error => error.code === 'invalid_response');
 });
 
@@ -247,7 +251,7 @@ test('POST passes the exact mutation fields and never accepts caller-selected or
   const result = await backend.handler(event('POST', {
     body: JSON.stringify({
       action: 'respond_candidate', requestId, expectedUpdatedAt: updatedAt,
-      shortlistItemId, response: 'not_a_fit'
+      shortlistItemId, response: 'interested'
     })
   }));
   assert.equal(result.statusCode, 200);
@@ -261,7 +265,7 @@ test('POST passes the exact mutation fields and never accepts caller-selected or
     p_applicant_id: null,
     p_shortlist_id: null,
     p_shortlist_item_id: shortlistItemId,
-    p_response: 'not_a_fit'
+    p_response: 'interested'
   });
 
   const scoped = await backend.handler(event('POST', {

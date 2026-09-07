@@ -211,6 +211,43 @@ test('mount shows loading, loads through the authenticated no-store endpoint, an
   assert.doesNotMatch(target.innerHTML, /Mariel|Morgan|sample|demo/i);
 });
 
+test('an explicit approval transport keeps preview reads and mutations off the live endpoint', async t => {
+  const { ui, calls } = install(t);
+  const target = fakeTarget();
+  const mutations = [];
+  const initial = payload('sales', [item()]);
+  const claimed = payload('sales', [item({ owner: { id: salesOwnerId, name: 'Morgan Lee' }, allowedActions: ['release'] })], {
+    caseload: { ownerId: salesOwnerId, claimed: 13, capacity: 40 }
+  });
+  assert.equal(ui.mount(target, {
+    role: 'sales',
+    loader: async () => initial,
+    submitter: async body => { mutations.push(body); return claimed; },
+    shortlistLoader: async () => ({ viewerRole: 'sales', generatedAt: updatedAt, hiringRequests: [], shortlists: [], candidates: [], notifications: [] }),
+    shortlistSubmitter: async () => ({})
+  }), true);
+  await settle();
+
+  assert.equal(calls.length, 0, 'preview loading must not call the live endpoint');
+  assert.match(target.innerHTML, /Santos, Mariel Anne/);
+  assert.equal(await ui.changeOwnership('claim', applicantId), true);
+  assert.equal(calls.length, 0, 'preview mutations must not call the live endpoint');
+  assert.equal(mutations.length, 1);
+  assert.equal(mutations[0].action, 'claim');
+});
+
+test('a partial approval transport fails closed instead of falling through to live mutations', async t => {
+  const { ui, calls } = install(t);
+  const target = fakeTarget();
+  ui.mount(target, { role: 'sales', loader: async () => payload('sales') });
+  await settle();
+
+  assert.equal(calls.length, 0);
+  assert.equal(await ui.changeOwnership('claim', applicantId), false);
+  assert.equal(calls.length, 0, 'missing preview submitter must never fall through to fetch');
+  assert.match(target.innerHTML, /local approval preview does not allow that action/i);
+});
+
 test('claim and release actions post only server-recognized fields and preserve audit request ids', async t => {
   const claimed = item({ owner: { id: salesOwnerId, name: 'Morgan Lee' }, allowedActions: ['release'] });
   const { ui, calls, events } = install(t, {
@@ -342,5 +379,7 @@ test('navigation and routing expose the bench only through authorized employee w
     const views = operations.match(new RegExp(`${role}:new Set\\(\\[([^\\]]*)\\]\\)`, 'i'))?.[1] || '';
     assert.equal(views.includes('available-talent'), false, `${role} must not expose the bench`);
   }
-  assert.match(operations, /current==='available-talent'[\s\S]*soroAvailableTalentBench\.mount\(root,\{role:currentAuthenticatedRole\(\)\}\)/i);
+  assert.match(operations, /current==='available-talent'[\s\S]*soroAvailableTalentBench\.mount\(root,availableTalentMountOptions\(accessRole\)\)/i);
+  assert.match(source, /data-bench-shortlist-add[\s\S]*Add to Client/i);
+  assert.match(source, /openAddDialog[\s\S]*preferredRequestId:\s*preferredHiringRequestId/i);
 });

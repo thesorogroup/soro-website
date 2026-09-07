@@ -237,13 +237,12 @@ test('missing add permission fails closed and only explicit server true enables 
   assert.equal(allowed.requests[0].canAddCandidate, true);
 });
 
-test('only the three approved client response values normalize', t => {
+test('shortlist responses are nonfinal and final pass stays in the Client Admin decision workflow', t => {
   const ui = install(t, 'client_admin');
-  assert.deepEqual([...ui.RESPONSE_VALUES].sort(), ['interested', 'not_a_fit', 'request_interview']);
+  assert.deepEqual([...ui.RESPONSE_VALUES].sort(), ['interested', 'request_interview']);
   assert.equal(ui.normalizeResponse('request_interview'), 'request_interview');
   assert.equal(ui.normalizeResponse('interested'), 'interested');
-  assert.equal(ui.normalizeResponse('not_a_fit'), 'not_a_fit');
-  for (const value of ['approve', 'reject', 'maybe', 'hire', 'decline', '', null]) {
+  for (const value of ['not_a_fit', 'approve', 'reject', 'maybe', 'hire', 'decline', '', null]) {
     assert.equal(ui.normalizeResponse(value), '');
   }
 });
@@ -255,7 +254,8 @@ test('client mode shows exact decision labels and no internal shortlist controls
   assert.equal(ui.mount(target, { role: 'client_reviewer', mode: 'client', loader: async () => loaded }), true);
   await settle();
 
-  for (const label of ['Request interview', 'Interested', 'Not a fit']) assert.match(target.innerHTML, new RegExp(`>${label}<`));
+  for (const label of ['Request interview', 'Interested']) assert.match(target.innerHTML, new RegExp(`>${label}<`));
+  assert.doesNotMatch(target.innerHTML, />Not a fit</);
   assert.doesNotMatch(target.innerHTML, /Add to (?:Client )?Shortlist|Send for Client Review|data-shortlist-remove/i);
 });
 
@@ -269,7 +269,7 @@ test('a recorded client response is immutable in the UI and directs changes thro
   assert.match(target.innerHTML, /Your response(?: is recorded)?:[\s\S]*Interested/i);
   assert.match(target.innerHTML, /recorded|contact Soro/i);
   assert.doesNotMatch(target.innerHTML, /You can change it|data-shortlist-response=/i);
-  assert.equal(await ui.respondCandidate(shortlistItemId, 'not_a_fit'), false);
+  assert.equal(await ui.respondCandidate(shortlistItemId, 'request_interview'), false);
 });
 
 test('client and Sales mutations submit only the exact API fields with a request id', async t => {
@@ -400,7 +400,7 @@ test('malformed successful results retain an id but changed response, timestamp,
 
   assert.equal(await ui.respondCandidate(shortlistItemId, 'interested'), false);
   assert.equal(await ui.respondCandidate(shortlistItemId, 'interested'), false);
-  assert.equal(await ui.respondCandidate(shortlistItemId, 'not_a_fit'), false);
+  assert.equal(await ui.respondCandidate(shortlistItemId, 'request_interview'), false);
 
   const newerTimestamp = '2026-09-01T17:14:00.000Z';
   ui.unmount({ clear: false });

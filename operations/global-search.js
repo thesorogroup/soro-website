@@ -268,7 +268,18 @@
       const types = currentTypes();
       input.placeholder = placeholderForTypes(types);
       input.setAttribute('aria-label', types.length === 1 ? 'Search clients' : 'Search clients and Talent');
-      if (!types.length) closePopup();
+      if (!types.length) {
+        if (timer) window.clearTimeout(timer);
+        timer = null;
+        abortController?.abort();
+        abortController = null;
+        requestSequence += 1;
+        entries = [];
+        groups = [];
+        lastQuery = '';
+        popup.replaceChildren?.();
+        closePopup();
+      }
       return types;
     }
 

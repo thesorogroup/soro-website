@@ -48,7 +48,7 @@ test('recovery completion validates the new password and updates it through Supa
   assert.match(auth, /clearRecoveryUrl\(\)/);
 });
 
-test('recovery loads authenticated access and routes VA passwords through the audited setup endpoint', () => {
+test('recovery loads authenticated access and routes VA and Client passwords through their audited setup endpoints', () => {
   const auth = read('operations/auth.js');
   const accessLookup = namedFunction(auth, 'loadPasswordRecoveryAccess');
 
@@ -56,10 +56,19 @@ test('recovery loads authenticated access and routes VA passwords through the au
   assert.match(accessLookup, /\.eq\(['"]id['"],\s*session\.user\.id\)/);
   assert.match(accessLookup, /!access\?\.active\s*\|\|\s*!authorizedRoles\.has\(access\.role\)/);
   assert.match(auth, /recoveryAccess\.role\s*===\s*['"]virtual_assistant['"]/);
-  assert.match(auth, /fetch\(['"]\/\.netlify\/functions\/talent-account-setup['"]/);
+  assert.match(auth, /clientProfileRoles\.has\(recoveryAccess\.role\)/);
+  assert.match(auth, /['"]\/\.netlify\/functions\/talent-account-setup['"]/);
+  assert.match(auth, /['"]\/\.netlify\/functions\/client-account-setup['"]/);
+  assert.match(auth, /fetch\(endpoint/);
   assert.match(auth, /Authorization:\s*`Bearer \$\{recoverySession\.access_token\}`/);
   assert.match(auth, /recoveryAccess\.must_change_password\s*\?\s*['"]complete_setup['"]\s*:\s*['"]complete_recovery['"]/);
-  assert.match(auth, /JSON\.stringify\(\{\s*action,\s*newPassword\s*\}\)/);
+  assert.match(auth, /passwordOperationRequestId\(\)/);
+  assert.match(auth, /\?\s*\{\s*action,\s*newPassword,\s*requestId:\s*recoveryPasswordRequestId\s*\}/);
+  assert.match(auth, /:\s*\{\s*action,\s*newPassword\s*\}/);
+  assert.match(auth, /error\.retryable\s*=\s*result\.retryable\s*===\s*true\s*\|\|\s*response\.status\s*>=\s*500/);
+  assert.match(auth, /catch \(error\) \{\s*if \(clientPasswordAction\) error\.retryable\s*=\s*true/);
+  assert.match(auth, /error\.retryable\s*!==\s*true[\s\S]*recoveryPasswordRequestId\s*=\s*['"]/);
+  assert.match(auth, /passwordRecoveryForm\.reset\(\);\s*recoveryPasswordRequestId\s*=\s*['"]/);
   assert.match(auth, /else\s*\{\s*const \{ error \} = await client\.auth\.updateUser\(\{\s*password:\s*newPassword\s*\}\)/);
 });
 

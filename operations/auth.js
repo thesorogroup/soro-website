@@ -35,6 +35,7 @@
   let recoveryAccess = null;
   let recoveryEventReceived = false;
   let recoveryAccessCheck = 0;
+  let recoveryPasswordRequestId = '';
 
   function recoveryRequestedByUrl() {
     const query = new URLSearchParams(window.location.search);
@@ -47,6 +48,14 @@
     ['code', 'type', 'token', 'token_hash'].forEach(parameter => url.searchParams.delete(parameter));
     url.hash = '';
     window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
+  }
+
+  function passwordOperationRequestId() {
+    const value = window.crypto?.randomUUID?.();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''))) {
+      throw new Error('This browser could not create a secure password request. Refresh in a current browser.');
+    }
+    return value;
   }
 
   function showChecking() {
@@ -167,6 +176,7 @@
     const opening = passwordRecoveryGate.hidden;
     passwordRecoveryGate.hidden = false;
     if (opening) {
+      recoveryPasswordRequestId = '';
       passwordRecoveryForm.reset();
       if (passwordRecoveryMessage) {
         passwordRecoveryMessage.textContent = '';
@@ -273,20 +283,41 @@
     submit.textContent = 'Saving your password…';
     setRecoveryMessage('Securing your account…');
     try {
-      if (recoveryAccess.role === 'virtual_assistant') {
+      if (recoveryAccess.role === 'virtual_assistant' || clientProfileRoles.has(recoveryAccess.role)) {
         const action = recoveryAccess.must_change_password ? 'complete_setup' : 'complete_recovery';
-        const response = await fetch('/.netlify/functions/talent-account-setup', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${recoverySession.access_token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action, newPassword })
-        });
+        const clientPasswordAction = clientProfileRoles.has(recoveryAccess.role);
+        const endpoint = recoveryAccess.role === 'virtual_assistant'
+          ? '/.netlify/functions/talent-account-setup'
+          : '/.netlify/functions/client-account-setup';
+        if (clientPasswordAction && !recoveryPasswordRequestId) {
+          recoveryPasswordRequestId = passwordOperationRequestId();
+        }
+        let response;
+        try {
+          response = await fetch(endpoint, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${recoverySession.access_token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(clientPasswordAction
+              ? { action, newPassword, requestId: recoveryPasswordRequestId }
+              : { action, newPassword })
+          });
+        } catch (error) {
+          if (clientPasswordAction) error.retryable = true;
+          throw error;
+        }
         const result = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(result.message || 'Your password could not be changed.');
+        if (!response.ok) {
+          const error = new Error(result.message || 'Your password could not be changed.');
+          error.code = String(result.code || '');
+          error.retryable = result.retryable === true || response.status >= 500;
+          throw error;
+        }
       } else {
         const { error } = await client.auth.updateUser({ password: newPassword });
         if (error) throw error;
       }
       passwordRecoveryForm.reset();
+      recoveryPasswordRequestId = '';
       setRecoveryMessage('Password saved. Opening your secure portal…', 'success');
       recoveryMode = false;
       recoveryEventReceived = false;
@@ -297,6 +328,9 @@
       const session = refreshed.session || (await client.auth.getSession()).data.session;
       await verifySession(session);
     } catch (error) {
+      if (clientProfileRoles.has(recoveryAccess?.role) && error.retryable !== true) {
+        recoveryPasswordRequestId = '';
+      }
       setRecoveryMessage(error.message || 'Your password could not be changed. Request a new reset link and try again.', 'error');
     } finally {
       submit.disabled = false;
@@ -376,6 +410,7 @@
       recoverySession = null;
       recoveryAccess = null;
       recoveryAccessCheck += 1;
+      recoveryPasswordRequestId = '';
       if (recoveryMode) {
         recoveryMode = false;
         clearRecoveryUrl();
