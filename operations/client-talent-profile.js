@@ -309,7 +309,7 @@
     });
   }
 
-  async function load(root, key) {
+  async function load(root, key, preferredId = '') {
     const version = ++requestVersion;
     try {
       const result = await request();
@@ -317,6 +317,7 @@
       const directory = normalizeDirectory(result);
       cachedDirectory = directory;
       cachedAccountKey = key;
+      if (preferredId && directory.talents.some(item => item.id === preferredId)) selectedTalentId = preferredId;
       if (!directory.talents.some(item => item.id === selectedTalentId)) selectedTalentId = directory.talents[0]?.id || '';
       root.innerHTML = renderProfile(directory, selectedTalentId);
       bindProfile(root, directory, key);
@@ -325,17 +326,18 @@
       root.innerHTML = renderError(error.message);
       root.querySelector('[data-client-talent-retry]')?.addEventListener('click', () => {
         root.innerHTML = renderLoading();
-        load(root, key);
+        load(root, key, preferredId);
       });
     }
   }
 
-  function mount(root) {
+  function mount(root, options = {}) {
     if (!root || !canOpenTalentProfile()) {
       reset();
       root?.replaceChildren();
       return;
     }
+    const preferredId = text(options.talentId);
     const key = accountKey();
     if (!text(currentAccess()?.user_id) || !key.startsWith(`${text(currentAccess()?.user_id)}:`)) {
       root.innerHTML = renderError('Your secure client account is not available.');
@@ -343,12 +345,13 @@
     }
     if (cachedAccountKey && cachedAccountKey !== key) reset();
     if (cachedDirectory && cachedAccountKey === key) {
+      if (preferredId && cachedDirectory.talents.some(item => item.id === preferredId)) selectedTalentId = preferredId;
       root.innerHTML = renderProfile(cachedDirectory, selectedTalentId);
       bindProfile(root, cachedDirectory, key);
       return;
     }
     root.innerHTML = renderLoading();
-    load(root, key);
+    load(root, key, preferredId);
   }
 
   window.addEventListener('soro-auth-changed', event => {

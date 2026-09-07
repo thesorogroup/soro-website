@@ -27,12 +27,16 @@
   let workspace = emptyWorkspace();
   let selectedRequestId = '';
   let pendingAction = '';
+  let pendingPassId = '';
   let feedback = Object.freeze({ type: '', message: '' });
   let sendConfirmationId = '';
   let activeController = null;
   let requestVersion = 0;
+  let mountGeneration = 0;
   let activeLoader = null;
   let activeSubmitter = null;
+  let activePassAdapter = null;
+  let endpointPassAdapter = null;
   let configuredLoader = null;
   let configuredSubmitter = null;
   let overlay = null;
@@ -391,14 +395,14 @@
       : candidate.canRespond
         ? '<p class="shortlist-client-decision"><strong>What would you like to do?</strong><span>Your Soro team will follow up on your choice.</span></p>'
         : '<p class="shortlist-client-decision"><strong>Response unavailable</strong><span>Contact your Soro team if you need help with this candidate review.</span></p>';
-    const actions = !current && candidate.canRespond ? `<div class="shortlist-decision-actions" role="group" aria-label="Response for ${escapeHtml(candidate.fullName)}"><button type="button" class="button" aria-pressed="false" data-shortlist-response="request_interview" data-shortlist-item-id="${candidate.shortlistItemId}"${pendingAction === candidate.shortlistItemId ? ' disabled' : ''}>Request interview</button><button type="button" class="button" aria-pressed="false" data-shortlist-response="interested" data-shortlist-item-id="${candidate.shortlistItemId}"${pendingAction === candidate.shortlistItemId ? ' disabled' : ''}>Interested</button></div>` : '';
+    const actions = !current && candidate.canRespond ? `<div class="shortlist-decision-actions" role="group" aria-label="Response for ${escapeHtml(candidate.fullName)}"><button type="button" class="button" aria-pressed="false" data-shortlist-response="request_interview" data-shortlist-item-id="${candidate.shortlistItemId}"${pendingAction === candidate.shortlistItemId ? ' disabled' : ''}>Request interview</button><button type="button" class="button" aria-pressed="false" data-shortlist-response="interested" data-shortlist-item-id="${candidate.shortlistItemId}"${pendingAction === candidate.shortlistItemId ? ' disabled' : ''}>Interested</button>${viewerRole === 'client_admin' && workspace.viewerRole === 'client_admin' ? `<button type="button" class="button" data-shortlist-pass="${candidate.shortlistItemId}"${pendingAction ? ' disabled' : ''}>Pass</button>` : ''}</div>` : '';
     return `<article class="shortlist-client-candidate" data-shortlist-item-id="${candidate.shortlistItemId}">
       <header><span class="shortlist-avatar" aria-hidden="true">${escapeHtml(initials(candidate.fullName))}</span><div><p class="eyebrow">Candidate for your review</p><h2>${escapeHtml(candidate.fullName)}</h2></div></header>
       <div class="shortlist-client-profile-grid"><section><small>Country &amp; time zone</small><strong>${escapeHtml(safeLocation(candidate))}</strong></section><section><small>Relevant experience</small><strong>${escapeHtml(candidate.experienceYears ? `${candidate.experienceYears} years` : 'Summary reviewed by Soro')}</strong></section><section><small>Education &amp; training</small><strong>${escapeHtml(candidate.educationAndTraining || 'Not recorded')}</strong></section></div>
       <div class="shortlist-skill-row"><small>Soro-verified skills</small><div>${skillChips(candidate)}</div></div>
       ${candidate.experienceSummary ? `<p class="shortlist-experience">${escapeHtml(candidate.experienceSummary)}</p>` : ''}
       ${clientScreeningMarkup(candidate)}
-      <footer class="${current ? 'shortlist-decision-recorded' : ''}">${decision}${actions}</footer>
+      <footer class="${current ? 'shortlist-decision-recorded' : ''}">${decision}${actions}${pendingPassId === candidate.shortlistItemId ? `<div class="shortlist-pass-confirm" role="alert"><strong>Pass on ${escapeHtml(candidate.fullName)}?</strong><p>This is a final decision. The candidate will return to Soro’s available talent bench.</p><button type="button" class="button" data-shortlist-pass-cancel>Keep reviewing</button><button type="button" class="button" data-shortlist-pass-confirm="${candidate.shortlistItemId}"${pendingAction ? ' disabled' : ''}>Confirm pass</button></div>` : ''}</footer>
     </article>`;
   }
 
@@ -841,9 +845,51 @@
     } finally { pendingAction = ''; render(); }
   }
 
+  function requestPassCandidate(shortlistItemId) {
+    const itemId = validUuid(shortlistItemId);
+    const request = workspace.requests.find(candidate => candidate.id === selectedRequestId);
+    const item = request?.shortlist.items.find(candidate => candidate.shortlistItemId === itemId);
+    if (pendingAction || viewerRole !== 'client_admin' || workspace.viewerRole !== 'client_admin' || mode !== 'client' || !activePassAdapter || !item?.canRespond || item.response) return false;
+    pendingPassId = itemId; render();
+    mountedRoot?.querySelector('[data-shortlist-pass-cancel]')?.focus?.();
+    return true;
+  }
+
+  async function passCandidate(shortlistItemId) {
+    const itemId = validUuid(shortlistItemId);
+    const request = workspace.requests.find(candidate => candidate.id === selectedRequestId);
+    const item = request?.shortlist.items.find(candidate => candidate.shortlistItemId === itemId);
+    if (pendingAction || mode !== 'client' || viewerRole !== 'client_admin' || workspace.viewerRole !== 'client_admin'
+      || !itemId || pendingPassId !== itemId || !item?.canRespond || item.response || !item.updatedAt || !activePassAdapter) return false;
+    const page = mountedRoot, version = requestVersion, mountVersion = mountGeneration, adapter = activePassAdapter;
+    const pageIsCurrent = () => mountedRoot === page && mountGeneration === mountVersion && page?.isConnected !== false
+      && (!page?.ownerDocument || page.querySelector('[data-shortlist-page]'));
+    pendingPassId = ''; pendingAction = itemId; feedback = Object.freeze({ type: '', message: '' }); render();
+    try {
+      await adapter.mutate('final_decision', { hiringRequestId: request.id, shortlistItemId: itemId,
+        expectedUpdatedAt: item.updatedAt, decision: 'passed' }, result => {
+          const verified = root.SoroClientPlacementWorkflow?.normalizeWorkspace(result, 'client_admin');
+          if (!verified || verified.viewerRole !== 'client_admin' || verified.request.hiringRequestId !== request.id)
+            throw new Error('The saved decision could not be verified. Refresh before trying again.');
+          return verified;
+        });
+      if (!pageIsCurrent() || requestVersion !== version) return false;
+      await refresh({ silent: true });
+      if (!pageIsCurrent()) return false;
+      feedback = Object.freeze({ type: 'success', message: 'Pass recorded. Your Soro team can now consider this candidate for another client.' });
+      dispatchUpdated('final_decision', { shortlistItemId: itemId, hiringRequestId: request.id });
+      if (typeof root.CustomEvent === 'function') root.dispatchEvent(new root.CustomEvent('soro:client-placement-updated', { detail: { requestId: request.id } }));
+      return true;
+    } catch (error) {
+      if (pageIsCurrent() && requestVersion === version) feedback = Object.freeze({ type: 'error', message: error.message || 'Your decision could not be saved.' });
+      return false;
+    } finally { if (pageIsCurrent()) { pendingAction = ''; render(); } }
+  }
+
   function openRequest(requestId) {
     const id = validUuid(requestId);
     if (!id || !workspace.requests.some(request => request.id === id)) return false;
+    pendingPassId = '';
     selectedRequestId = id;
     feedback = Object.freeze({ type: '', message: '' });
     render();
@@ -852,6 +898,7 @@
   }
 
   function closeRequest() {
+    pendingPassId = '';
     selectedRequestId = '';
     feedback = Object.freeze({ type: '', message: '' });
     render();
@@ -908,6 +955,11 @@
     if (remove && !remove.disabled) { removeCandidate(remove.dataset.shortlistRemove); return; }
     const profile = event.target.closest?.('[data-shortlist-profile]');
     if (profile) { openTalentProfile(profile.dataset.shortlistProfile); return; }
+    const pass = event.target.closest?.('[data-shortlist-pass]');
+    if (pass && !pass.disabled) { requestPassCandidate(pass.dataset.shortlistPass); return; }
+    if (event.target.closest?.('[data-shortlist-pass-cancel]')) { pendingPassId = ''; render(); return; }
+    const confirmPass = event.target.closest?.('[data-shortlist-pass-confirm]');
+    if (confirmPass && !confirmPass.disabled) { passCandidate(confirmPass.dataset.shortlistPassConfirm); return; }
     const response = event.target.closest?.('[data-shortlist-response]');
     if (response && !response.disabled) respondCandidate(response.dataset.shortlistItemId, response.dataset.shortlistResponse);
   }
@@ -921,6 +973,8 @@
   }
 
   function mount(target, options = {}) {
+    mountGeneration += 1;
+    pendingAction = '';
     const nextRole = normalizedRole(options.role || effectiveRole());
     const nextMode = text(options.mode, 20).toLowerCase() || modeForRole(nextRole);
     if (!target || typeof target.addEventListener !== 'function' || !canOpenForRole(nextRole, nextMode)) {
@@ -932,9 +986,12 @@
     mountedRoot = target;
     viewerRole = nextRole;
     mode = nextMode;
+    pendingPassId = '';
     selectedRequestId = validUuid(options.requestId, { optional: true });
     activeLoader = typeof options.loader === 'function' ? options.loader : null;
     activeSubmitter = typeof options.submitter === 'function' ? options.submitter : null;
+    if (!activeLoader && !endpointPassAdapter) endpointPassAdapter = root.SoroClientPlacementWorkflow?.createEndpointAdapter?.();
+    activePassAdapter = options.passAdapter || (activeLoader ? null : endpointPassAdapter);
     phase = 'loading';
     message = '';
     feedback = Object.freeze({ type: '', message: '' });
@@ -949,6 +1006,7 @@
   }
 
   function unmount({ clear = true } = {}) {
+    mountGeneration += 1;
     requestVersion += 1;
     activeController?.abort?.();
     activeController = null;
@@ -964,6 +1022,8 @@
     pendingAction = '';
     activeLoader = null;
     activeSubmitter = null;
+    activePassAdapter = null;
+    pendingPassId = '';
     return true;
   }
 
@@ -1172,6 +1232,8 @@
   }
 
   function handleAuthChanged(event) {
+    mountGeneration += 1;
+    pendingPassId = '';
     const ownerChanged = syncMutationRetryOwner(event?.detail?.session ? event.detail.session?.user?.id : '');
     if (ownerChanged) closeOverlay();
     const authenticatedRole = normalizedRole(event?.detail?.access?.role);
@@ -1230,6 +1292,8 @@
     removeCandidate,
     sendShortlist,
     respondCandidate,
+    passCandidate,
+    requestPassCandidate,
     enhanceAvailableTalentBench
   });
 }));

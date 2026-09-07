@@ -649,6 +649,8 @@
       setActive();
     }
     if (current === 'help') {
+      window.soroClientShortlistWorkflow?.unmount?.({ clear: false });
+      window.SoroClientDashboard?.unmount?.({ clear: false });
       root.innerHTML = supportPage();
       return;
     }

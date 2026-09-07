@@ -61,7 +61,7 @@ test('Client Portal navigation remains client-safe while candidate review can co
 test('Client Talent Profile mounts only through the authenticated, fail-closed route', () => {
   const operations = read('operations/operations.js');
   const source = read('operations/client-talent-profile.js');
-  assert.match(operations, /current==='client-talent-profile'[\s\S]*SoroClientTalentProfile\?\.canOpenTalentProfile\(\)[\s\S]*SoroClientTalentProfile\.mount\(root\)/);
+  assert.match(operations, /current==='client-talent-profile'[\s\S]*SoroClientTalentProfile\?\.canOpenTalentProfile\(\)[\s\S]*SoroClientTalentProfile\.mount\(root,\{talentId:preferredClientTalentId\}\)/);
   assert.match(source, /CLIENT_TALENT_ROLES\s*=\s*new Set\(\['client_admin', 'client_reviewer'\]\)/);
   assert.match(source, /ENDPOINT\s*=\s*'\/\.netlify\/functions\/client-talent-profile'/);
   assert.match(source, /method:\s*'GET'/);
@@ -148,9 +148,9 @@ test('Client Talent assets load before routing and include desktop/mobile safegu
   const css = read('operations/client-talent-profile.css');
   assert.match(html, /client-talent-profile\.css\?v=20260829-production-visuals/);
   assert.match(html, /talent-profile-visuals\.js\?v=20260829-production-visuals/);
-  assert.match(html, /client-talent-profile\.js\?v=20260829-production-visuals/);
-  assert.ok(html.indexOf('talent-profile-visuals.js?v=20260829-production-visuals') < html.indexOf('client-talent-profile.js?v=20260829-production-visuals'));
-  assert.ok(html.indexOf('client-talent-profile.js?v=20260829-production-visuals') < html.indexOf('src="operations.js?'));
+  assert.match(html, /client-talent-profile\.js\?v=20260907-client-home/);
+  assert.ok(html.indexOf('talent-profile-visuals.js?v=20260829-production-visuals') < html.indexOf('client-talent-profile.js?v=20260907-client-home'));
+  assert.ok(html.indexOf('client-talent-profile.js?v=20260907-client-home') < html.indexOf('src="operations.js?'));
   assert.match(css, /grid-template-columns:\s*230px minmax\(0, 1fr\) minmax\(280px, 350px\)/);
   assert.match(css, /@media \(min-width: 1101px\)[\s\S]*\.client-talent-folder-art/);
   assert.match(css, /\.client-talent-folder-front-seam[\s\S]*stroke:\s*rgba\(144, 125, 91, \.24\)/);

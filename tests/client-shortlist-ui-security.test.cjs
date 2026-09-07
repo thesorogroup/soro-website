@@ -617,3 +617,50 @@ test('navigation never exposes Sales shortlists to unrelated roles or client rev
     assert.equal(views.includes('client-candidate-review'), false, `${role} must not receive client candidate review`);
   }
 });
+test('Client Administrator can pass directly with confirmation, canonical mutation and refresh', async t => {
+  const ui = install(t, 'client_admin');
+  const oldConfirm = globalThis.confirm, oldPlacement = globalThis.SoroClientPlacementWorkflow;
+  t.after(() => { globalThis.confirm = oldConfirm; globalThis.SoroClientPlacementWorkflow = oldPlacement; });
+  globalThis.confirm = () => true;
+  const placement = require('../operations/client-placement-workflow.js');
+  globalThis.SoroClientPlacementWorkflow = placement;
+  let data = workspace('client_admin'), calls = [];
+  const adapter = { mutate: async (action, values, verify) => {
+    calls.push({action,values}); data = workspace('client_admin'); data.requests[0].shortlist.items = [];
+    const result = placement.defaultSeed('client_admin'); result.request.hiringRequestId = requestId;
+    return verify(result);
+  }};
+  const target = fakeTarget();
+  ui.mount(target, {role:'client_admin',mode:'client',requestId,loader:async()=>data,passAdapter:adapter});
+  await settle(); assert.match(target.innerHTML, /data-shortlist-pass=/);
+  assert.equal(await ui.passCandidate(shortlistItemId), false);
+  assert.equal(ui.requestPassCandidate(shortlistItemId), true);
+  assert.match(target.innerHTML,/data-shortlist-pass-confirm=/);
+  assert.equal(await ui.passCandidate(shortlistItemId), true);
+  assert.equal(calls.length,1); assert.equal(calls[0].action,'final_decision');
+  assert.deepEqual(calls[0].values,{hiringRequestId:requestId,shortlistItemId,expectedUpdatedAt:itemUpdatedAt,decision:'passed'});
+  assert.doesNotMatch(target.innerHTML,/data-shortlist-pass=/);assert.match(target.innerHTML,/Pass recorded/);
+});
+
+test('Reviewer cannot pass, missing confirmation cannot pass, preview never falls through to live transport', async t => {
+  const ui=install(t,'client_reviewer'), target=fakeTarget(); let called=0;
+  ui.mount(target,{role:'client_reviewer',mode:'client',requestId,loader:async()=>workspace('client_reviewer'),passAdapter:{mutate:async()=>{called++;}}});
+  await settle();assert.doesNotMatch(target.innerHTML,/data-shortlist-pass=/);assert.equal(await ui.passCandidate(shortlistItemId),false);assert.equal(called,0);
+  ui.mount(target,{role:'client_admin',mode:'client',requestId,loader:async()=>workspace('client_admin')});
+  await settle();assert.equal(await ui.passCandidate(shortlistItemId),false);assert.equal(called,0);
+});
+test('In-flight Pass cannot overwrite Help or a same-root remount', async t => {
+  const ui=install(t,'client_admin'), target=fakeTarget();
+  const oldPlacement=globalThis.SoroClientPlacementWorkflow;
+  globalThis.SoroClientPlacementWorkflow=require('../operations/client-placement-workflow.js');
+  t.after(()=>{globalThis.SoroClientPlacementWorkflow=oldPlacement;});
+  let resolve;
+  ui.mount(target,{role:'client_admin',mode:'client',requestId,loader:async()=>workspace('client_admin'),passAdapter:{mutate:()=>new Promise(r=>resolve=r)}});
+  await settle();ui.requestPassCandidate(shortlistItemId);const pending=ui.passCandidate(shortlistItemId);
+  ui.unmount({clear:false});target.innerHTML='Help form in progress';resolve({});await pending;
+  assert.equal(target.innerHTML,'Help form in progress');
+  ui.mount(target,{role:'client_admin',mode:'client',requestId,loader:async()=>workspace('client_admin'),passAdapter:{mutate:()=>new Promise(r=>resolve=r)}});
+  await settle();ui.requestPassCandidate(shortlistItemId);const second=ui.passCandidate(shortlistItemId);
+  ui.unmount({clear:false});ui.mount(target,{role:'client_reviewer',mode:'client',requestId,loader:async()=>workspace('client_reviewer')});
+  await settle();resolve({});await second;assert.doesNotMatch(target.innerHTML,/Pass recorded|Confirm pass/);
+});

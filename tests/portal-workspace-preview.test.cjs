@@ -229,7 +229,7 @@ test('Admin non-Admin lifecycle previews use local adapters while signed-in role
   assert.match(salesShortlistRoute, /const accessRole=currentAuthenticatedRole\(\)/);
   assert.match(salesShortlistRoute, /clientShortlistMountOptions\(accessRole,'sales'/);
   assert.match(clientReviewRoute, /const accessRole=currentAuthenticatedRole\(\)/);
-  assert.match(clientReviewRoute, /clientShortlistMountOptions\(accessRole,'client'\)/);
+  assert.match(clientReviewRoute, /clientShortlistMountOptions\(accessRole,'client',preferredHiringRequestId\)/);
   assert.match(clientsRoute, /clientWorkflowMountOptions\(accessRole\)/);
 
   assert.match(clientWorkflow, /activeAdapter = options\.adapter \|\| createEndpointAdapter/);
@@ -362,7 +362,7 @@ test('Client workspace preview uses network-free renderers while live routes sta
   assert.match(talentPreview, /preview\.renderProfile\(/);
   assert.doesNotMatch(talentPreview, /\.mount\(/);
   assert.match(talentRoute, /SoroClientTalentProfile\?\.canOpenTalentProfile\(\)/);
-  assert.match(talentRoute, /SoroClientTalentProfile\.mount\(root\)/);
+  assert.match(talentRoute, /SoroClientTalentProfile\.mount\(root,\{talentId:preferredClientTalentId\}\)/);
 });
 
 test('operations enhancements delegates ordinary portal views back to the canonical renderer', () => {

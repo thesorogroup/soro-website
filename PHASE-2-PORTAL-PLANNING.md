@@ -325,6 +325,21 @@ Continue planning one consequential decision at a time. After tangents, return t
 
 ## Important unresolved decisions
 
+### Client launch preparation — September 7, 2026
+
+The marketing-meeting preparation is the current priority; payroll remains paused. The current user decision is one active Client matching/interview/placement process per Talent at a time. The historical multiple-Client question below is not permission to broaden that restriction.
+
+Approved for production release on September 7, 2026:
+
+- A company-scoped Client Dashboard replaces static overview placeholders with pending reviews/decisions, shared hiring requests, upcoming/ongoing interviews, and current assigned Talent. It reuses the existing request, interview/placement, Talent Profile, Account Settings and Help routes.
+- Client Billing receives account/contact access only; Client Reviewers cannot make final candidate decisions. Internal discovery requests, rates, private applicant details, private files, and calendar diagnostics remain excluded.
+- Client Administrators can pass directly from initial Candidate Review with an explicit inline confirmation. Migration 042 retains the existing final-decision transaction, optimistic timestamps, calendar cancellation restrictions, append-only audit and one-active-process constraints. Selecting an unresponded candidate remains prohibited.
+- Migrations 041/042 were applied successfully before releasing the new assets. Production function checksums match the reviewed source, with execution restricted to the existing service role. All 675 local tests passed; live invitation and calendar rehearsal remain separate launch gates.
+
+Remaining launch gates: verify a controlled real Client invitation, first password setup, fresh login, reset/resend and changed-email handling; verify Microsoft 365 create/reschedule/cancel and Teams joining using controlled recipients; confirm a reliable candidate-notification delivery process (the portal badge alone is not an email notification); rehearse Client isolation and the full selection-to-placement handoff. No test invitations, calendar events, credentials or Client records were created by this build or release preparation.
+
+Private review: `work/client-dashboard-approval/index.html` on local port 4189. These fixture files must not be included in deployment.
+
 1. Soro's legal and commercial relationship to placed VAs: employer/payor, managed staffing provider, recruitment/placement partner, or a hybrid.
 2. Whether a VA may serve multiple clients simultaneously.
 3. Client portal scope for the first release versus later phases.
