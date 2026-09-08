@@ -325,6 +325,18 @@ Continue planning one consequential decision at a time. After tangents, return t
 
 ## Important unresolved decisions
 
+### Candidate-review emails — local build September 8, 2026
+
+The user requested the connected candidate-review email workflow, branded layouts, and sample emails for appearance and delivery testing. Built locally, not yet deployed or enabled:
+
+- New shortlist notifications queue a Client "Candidates ready" email. Interested, interview-requested, and direct Pass responses queue an assigned-Sales "Client responded" email, including Pass after later hiring stages.
+- Messages use the established Soro branding and `do-not-reply@thesorogroup.com`, linking to the specific signed-in hiring request. No candidate names, private notes, files, contact information, or assessment details enter email content.
+- The existing durable confirmation dispatcher handles deduplication, immutable retries, current access checks, and manual-review failures. No historical notifications are backfilled.
+- Internal shortlist and placement workspaces show scoped email counts for sent, queued/retrying, and needs attention. Sent means accepted by the email provider, not proven inbox delivery. Client viewers never receive staff delivery metadata.
+- Migration `20260908_050_shortlist_emails.sql` is forward-only and remains unapplied. All 750 tests pass, including the local SQL fixture covering access revocation, inactive Sales owners, direct Pass, and service-only visibility.
+
+Private layout preview: `work/shortlist-email-approval/serve.cjs` on local port 4195. Two Resend sample templates are saved as drafts, not published or sent. The user approved the appearance and requested production deployment on September 8, 2026. Release the new renderer first, then apply050; never let an old renderer claim new event types. A controlled sample send and actual inbox rendering check remain separate from deployment verification. Payroll remains paused.
+
 ### Support follow-up view — approved build September 8, 2026
 
 Add an internal Needs Attention view alongside All tickets in Help & Support. Show unresolved unassigned tickets and open/in-progress tickets awaiting a public Soro reply, oldest waiting first, with reason, elapsed waiting time, team and owner. Admin/Founder oversees every authorized team; teams retain their existing scope and assignment controls. Staff members' own tickets in another queue remain requester-only, not part of their staff attention view.

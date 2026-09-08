@@ -277,6 +277,12 @@
       placements: Object.freeze((Array.isArray(source.placements) ? source.placements : []).map(item => normalizePlacement(item, clientSafe)).filter(Boolean)),
       calendarSyncPending: source.calendarSyncPending === true
     };
+    if (['admin','sales_management','sales'].includes(role)) {
+      normalized.emailDeliveryUnavailable = source.emailDeliveryUnavailable === true;
+      normalized.emailDeliveries = (Array.isArray(source.emailDeliveries) ? source.emailDeliveries : []).filter(row =>
+        ['sentCount','pendingCount','reviewCount'].every(key=>Number.isSafeInteger(row?.[key])&&row[key]>=0)
+      ).map(row=>Object.freeze({sentCount:row.sentCount,pendingCount:row.pendingCount,reviewCount:row.reviewCount}));
+    }
     return Object.freeze(normalized);
   }
 
@@ -780,6 +786,7 @@
         <div class="cpw-candidate-grid">${value.candidates.length ? value.candidates.map(candidate => candidateMarkup(candidate, clientSafe)).join('') : '<div class="cpw-empty"><h3>No candidates are ready for review.</h3><p>Shortlisted talent will appear here after Sales sends the shortlist.</p></div>'}</div>
       </section>
       ${clientSafe ? placementsMarkup(true) : `${handoffsMarkup()}${placementsMarkup(false)}`}
+      ${['admin','sales_management','sales'].includes(value.viewerRole) ? `<section class="cpw-section" aria-label="Candidate email updates"><h2>Candidate email updates</h2>${value.emailDeliveryUnavailable?'<p>Email status is temporarily unavailable. Your hiring request remains saved.</p>':value.emailDeliveries?.length?`<p>${value.emailDeliveries.reduce((n,r)=>n+r.sentCount,0)} sent · ${value.emailDeliveries.reduce((n,r)=>n+r.pendingCount,0)} queued / retrying · ${value.emailDeliveries.reduce((n,r)=>n+r.reviewCount,0)} need attention</p><p>Sent means accepted by the email service, not confirmed inbox delivery. An administrator can review messages needing attention.</p>`:'<p>No email record loaded. Older activity is not emailed again.</p>'}<button type="button" class="cpw-link" data-cpw-refresh>Refresh email status</button></section>`:''}
       ${editorMarkup()}
     </section>`;
   }

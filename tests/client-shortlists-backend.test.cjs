@@ -279,7 +279,9 @@ test('POST handler derives actor scope and passes only the exact RPC contract', 
     })
   });
   assert.equal(result.statusCode, 200);
-  assert.equal(requests.length, 2);
+  assert.equal(requests.length, 3);
+  assert.match(requests[2].url, /\/rest\/v1\/rpc\/get_client_shortlist_email_delivery$/);
+  assert.deepEqual(JSON.parse(requests[2].options.body), {p_actor_user_id: IDS.actor});
   assert.match(requests[1].url, /\/rest\/v1\/rpc\/change_client_shortlist$/);
   assert.deepEqual(JSON.parse(requests[1].options.body), {
     p_actor_user_id: IDS.actor,

@@ -738,7 +738,16 @@ async function getWorkflow(event) {
     p_actor_user_id: user.id,
     p_hiring_request_id: hiringRequestId
   });
-  return json(200, publicPayload(payload));
+  const result = publicPayload(payload);
+  if (['admin','sales_management','sales'].includes(result.viewerRole)) {
+    try {
+      const rows = await callRpc('get_client_shortlist_email_delivery', {p_actor_user_id:user.id,p_hiring_request_id:hiringRequestId});
+      result.emailDeliveries = require('./client-shortlists').publicEmailDelivery(rows,
+        [...new Set(result.candidates.map(item => item.shortlistId))].map(shortlistId => ({shortlistId})));
+      result.emailDeliveryUnavailable = false;
+    } catch { result.emailDeliveries = []; result.emailDeliveryUnavailable = true; }
+  }
+  return json(200, result);
 }
 
 async function mutateWorkflow(event) {

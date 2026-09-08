@@ -589,13 +589,45 @@ function publicPayload(value) {
   };
 }
 
+function publicEmailDelivery(value, shortlists) {
+  if (!Array.isArray(value) || value.length > MAX_SHORTLISTS) throw new Error('Invalid email status');
+  const ids = new Set(shortlists.map(row => row.shortlistId));
+  const seen = new Set();
+  return value.map(row => {
+    if (!isPlainObject(row) || !ids.has(row.shortlistId) || seen.has(row.shortlistId)) throw new Error('Invalid email scope');
+    seen.add(row.shortlistId);
+    const result = {shortlistId: requiredUuid(row.shortlistId)};
+    for (const field of ['clientCount','salesCount','sentCount','pendingCount','reviewCount']) {
+      if (!Number.isSafeInteger(row[field]) || row[field] < 0) throw new Error('Invalid email count');
+      result[field] = row[field];
+    }
+    if(result.clientCount + result.salesCount !== result.sentCount + result.pendingCount + result.reviewCount) throw new Error('Invalid email totals');
+    result.lastSentAt = nullableTimestamp(row.lastSentAt);
+    return result;
+  });
+}
+
+async function withEmailDelivery(payload, actorId) {
+  const result = publicPayload(payload);
+  if (!INTERNAL_ROLES.has(result.viewerRole)) return result;
+  try {
+    result.emailDeliveries = publicEmailDelivery(await callRpc('get_client_shortlist_email_delivery', {p_actor_user_id: actorId}),result.shortlists);
+    result.emailDeliveryUnavailable = false;
+  } catch {
+    // A delivery-status outage must not turn a committed shortlist into a failed send.
+    result.emailDeliveries = [];
+    result.emailDeliveryUnavailable = true;
+  }
+  return result;
+}
+
 async function getWorkspace(event) {
   rejectUnexpectedGetInput(event);
   const user = await authenticatedUser(event);
   const payload = await callRpc('get_client_shortlist_workspace', {
     p_actor_user_id: user.id
   });
-  return json(200, publicPayload(payload));
+  return json(200, await withEmailDelivery(payload, user.id));
 }
 
 async function changeWorkspace(event) {
@@ -613,7 +645,7 @@ async function changeWorkspace(event) {
     p_shortlist_item_id: input.shortlistItemId,
     p_response: input.response
   });
-  return json(200, publicPayload(payload));
+  return json(200, await withEmailDelivery(payload, user.id));
 }
 
 async function handler(event) {
@@ -648,6 +680,8 @@ async function handler(event) {
 }
 
 exports.handler = handler;
+exports.publicEmailDelivery = publicEmailDelivery;
+exports.withEmailDelivery = withEmailDelivery;
 exports.ACTIONS = ACTIONS;
 exports.ACTION_BODY_KEYS = ACTION_BODY_KEYS;
 exports.CLIENT_REVIEW_ROLES = CLIENT_REVIEW_ROLES;

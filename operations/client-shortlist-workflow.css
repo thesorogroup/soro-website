@@ -1190,3 +1190,11 @@
   }
 }
 .shortlist-pass-confirm{margin-top:16px;padding:16px;border:1px solid #dcc59c;border-radius:10px;background:#fffaed;color:#173859}.shortlist-pass-confirm p{margin:8px 0 12px;line-height:1.5}.shortlist-pass-confirm .button{margin:4px 8px 4px 0}
+/* Email progress stays secondary to the candidate review workflow. */
+.shortlist-email-status { margin-top: 16px; padding: 18px 20px; border: 1px solid #dce5ef; border-radius: 12px; background: #f7faff; color: #082d5c; }
+.shortlist-email-status > div:first-child { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.shortlist-email-status p { margin: 8px 0 0; font-size: 14px; line-height: 1.6; }
+.shortlist-email-counts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.shortlist-email-counts span { padding: 5px 10px; border-radius: 6px; background: #e9f0f8; font-size: 14px; }
+.shortlist-email-counts .shortlist-email-review { background: #fff0d4; color: #7a4600; }
+.shortlist-email-status .shortlist-email-note { color: #51657b; font-size: 13px; }

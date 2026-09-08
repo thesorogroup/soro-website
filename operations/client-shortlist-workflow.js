@@ -316,6 +316,11 @@
       viewerRole: returnedRole,
       requests: Object.freeze(visibleRequests),
       candidates: clientMode ? Object.freeze([]) : Object.freeze(candidates),
+      emailDeliveryUnavailable: !clientMode && payload.emailDeliveryUnavailable === true,
+      emailDeliveries: Object.freeze(clientMode ? [] : (Array.isArray(payload.emailDeliveries) ? payload.emailDeliveries : []).filter(row =>
+        visibleRequests.some(request => request.shortlist.id === row?.shortlistId)
+        && ['clientCount','salesCount','sentCount','pendingCount','reviewCount'].every(key => Number.isSafeInteger(row[key]) && row[key] >= 0)
+      ).map(row => Object.freeze({shortlistId: validUuid(row.shortlistId),clientCount:row.clientCount,salesCount:row.salesCount,sentCount:row.sentCount,pendingCount:row.pendingCount,reviewCount:row.reviewCount,lastSentAt:validTimestamp(row.lastSentAt,{optional:true})}))),
       notifications: Object.freeze(notificationSource.slice(0, 50).map(item => Object.freeze({
         id: validUuid(item?.id, { optional: true }),
         label: text(item?.label || item?.title || item?.message, 200)
@@ -448,6 +453,7 @@
       ${clientMode ? `<section class="shortlist-client-intro"><strong>${items.length} candidate${items.length === 1 ? '' : 's'} selected for you</strong><span>${responses}/${items.length} response${items.length === 1 ? '' : 's'} completed</span></section>` : ''}
       <section class="shortlist-candidate-list" aria-label="${clientMode ? 'Submitted candidates' : 'Shortlist candidates'}">${items.length ? items.map(candidate => clientMode ? clientCandidateMarkup(candidate) : salesCandidateMarkup(candidate, request)).join('') : (clientMode ? emptyClientMarkup() : emptyDraftMarkup())}</section>
       ${!clientMode ? salesSendBarMarkup(request) : clientContinueBarMarkup(request)}
+      ${!clientMode && submitted ? emailDeliveryMarkup(request) : ''}
       ${sendConfirmationId === request.id ? sendDialogMarkup(request) : ''}
     </main>`;
   }
@@ -456,6 +462,13 @@
     const count = request.shortlist.items.length;
     if (request.shortlist.status === 'client_review') return `<section class="shortlist-send-bar shortlist-send-bar--sent"><div><strong>Sent for client review</strong><span>Client responses appear on each candidate as they arrive.</span></div><div><span>${request.shortlist.items.filter(item => item.response).length}/${count} responded</span><button type="button" class="button" data-shortlist-placement="${request.id}">Interviews &amp; selection →</button></div></section>`;
     return `<section class="shortlist-send-bar"><div><strong>Ready to share this shortlist?</strong><span>Soro will send ${count} client-safe candidate profile${count === 1 ? '' : 's'} to ${escapeHtml(request.clientName)}.</span></div><button type="button" class="button primary" data-shortlist-send="${request.id}"${!count || !request.shortlist.id || !request.shortlist.updatedAt || !request.shortlist.canSend || pendingAction ? ' disabled' : ''}>Send for Client Review</button></section>`;
+  }
+
+  function emailDeliveryMarkup(request) {
+    if (workspace.emailDeliveryUnavailable) return '<section class="shortlist-email-status" role="status"><strong>Email status is temporarily unavailable.</strong><p>Your shortlist remains saved. Refresh to check email progress.</p><button class="text-button" type="button" data-shortlist-retry>Refresh email status</button></section>';
+    const row = workspace.emailDeliveries?.find(item => item.shortlistId === request.shortlist.id);
+    if (!row) return '<section class="shortlist-email-status"><strong>Email updates</strong><p>No email record for this shortlist. Emails begin with new sends and responses after this feature is enabled; older activity is not emailed again.</p></section>';
+    return `<section class="shortlist-email-status" aria-label="Shortlist email status"><div><strong>Email updates</strong><button class="text-button" type="button" data-shortlist-retry>Refresh status</button></div><p>${row.clientCount} client notification${row.clientCount===1?'':'s'} · ${row.salesCount} Sales notification${row.salesCount===1?'':'s'}</p><div class="shortlist-email-counts"><span>${row.sentCount} sent</span><span>${row.pendingCount} queued / retrying</span>${row.reviewCount?`<span class="shortlist-email-review">${row.reviewCount} need attention</span>`:''}</div><p class="shortlist-email-note">Sent means accepted by the email service, not confirmed inbox delivery.${row.lastSentAt?` Last sent ${escapeHtml(formatDate(row.lastSentAt))}.`:''}${row.reviewCount?' Contact an administrator to check the recipient’s current access and delivery record. Do not resend the shortlist to retry an email.':''}</p></section>`;
   }
 
   function clientContinueBarMarkup(request) {

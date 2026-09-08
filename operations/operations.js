@@ -562,7 +562,15 @@ function goBackFromReadOnlyTalentProfile(){const destination=viewAllowedForAuthe
 window.soroOpenClientProfile=openClientProfile;
 window.soroOpenTalentProfile=openTalentProfile;
 window.soroGoBackFromReadOnlyTalentProfile=goBackFromReadOnlyTalentProfile;
-nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(!b||!viewAllowedForAuthenticatedRole(b.dataset.view))return;current=b.dataset.view;selectedTalentId=null;selectedClientId=null;history.pushState({},'',`${location.pathname}#${current}`);setActive();render();document.querySelector('.sidebar').classList.remove('open')});window.addEventListener('popstate',()=>{const talentMatch=location.hash.match(/^#talent\/([^/]+)$/),clientMatch=location.hash.match(/^#client\/([^/]+)$/),placementMatch=location.hash.match(/^#client-placement\/([^/]+)$/);if(talentMatch){selectedTalentId=talentMatch[1];selectedClientId=null;current='talent-profile'}else if(clientMatch){selectedClientId=clientMatch[1];selectedTalentId=null;current='client-record'}else if(placementMatch){preferredHiringRequestId=placementMatch[1];selectedTalentId=null;selectedClientId=null;current='client-placement'}else{current=location.hash.slice(1)||'overview';selectedTalentId=null;selectedClientId=null}if(!viewAllowedForAuthenticatedRole(current)){current='overview';selectedTalentId=null;selectedClientId=null;history.replaceState({},'',`${location.pathname}#overview`)}setActive();render()});document.getElementById('mobile-menu').addEventListener('click',()=>document.querySelector('.sidebar').classList.toggle('open'));document.getElementById('client-mobile-profile')?.addEventListener('click',goToMyProfile);document.querySelectorAll('dialog').forEach(dialog=>{dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close('cancel')});dialog.querySelector('.modal-close')?.addEventListener('click',()=>dialog.close('cancel'));dialog.querySelector('.modal-cancel')?.addEventListener('click',()=>dialog.close('cancel'))});
+nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(!b||!viewAllowedForAuthenticatedRole(b.dataset.view))return;current=b.dataset.view;selectedTalentId=null;selectedClientId=null;history.pushState({},'',`${location.pathname}#${current}`);setActive();render();document.querySelector('.sidebar').classList.remove('open')});window.addEventListener('popstate',()=>{
+  const talentMatch=location.hash.match(/^#talent\/([^/]+)$/),clientMatch=location.hash.match(/^#client\/([^/]+)$/),placementMatch=location.hash.match(/^#client-placement\/([^/]+)$/),reviewMatch=location.hash.match(/^#client-candidate-review\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
+  if(talentMatch){selectedTalentId=talentMatch[1];selectedClientId=null;current='talent-profile'}
+  else if(clientMatch){selectedClientId=clientMatch[1];selectedTalentId=null;current='client-record'}
+  else if(placementMatch){preferredHiringRequestId=placementMatch[1];selectedTalentId=null;selectedClientId=null;current='client-placement'}
+  else if(reviewMatch){preferredHiringRequestId=reviewMatch[1];selectedTalentId=null;selectedClientId=null;current='client-candidate-review'}
+  else{current=location.hash.slice(1)||'overview';selectedTalentId=null;selectedClientId=null}
+  if(!viewAllowedForAuthenticatedRole(current)){current='overview';selectedTalentId=null;selectedClientId=null;history.replaceState({},'',`${location.pathname}#overview`)}setActive();render()
+});document.getElementById('mobile-menu').addEventListener('click',()=>document.querySelector('.sidebar').classList.toggle('open'));document.getElementById('client-mobile-profile')?.addEventListener('click',goToMyProfile);document.querySelectorAll('dialog').forEach(dialog=>{dialog.addEventListener('click',event=>{if(event.target===dialog)dialog.close('cancel')});dialog.querySelector('.modal-close')?.addEventListener('click',()=>dialog.close('cancel'));dialog.querySelector('.modal-cancel')?.addEventListener('click',()=>dialog.close('cancel'))});
 function applyRole(nextRole){
   if(actualAuthenticatedRole()!=='admin'||!roleConfig[nextRole])return;
   role=nextRole;
@@ -801,9 +809,11 @@ window.addEventListener('soro-auth-changed',event=>{
 const initialTalentHash=location.hash.match(/^#talent\/([^/]+)$/);
 const initialClientHash=location.hash.match(/^#client\/([^/]+)$/);
 const initialPlacementHash=location.hash.match(/^#client-placement\/([^/]+)$/);
+const initialReviewHash=location.hash.match(/^#client-candidate-review\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
 if(initialTalentHash){current='talent-profile';selectedTalentId=initialTalentHash[1]}
 else if(initialClientHash){current='client-record';selectedClientId=initialClientHash[1]}
 else if(initialPlacementHash){current='client-placement';preferredHiringRequestId=initialPlacementHash[1]}
+else if(initialReviewHash){current='client-candidate-review';preferredHiringRequestId=initialReviewHash[1]}
 else if(location.hash.slice(1) in data||['help','my-profile','client-talent-profile','client-candidate-review','client-shortlists','talent-my-profile','talent-review','available-talent'].includes(location.hash.slice(1))){current=location.hash.slice(1)}
 render();
 
