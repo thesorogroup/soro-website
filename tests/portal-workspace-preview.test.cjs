@@ -195,9 +195,9 @@ test('Admin workspace previews map all five choices to the real role navigation'
   }
 
   assert.deepEqual(roleViews(source, 'admin'), ['overview', 'tasks', 'clients', 'client-shortlists', 'client-placement', 'vas', 'available-talent', 'talent-review', 'talent-profile', 'placements', 'documents', 'reports', 'employees', 'payroll', 'help']);
-  assert.deepEqual(roleViews(source, 'sales'), ['overview', 'tasks', 'clients', 'client-shortlists', 'client-placement', 'available-talent', 'talent-profile', 'placements', 'reports', 'help']);
+  assert.deepEqual(roleViews(source, 'sales'), ['documents', 'overview', 'tasks', 'clients', 'client-shortlists', 'client-placement', 'available-talent', 'talent-profile', 'placements', 'reports', 'help']);
   assert.deepEqual(roleViews(source, 'talent_management'), ['overview', 'tasks', 'clients', 'client-placement', 'vas', 'available-talent', 'talent-review', 'talent-profile', 'placements', 'documents', 'reports', 'talent-payout-review', 'help']);
-  assert.deepEqual(roleViews(source, 'client_admin'), ['overview', 'client-candidate-review', 'client-placement', 'client-talent-profile', 'my-profile', 'help']);
+  assert.deepEqual(roleViews(source, 'client_admin'), ['documents', 'overview', 'client-candidate-review', 'client-placement', 'client-talent-profile', 'my-profile', 'help']);
   assert.deepEqual(roleViews(source, 'virtual_assistant'), ['overview', 'talent-my-profile', 'documents', 'help']);
   assert.deepEqual(roleViews(source, 'billing'), ['overview', 'tasks', 'placements', 'documents', 'reports', 'help']);
 
@@ -253,8 +253,7 @@ test('Admin-to-Sales preview cannot use the Admin session for search or live pro
 
   api.openClientProfile('10000000-0000-4000-8000-000000000002');
   assert.equal(calls.internalClientProfile, 0, 'The live internal Client profile must not mount in Sales preview.');
-  assert.equal(calls.localClientMounts.length, 1);
-  assert.equal(calls.localClientMounts[0].options.adapter.kind, 'approval');
+  assert.equal(calls.localClientMounts.length, 0, 'Removed sample clients must not mount.');
 
   api.openTalentProfile('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1');
   assert.equal(calls.readOnlyTalentProfile, 0, 'The live Talent profile must fail closed in Sales preview.');
@@ -262,64 +261,15 @@ test('Admin-to-Sales preview cannot use the Admin session for search or live pro
   assert.equal(calls.fetch, 0);
 });
 
-test('the preview Client Hub preserves one valid request UUID through shortlist and placement routing', async t => {
-  const { api, calls, window } = loadOperationsController();
+test('workspace preview has no fictional client records and cannot launch live placement work', () => {
+  const {api,calls,elements}=loadOperationsController();
   api.applyRole('sales');
-  const originalCustomEvent = globalThis.CustomEvent;
-  const originalDispatchEvent = globalThis.dispatchEvent;
-  globalThis.CustomEvent = window.CustomEvent;
-  globalThis.dispatchEvent = event => window.dispatchEvent(event);
-  t.after(() => {
-    clientWorkflow.unmount();
-    shortlistWorkflow.unmount();
-    if (originalCustomEvent === undefined) delete globalThis.CustomEvent;
-    else globalThis.CustomEvent = originalCustomEvent;
-    if (originalDispatchEvent === undefined) delete globalThis.dispatchEvent;
-    else globalThis.dispatchEvent = originalDispatchEvent;
-  });
-
-  const previewSeed = clientWorkflow.defaultSeed();
-  const clientId = previewSeed[0].id;
-  const requestId = previewSeed[0].hiringRequests[0].id;
-  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-  assert.match(requestId, uuid);
-  assert.equal(requestId, placementWorkflow.defaultSeed('sales').request.hiringRequestId);
-  const generatedAdapter = clientWorkflow.createApprovalAdapter();
-  const createdPreview = await generatedAdapter.createClientBundle(clientWorkflow.normalizeBundle({
-    companyName: 'Preview Client', contactName: 'Avery Parker', contactEmail: 'avery@preview.example',
-    ownerId: 'preview-owner-morgan', roleTitle: 'Operations VA', portalInvite: false
-  }));
-  assert.match(createdPreview.id, uuid);
-  assert.match(createdPreview.hiringRequests[0].id, uuid);
-  const previewWithAnotherRequest = await generatedAdapter.addHiringRequest(createdPreview, { roleTitle: 'Support VA' });
-  assert.match(previewWithAnotherRequest.hiringRequests[0].id, uuid);
-
-  const shortlistTarget = clientHubTarget();
-  await clientWorkflow.mount(shortlistTarget, { role: 'sales', clientId, adapter: clientWorkflow.createApprovalAdapter(previewSeed) });
-  assert.match(shortlistTarget.innerHTML, /data-client-workflow-state="hub"/);
-  const shortlistButton = shortlistTarget.nextButtons.find(button => button.dataset.clientWorkflowNext === 'shortlist');
-  assert.ok(shortlistButton);
-  shortlistButton.click();
-  const shortlistOptions = calls.shortlistMounts.at(-1).options;
-  assert.equal(shortlistOptions.requestId, requestId);
-  assert.equal(api.state().preferredHiringRequestId, requestId);
-
-  await shortlistOptions.submitter({ action: 'send_shortlist' });
-  const shortlistPage = operationElement('shortlist-page');
-  shortlistWorkflow.mount(shortlistPage, shortlistOptions);
-  await new Promise(resolve => setImmediate(resolve));
-  assert.match(shortlistPage.innerHTML, new RegExp(`data-shortlist-placement="${requestId}"`));
-  const placementLink = { dataset: { shortlistPlacement: requestId } };
-  shortlistPage.dispatch('click', { target: { closest(selector) { return selector === '[data-shortlist-placement]' ? placementLink : null; } } });
-  const placementOptions = calls.placementMounts.at(-1).options;
-  assert.equal(placementOptions.hiringRequestId, requestId);
-  assert.equal(placementOptions.adapter.kind, 'approval');
-  assert.equal(placementOptions.adapter.seed.request.hiringRequestId, requestId);
-  assert.match(calls.history.at(-1).url, new RegExp(`#client-placement/${requestId}$`));
-
-  const placementCount = calls.placementMounts.length;
-  assert.equal(api.openClientPlacementWorkflow('preview-request-medical-va'), false);
-  assert.equal(calls.placementMounts.length, placementCount, 'Invalid live IDs must remain rejected.');
+  api.openClientProfile('10000000-0000-4000-8000-000000000002');
+  assert.equal(calls.localClientMounts.length,0);
+  assert.equal(calls.internalClientProfile,0);
+  assert.equal(calls.fetch,0);
+  assert.equal(api.openClientPlacementWorkflow('not-a-record'),false);
+  assert.match(read('operations/operations.js'),/Sample accounts and records have been removed/);
 });
 
 test('workspace preview state never mutates the authenticated authorization record', () => {

@@ -227,6 +227,7 @@
   function bindProfile(root, profile, key) {
     const form = root.querySelector('#client-profile-form');
     if (!form) return;
+    const documents=root.ownerDocument.createElement('button');documents.type='button';documents.className='button dc-profile-link';documents.textContent='My documents & requests';documents.addEventListener('click',()=>window.soroOpenDocumentCenter?.());form.before(documents);
     const unsaved = form.querySelector('[data-client-profile-unsaved]');
     form.addEventListener('input', () => {
       if (unsaved) unsaved.hidden = Object.keys(changedPayload(form, profile)).length === 0;

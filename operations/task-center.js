@@ -15,6 +15,8 @@
   let requestVersion = 0;
   let reviewCount = 0;
   let supportUnread = 0;
+  let documentAttention = 0;
+  function setDocumentNotifications(value){documentAttention=Math.max(0,Math.min(100000,Number(value?.count)||0));updateShell();}
   function setSupportNotifications(value) {
     supportUnread = Math.max(0, Math.min(100000, Number(value?.unread) || 0));
     updateShell();
@@ -183,7 +185,7 @@
     if (tasksNav) tasksNav.setAttribute('aria-label', open ? `My Tasks, ${open} open` : 'My Tasks, none open');
 
     const accessibleReviewCount = canOpenReviewQueue() ? reviewCount : 0;
-    const notificationCount = (state.phase === 'ready' ? state.summary.urgentUnread : 0) + accessibleReviewCount + supportUnread;
+    const notificationCount = (state.phase === 'ready' ? state.summary.urgentUnread : 0) + accessibleReviewCount + supportUnread + documentAttention;
     const bell = root?.document?.getElementById?.('notifications-button');
     const badge = root?.document?.getElementById?.('notifications-count');
     if (badge) {
@@ -215,7 +217,8 @@
       : '';
     const taskItems = taskNotifications.map(item => `<button type="button" data-notification-view="tasks" data-notification-id="${escapeHtml(item.id)}"><span class="notification-dot"></span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.message)}</small></span><b>Open</b></button>`).join('');
     const supportItem = supportUnread ? `<button type="button" data-notification-view="help"><span class="notification-dot"></span><span><strong>${supportUnread} support ${supportUnread === 1 ? 'ticket has' : 'tickets have'} unread updates</strong><small>Open Help & Support to read and respond.</small></span><b>Open</b></button>` : '';
-    list.innerHTML = `${queueItem}${taskItems}${supportItem}` || '<p class="notifications-empty">You have no notifications requiring attention.</p>';
+    const documentItem=documentAttention?`<button type="button" data-notification-view="documents"><span class="notification-dot"></span><span><strong>${documentAttention} document ${documentAttention===1?'request needs':'requests need'} attention</strong><small>Review your assigned documents or returned submissions.</small></span><b>Open</b></button>`:'';
+    list.innerHTML = `${queueItem}${taskItems}${supportItem}${documentItem}` || '<p class="notifications-empty">You have no notifications requiring attention.</p>';
   }
 
   function assigneeId(assignee) {
@@ -393,6 +396,7 @@
 
   function handleAuthChange(event) {
     supportUnread = 0;
+    documentAttention=0;
     const access = event?.detail?.access || null;
     if (!access || !canLoad(access.role)) {
       requestVersion += 1;
@@ -417,6 +421,7 @@
   bindTaskForm();
   bindNotifications();
   root?.addEventListener?.('soro-auth-changed', handleAuthChange);
+  root?.addEventListener?.('soro:document-notifications',()=>setDocumentNotifications(root.soroDocumentNotifications));
   root?.addEventListener?.('soro:talent-review-queue-updated', handleReviewQueueUpdate);
   if (root?.document) {
     root.addEventListener?.('focus', refreshWhenActive);
@@ -426,6 +431,6 @@
 
   return Object.freeze({
     ENDPOINT, AUTO_REFRESH_MS, OPERATIONS_TIME_ZONE, PRIORITY_LABELS, canLoad, normalizePayload, currentState: () => state, reviewQueueCount,
-    dashboardData, renderPage, bindPage, bindDashboardMetric, refresh, updateTask, createTask, handleAuthChange, handleReviewQueueUpdate, setSupportNotifications
+    dashboardData, renderPage, bindPage, bindDashboardMetric, refresh, updateTask, createTask, handleAuthChange, handleReviewQueueUpdate, setSupportNotifications, setDocumentNotifications
   });
 }));

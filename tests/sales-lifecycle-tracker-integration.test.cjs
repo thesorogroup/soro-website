@@ -70,7 +70,7 @@ test('shell mounts the tracker only in a Sales overview with an eligible effecti
   }
 });
 
-test('Admin-as-Sales preview passes an explicit labeled sample loader with the complete contract', async () => {
+test('Admin-as-Sales preview preserves its isolated loader without fictional client records', async () => {
   const run = context({ preview: true });
   run.sandbox.mountSalesTracker();
   const config = run.mounts[0].config;
@@ -78,7 +78,7 @@ test('Admin-as-Sales preview passes an explicit labeled sample loader with the c
   assert.equal(typeof config.loader, 'function');
   const sample = await config.loader();
   const normalized = tracker.normalizeWorkspace(sample, 'sales');
-  assert.ok(normalized.rows.length > 0);
+  assert.equal(normalized.rows.length, 0);
   for (const row of normalized.rows) for (const key of ['seatCount', 'candidateCount', 'interviewCount', 'placementCount', 'activePlacementCount', 'onboardingCount']) assert.equal(Number.isInteger(row[key]), true, key);
 });
 

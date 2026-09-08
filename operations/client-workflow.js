@@ -922,6 +922,7 @@
     const portalCanManage = portalActions(client.portal).length > 0;
     return `<main class="page client-workflow-page client-workflow-hub" data-client-workflow data-client-workflow-state="hub" data-client-id="${escapeHtml(client.id)}">
       <button class="client-workflow-back" type="button" data-client-workflow-back>← Back to Client Pipeline</button>
+      <div class="dc-profile-link"><button type="button" class="button" data-document-profile="client" data-document-subject="${escapeHtml(client.id)}">Documents & requests</button></div>
       <header class="client-workflow-hub-heading">
         <span class="client-workflow-hub-mark" aria-hidden="true">${escapeHtml(initials(client.company.name))}</span>
         <div><p class="eyebrow">Client Hub</p><h1>${escapeHtml(client.company.name)}</h1><p>${escapeHtml(client.company.industry || 'Industry not recorded')} · Owned by ${escapeHtml(client.owner.name)}</p></div>

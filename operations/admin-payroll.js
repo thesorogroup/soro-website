@@ -848,6 +848,7 @@
     rendererInstalled = true;
     const originalRender = render;
     render = function () {
+      window.SoroDocumentCenter?.unmount?.();
       if (typeof current === 'undefined' || !['payroll', 'talent-payout-review'].includes(current)) return originalRender();
       if (!canOpenView(current, actualRole())) {
         current = 'overview';

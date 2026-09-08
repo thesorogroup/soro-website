@@ -136,6 +136,7 @@
   }
 
   render = function () {
+    window.SoroDocumentCenter?.unmount?.();
     if (current !== 'employees') return originalRender();
     if (!canManageEmployees()) {
       current = 'overview';
@@ -394,9 +395,10 @@
         <dl class="employee-profile-details"><div><dt>Hire date</dt><dd>${escapeHtml(formatEmployeeDate(employee.hire_date))}</dd></div><div><dt>Email</dt><dd>${employee.email ? `<a href="mailto:${escapeHtml(employee.email)}">${escapeHtml(employee.email)}</a>` : 'Not recorded'}</dd></div><div><dt>Phone</dt><dd>${employee.phone ? `<a href="tel:${escapeHtml(employee.phone)}">${escapeHtml(employee.phone)}</a>` : 'Not recorded'}</dd></div><div><dt>Payment route</dt><dd>${profileComplete ? escapeHtml(EMPLOYEE_PAYMENT_ROUTE_LABELS[paymentRoute]) : 'Not recorded'}</dd></div>${profileComplete ? recipientDetail : ''}<div class="employee-profile-address"><dt>Address</dt><dd>${employeeAddress(employee) ? escapeHtml(employeeAddress(employee)).replaceAll('\n', '<br>') : 'Not recorded'}</dd></div></dl>
         ${status.setupRequired && access.role === 'admin' ? '<label class="employee-profile-security-check">Administrator security check<input name="administrator_password" type="password" autocomplete="current-password" placeholder="Re-enter your Soro password" /><small>Required before generating new credentials for an Administrator.</small></label>' : ''}
         ${access.role === 'sales' ? `<section class="employee-effective-access"><strong>Client-facing work contact</strong><p>These details appear on assigned clients’ dashboards. Private employee contact details above are not shared.</p><p>${escapeHtml(access.business_email || 'Work email not set')}<br>${escapeHtml(access.business_phone || 'Work phone not set')}</p><button type="button" class="admin-record-button" data-edit-business-contact>Edit work contact</button></section>` : ''}
-        <p class="employee-profile-action-message" aria-live="polite"></p><footer class="record-manager-footer">${profileComplete && status.setupRequired ? '<button type="button" class="admin-record-button" data-reissue-credentials>Generate new temporary password</button>' : ''}${profileComplete ? '<button type="button" class="admin-record-button" data-edit-payment-route>Edit payment setup</button>' : ''}<button type="button" class="admin-record-button admin-record-button--primary" data-close-profile>Close profile</button></footer>
+        <p class="employee-profile-action-message" aria-live="polite"></p><footer class="record-manager-footer"><button type="button" class="admin-record-button" data-employee-documents>Documents & requests</button>${profileComplete && status.setupRequired ? '<button type="button" class="admin-record-button" data-reissue-credentials>Generate new temporary password</button>' : ''}${profileComplete ? '<button type="button" class="admin-record-button" data-edit-payment-route>Edit payment setup</button>' : ''}<button type="button" class="admin-record-button admin-record-button--primary" data-close-profile>Close profile</button></footer>
       </div>`
     });
+    dialog.querySelector('[data-employee-documents]')?.addEventListener('click',()=>{dialog.close('documents');window.soroOpenDocumentCenter?.({subjectKind:'employee',subjectId:employee.user_id});});
     dialog.querySelector('[data-close-profile]')?.addEventListener('click', () => dialog.close('done'));
     dialog.querySelector('[data-reissue-credentials]')?.addEventListener('click', event => reissueTemporaryPassword(employee, dialog, event.currentTarget));
     dialog.querySelector('[data-edit-payment-route]')?.addEventListener('click', () => openEmployeePaymentDialog(employee, dialog));

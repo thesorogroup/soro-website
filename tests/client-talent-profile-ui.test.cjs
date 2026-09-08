@@ -49,9 +49,9 @@ const fixture = {
 test('Client Portal navigation remains client-safe while candidate review can continue into placement', () => {
   const operations = read('operations/operations.js');
   const html = read('operations/index.html');
-  assert.match(operations, /client_admin:new Set\(\['overview','client-candidate-review','client-placement','client-talent-profile','my-profile','help'\]\)/);
-  assert.match(operations, /client_reviewer:new Set\(\['overview','client-candidate-review','client-placement','client-talent-profile','my-profile','help'\]\)/);
-  assert.match(operations, /client_billing:new Set\(\['overview','my-profile','help'\]\)/);
+  assert.match(operations, /client_admin:new Set\(\['documents','overview','client-candidate-review','client-placement','client-talent-profile','my-profile','help'\]\)/);
+  assert.match(operations, /client_reviewer:new Set\(\['documents','overview','client-candidate-review','client-placement','client-talent-profile','my-profile','help'\]\)/);
+  assert.match(operations, /client_billing:new Set\(\['documents','overview','my-profile','help'\]\)/);
   assert.doesNotMatch(operations, /client_billing:new Set\([^\n]*client-talent-profile/);
   assert.match(html, /id="client-talent-profile-nav"[^>]*data-view="client-talent-profile"[^>]*hidden>Talent Profile</);
   assert.match(html, /id="client-account-settings-nav"[^>]*data-view="my-profile"[^>]*hidden>Account Settings</);

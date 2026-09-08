@@ -59,8 +59,8 @@ test('the client identity controls open Account Settings while Admin preview sta
 test('the page loads cache-busted profile assets before routing and authentication', () => {
   const html = read('operations/index.html');
   assert.match(html, /client-profile\.css\?v=20260829-client-profile/);
-  assert.match(html, /client-profile\.js\?v=20260907-client-care/);
-  assert.ok(html.indexOf('client-profile.js?v=20260907-client-care') < html.indexOf('src="operations.js?'));
+  assert.match(html, /client-profile\.js\?v=20260908-document-center/);
+  assert.ok(html.indexOf('client-profile.js?v=20260908-document-center') < html.indexOf('src="operations.js?'));
   assert.match(html, /auth\.js\?v=20260907-client-account-setup/);
 });
 
