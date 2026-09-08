@@ -127,8 +127,11 @@ test('private Talent address and Benefits authority comes from authenticated acc
 
   assert.match(tabs, /window\.soroCurrentAccess/);
   assert.doesNotMatch(tabs, /typeof\s+role|\broleConfig\b/);
-  const benefitsRoles = namedDeclaration(tabs, ['benefitsRoles', 'BENEFITS_ROLES']);
-  assert.doesNotMatch(benefitsRoles, /['"]sales(?:_management)?['"]/i);
+  const benefitsGuard = namedFunction(tabs, 'canViewBenefits');
+  assert.match(benefitsGuard, /SoroTalentHealthcare\.canView\(window\.soroCurrentAccess/);
+  assert.match(benefitsGuard, /SoroTalentHealthcare\?\.liveAllowed/);
+  const healthcare = read('operations/talent-healthcare.js');
+  assert.match(healthcare, /\['admin','talent_management'\]\.includes\(a.role\)/);
 });
 
 test('private Talent editing and the skill library ignore the mutable workspace preview role', () => {

@@ -131,6 +131,18 @@ The VA portal should eventually provide self-service visibility into the VA's ow
 
 All access and changes to Growth & Support information require enhanced audit logging and must follow the eventual retention, consent, and privacy rules.
 
+### Healthcare administration build — September 8, 2026
+
+Status: approved for production release on September 8, 2026. Healthcare schema 053 and the interface below are included in this release.
+
+- Talent Profile → Benefits → Healthcare reuses the existing profile layout. Medical, Prescription, Dental, and Vision have separate carrier, plan, member/account/group identifiers, coverage dates, and member-service contacts. Prescription coverage also records BIN, PCN, and prescription group identifiers.
+- Covered dependents/+1 have their own name, relationship, covered plan types, member ID, coverage dates, and an optional birth date only when needed for administration. This is not a clinical record or a place for government IDs or passwords.
+- An active Talent account can read only its own coverage. Actual Admin/Founder and Talent Management accounts can maintain same-organization records. Sales, Clients, and Billing cannot read this section. Account identifiers are masked until revealed; private snapshots and access/change events stay outside shared activity feeds, search, and reports.
+- A new onboarding/active placement creates a healthcare enrollment follow-up. Admin/Talent Management can also add it to an existing placement. Carrier confirmation, an effective date, and updated coverage details are required to mark enrollment confirmed. Existing placement activation gates are unchanged.
+- A planned coverage-ending step can be opened without changing the placement's actual end date. A placement that is ended opens a cancellation review automatically. Staff must check continuing assignments and current coverage, record the carrier's confirmation, or document why coverage continues/no change is needed.
+- The placement-ending workflow remains partial: this build adds the healthcare step, not a new full employment-ending action. No insurance-provider request, enrollment/cancellation email, payroll change, benefit-credit calculation, or allowance activation is performed automatically. The earlier allowance policy above is not proof that insurance coverage has been activated.
+- No sample coverage, dependent, or account data is inserted into production. Consent, retention, provider procedures, and any legal/privacy requirements remain launch-validation items.
+
 ## Dreams & Growth Pathway
 
 The Dream Pathway begins when a VA enters an Active client placement, not while the VA is on the Available VA Bench. Every active VA receives a quarterly Growth & Support review. Dreams, needs, goals, and circumstances may change; each review should preserve the current discussion, progress, and a specific next step.

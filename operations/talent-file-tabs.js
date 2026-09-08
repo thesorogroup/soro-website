@@ -2,7 +2,6 @@
 (function () {
   const originalProfilePage = profilePage;
   const originalLoadTalentProfileDocuments = loadTalentProfileDocuments;
-  const benefitsRoles = new Set(['admin', 'talent_management']);
   const payRoles = new Set(['admin', 'billing', 'talent_management']);
   let activeTab = 'profile';
   let lastTalentId = null;
@@ -23,10 +22,20 @@
       && ['sales', 'sales_management'].includes(effectiveProfileRole());
   }
 
-  function canViewBenefits() {
-    return !isReadOnlySalesProfile()
-      && !(typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView())
-      && benefitsRoles.has(String(window.soroCurrentAccess?.role || '').toLowerCase());
+  function canViewBenefits(applicant) {
+    return !isReadOnlySalesProfile() && window.SoroTalentHealthcare?.liveAllowed()
+      && window.SoroTalentHealthcare.canView(window.soroCurrentAccess, applicant,
+        typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView());
+  }
+
+  function mountHealthcare(shell) {
+    const target = shell?.querySelector('[data-talent-healthcare]');
+    if (!target?.isConnected || target.dataset.healthcareMounted) return;
+    const applicant = typeof currentTalentProfileApplicant === 'function' ? currentTalentProfileApplicant() : null;
+    if (!canViewBenefits(applicant) || applicant.id !== target.dataset.talentHealthcare) return;
+    target.dataset.healthcareMounted = 'true';
+    window.SoroTalentHealthcare.mount(target, { applicantId: applicant.id,
+      isCurrent: () => lastTalentId === applicant.id && canViewBenefits(applicant) });
   }
 
   function canViewPay() {
@@ -133,8 +142,7 @@
   }
 
   function benefitsPanel(applicant) {
-    const active = String(applicant.status || '').toLowerCase() === 'active';
-    return `<div class="talent-tab-heading"><div><p class="eyebrow">Protected Growth &amp; Support</p><h2>Benefits</h2><p>Restricted benefit administration and support information for authorized Soro team members.</p></div><span class="restricted-chip" aria-label="Restricted access">▣ Restricted</span></div><div class="talent-tab-summary"><article><span>Current status</span><strong>${active ? 'Eligibility review needed' : 'Not active yet'}</strong><small>${active ? 'Confirm the applicable program and effective date.' : 'Benefit administration begins only after the applicable active-placement requirements are confirmed.'}</small></article><article><span>Benefit credits</span><strong>Not configured</strong><small>No credit balance or earning rule has been approved for this Talent.</small></article><article><span>Next review</span><strong>Not scheduled</strong><small>The next Growth &amp; Support review will appear here when scheduled.</small></article></div><div class="talent-tab-empty"><span aria-hidden="true">＋</span><div><strong>No benefit records yet</strong><p>Enrollment, eligibility, approved support, and auditable benefit-credit activity will appear here without exposing clinical or provider records.</p></div></div>`;
+    return `<div data-talent-healthcare="${escapeHtml(applicant.id)}"></div>`;
   }
 
   function attendancePanel() {
@@ -215,6 +223,7 @@
     activeArtwork?.removeAttribute('transform');
     fillPath?.setAttribute('d', geometry.fill);
     edgePath?.setAttribute('d', geometry.edge);
+    if (requested === 'benefits') mountHealthcare(shell);
   }
 
   profilePage = function (applicant) {
@@ -247,7 +256,7 @@
     details.insertAdjacentElement('beforebegin', summaryColumn);
     summaryColumn.append(details);
     if (screening) summaryColumn.append(screening);
-    const benefitsAvailable = canViewBenefits();
+    const benefitsAvailable = canViewBenefits(applicant);
     if (!benefitsAvailable && activeTab === 'benefits') activeTab = 'profile';
 
     const shell = document.createElement('section');
@@ -357,6 +366,7 @@
     const applicant = typeof currentTalentProfileApplicant === 'function'
       ? currentTalentProfileApplicant()
       : liveApplicants.find(item => item.id === selectedTalentId);
+    if (applicant && window.SoroTalentHealthcare?.consumeOpen(applicant.id)) activateTab('benefits');
     await loadTalentFileContext(applicant);
   };
 
