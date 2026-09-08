@@ -8,3 +8,7 @@
 @media(max-width:1120px){.client-home-grid{grid-template-columns:minmax(0,1fr)}.client-home-aside{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.client-home-support{grid-column:1/-1}.client-home-metrics{gap:12px}.client-home-metric{padding:16px}}
 @media(max-width:680px){.client-home-heading{flex-direction:column;gap:14px}.client-home-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.client-home-aside{grid-template-columns:minmax(0,1fr)}.client-home-grid,.client-home-main,.client-home-aside{gap:16px}.client-home-panel,.client-home-support{padding:18px}.client-home-request{align-items:flex-start;flex-direction:column;gap:12px}.client-home-request>.client-home-button{flex:none}.client-home-interview{grid-template-columns:42px minmax(0,1fr)}.client-home-heading h1{font-size:1.75rem}}
 @media(prefers-reduced-motion:reduce){.client-home *{scroll-behavior:auto!important}}
+/* Deliberately published work contact details, never private employee fields. */
+.client-home-sales-contact { display:grid; gap:8px; margin-bottom:22px; padding-bottom:20px; border-bottom:1px solid #dbe5ee; }
+.client-home-sales-contact h2,.client-home-sales-contact p { margin:0; }
+.client-home-sales-contact a { color:#215989; overflow-wrap:anywhere; text-underline-offset:3px; }

@@ -1,6 +1,9 @@
 [build]
   publish = "."
 
+[functions."portal-confirmations"]
+  schedule = "* * * * *"
+
 [[redirects]]
   from = "/about-us/"
   to = "/about-us.html"

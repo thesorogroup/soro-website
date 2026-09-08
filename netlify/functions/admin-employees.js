@@ -413,6 +413,20 @@ function validUuid(value) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || '').trim());
 }
 
+async function updateEmployeeBusinessContact(event, body) {
+  const administrator = await requireAdministrator(event);
+  if (!administrator) return json(403, { message: 'Administrator access is required.' });
+  const email = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+  const phone = typeof body.phone === 'string' ? body.phone.trim() : '';
+  if (!validUuid(body.userId) || typeof body.email !== 'string' || typeof body.phone !== 'string'
+    || email.length > 254 || (email && !/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email))
+    || (phone && (!/^[+\d(). x-]{3,40}$/i.test(phone) || !/[0-9]/.test(phone)))) return json(400, { message: 'Enter valid work contact details, or leave them blank.' });
+  await serviceRequest('/rest/v1/rpc/update_employee_business_contact', { method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ p_actor_user_id: administrator.user.id, p_user_id: body.userId, p_email: email, p_phone: phone }) });
+  return json(200, { saved: true });
+}
+
 async function updateEmployeePaymentRoute(event, body) {
   const administrator = await requireAdministrator(event);
   if (!administrator) return json(403, { message: 'Only an active Soro Administrator can update employee payment routing.' });
@@ -633,6 +647,10 @@ exports.handler = async (event) => {
         return json(400, { code: 'unsupported_scope', message: 'Only the approved employee profile fields are accepted.' });
       }
       return await createEmployee(event, body);
+    }
+    if (action === 'update_employee_business_contact') {
+      if (!hasExactKeys(body, ['action','userId','email','phone'], [])) return json(400, { message: 'Only work contact fields are accepted.' });
+      return await updateEmployeeBusinessContact(event, body);
     }
     if (action === 'update_employee_payment_route') {
       if (!hasExactKeys(body, UPDATE_PAYMENT_ROUTE_REQUIRED_KEYS, UPDATE_PAYMENT_ROUTE_OPTIONAL_KEYS)) {

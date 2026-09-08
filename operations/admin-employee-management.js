@@ -393,12 +393,37 @@
         ${profileComplete ? '' : '<section class="employee-effective-access employee-profile-incomplete"><strong>Private profile details are not complete</strong><p>The Founder identity is active and has Administrator access. Hire date, phone, address, and payment details have intentionally not been invented and can be completed when the real information is available.</p></section>'}
         <dl class="employee-profile-details"><div><dt>Hire date</dt><dd>${escapeHtml(formatEmployeeDate(employee.hire_date))}</dd></div><div><dt>Email</dt><dd>${employee.email ? `<a href="mailto:${escapeHtml(employee.email)}">${escapeHtml(employee.email)}</a>` : 'Not recorded'}</dd></div><div><dt>Phone</dt><dd>${employee.phone ? `<a href="tel:${escapeHtml(employee.phone)}">${escapeHtml(employee.phone)}</a>` : 'Not recorded'}</dd></div><div><dt>Payment route</dt><dd>${profileComplete ? escapeHtml(EMPLOYEE_PAYMENT_ROUTE_LABELS[paymentRoute]) : 'Not recorded'}</dd></div>${profileComplete ? recipientDetail : ''}<div class="employee-profile-address"><dt>Address</dt><dd>${employeeAddress(employee) ? escapeHtml(employeeAddress(employee)).replaceAll('\n', '<br>') : 'Not recorded'}</dd></div></dl>
         ${status.setupRequired && access.role === 'admin' ? '<label class="employee-profile-security-check">Administrator security check<input name="administrator_password" type="password" autocomplete="current-password" placeholder="Re-enter your Soro password" /><small>Required before generating new credentials for an Administrator.</small></label>' : ''}
+        ${access.role === 'sales' ? `<section class="employee-effective-access"><strong>Client-facing work contact</strong><p>These details appear on assigned clients’ dashboards. Private employee contact details above are not shared.</p><p>${escapeHtml(access.business_email || 'Work email not set')}<br>${escapeHtml(access.business_phone || 'Work phone not set')}</p><button type="button" class="admin-record-button" data-edit-business-contact>Edit work contact</button></section>` : ''}
         <p class="employee-profile-action-message" aria-live="polite"></p><footer class="record-manager-footer">${profileComplete && status.setupRequired ? '<button type="button" class="admin-record-button" data-reissue-credentials>Generate new temporary password</button>' : ''}${profileComplete ? '<button type="button" class="admin-record-button" data-edit-payment-route>Edit payment setup</button>' : ''}<button type="button" class="admin-record-button admin-record-button--primary" data-close-profile>Close profile</button></footer>
       </div>`
     });
     dialog.querySelector('[data-close-profile]')?.addEventListener('click', () => dialog.close('done'));
     dialog.querySelector('[data-reissue-credentials]')?.addEventListener('click', event => reissueTemporaryPassword(employee, dialog, event.currentTarget));
     dialog.querySelector('[data-edit-payment-route]')?.addEventListener('click', () => openEmployeePaymentDialog(employee, dialog));
+    dialog.querySelector('[data-edit-business-contact]')?.addEventListener('click', () => openEmployeeBusinessDialog(employee, dialog));
+    dialog.showModal();
+  }
+
+  function openEmployeeBusinessDialog(employee, profileDialog) {
+    if (!canManageEmployees() || employeeAccess(employee).role !== 'sales') return;
+    const access = employeeAccess(employee);
+    const dialog = dialogShell({ eyebrow: 'Client-facing details', title: 'Sales work contact', content: `<form class="record-manager-form"><p>Only enter contact details you want clients to see. Both fields are optional.</p><div class="record-manager-field"><label>Work email<input name="email" type="email" maxlength="254" value="${escapeHtml(access.business_email || '')}"></label></div><div class="record-manager-field"><label>Work phone<input name="phone" type="tel" maxlength="40" value="${escapeHtml(access.business_phone || '')}"></label></div><p role="status"></p><footer class="record-manager-footer"><button type="button" class="admin-record-button" data-cancel>Cancel</button><button class="admin-record-button admin-record-button--primary" type="submit">Save work contact</button></footer></form>` });
+    dialog.querySelector('[data-cancel]').addEventListener('click', () => dialog.close());
+    dialog.querySelector('form').addEventListener('submit', async event => {
+      event.preventDefault();
+      if (!canManageEmployees()) return;
+      const form = event.target, button = form.querySelector('[type="submit"]');
+      button.disabled = true;
+      try {
+        const session = await window.soroSupabase.auth.getSession();
+        if (!session.data?.session?.access_token) throw new Error('Sign in again to continue.');
+        const response = await fetch('/.netlify/functions/admin-employees', { method: 'POST', headers: { Authorization: `Bearer ${session.data.session.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_employee_business_contact', userId: employee.user_id, email: form.elements.email.value, phone: form.elements.phone.value }) });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Could not save work contact.');
+        dialog.close(); profileDialog.close(); await loadEmployees(); openEmployeeProfile(employee.user_id);
+      } catch (error) { form.querySelector('[role="status"]').textContent = error.message; }
+      finally { button.disabled = false; }
+    });
     dialog.showModal();
   }
 

@@ -126,14 +126,20 @@ function optionalText(value, label, { minimum = 0, maximum, nullable = true } = 
 function normalizedWebsite(value) {
   const normalized = optionalText(value, 'Website', { maximum: 2048, nullable: true });
   if (!normalized) return null;
+  const invalidWebsite = () => httpError(400, 'invalid_field', 'Enter a website such as example.com, including its domain extension.');
+  if (/[\s\\\u0000-\u001f\u007f]/.test(normalized)
+    || (/^[a-z][a-z0-9+.-]*:/i.test(normalized) && !/^https?:\/\//i.test(normalized))) throw invalidWebsite();
   const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(normalized) ? normalized : `https://${normalized}`;
   let url;
   try { url = new URL(withScheme); } catch {
     throw httpError(400, 'invalid_field', 'Enter a valid company website.');
   }
-  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || !url.hostname) {
-    throw httpError(400, 'invalid_field', 'Enter a valid http or https company website.');
-  }
+  const hostname = url.hostname.replace(/\.$/, '');
+  const labels = hostname.split('.');
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password
+    || hostname.length > 253 || labels.length < 2
+    || labels.some(label => !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label))
+    || !/^(?:[a-z]{2,63}|xn--[a-z0-9-]{2,59})$/i.test(labels.at(-1))) throw invalidWebsite();
   const result = url.toString();
   if (result.length > 2048) throw httpError(400, 'invalid_field', 'Website must be no more than 2048 characters.');
   return result;

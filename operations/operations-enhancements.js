@@ -642,6 +642,7 @@
   window.soroRemoveOwnProfileManagementActions = removeOwnProfileManagementActions;
 
   render = function () {
+    window.SoroSupportTickets?.unmount?.();
     if (typeof viewAllowedForAuthenticatedRole === 'function' && !viewAllowedForAuthenticatedRole(current)) {
       // Auth has not established workspace access yet. Keep any invitation or
       // recovery callback intact until Supabase consumes it; baseRender keeps
@@ -656,6 +657,7 @@
       window.soroClientShortlistWorkflow?.unmount?.({ clear: false });
       window.SoroClientDashboard?.unmount?.({ clear: false });
       root.innerHTML = supportPage();
+      window.SoroSupportTickets?.mount?.(root);
       return;
     }
     if (current === 'talent-my-profile') {
@@ -779,30 +781,6 @@
       render();
       return;
     }
-    if (event.target.id !== 'help-ticket-form') return;
-    event.preventDefault();
-    const form = new FormData(event.target);
-    const confirmation = document.getElementById('ticket-confirmation');
-    const submitButton = event.target.querySelector('[type="submit"]');
-    if (!window.soroSupabase) {
-      confirmation.innerHTML = '<p class="ticket-confirmation">Support is temporarily unavailable. Please refresh and try again.</p>';
-      return;
-    }
-    submitButton.disabled = true;
-    submitButton.textContent = 'Submitting…';
-    const { data: ticket, error } = await window.soroSupabase
-      .from('support_tickets')
-      .insert({ subject: form.get('subject'), area: form.get('area'), details: form.get('details') })
-      .select('ticket_number')
-      .single();
-    submitButton.disabled = false;
-    submitButton.textContent = 'Submit support ticket';
-    if (error) {
-      confirmation.innerHTML = `<p class="ticket-confirmation">We could not submit this ticket yet. Please try again or sign in again if your session has expired.</p>`;
-      return;
-    }
-    event.target.reset();
-    confirmation.innerHTML = `<p class="ticket-confirmation">Ticket ${escapeHtml(ticket.ticket_number)} submitted. The Soro support team can now review it.</p>`;
   });
   render();
 }());
