@@ -1307,7 +1307,10 @@
     }
   }
 
-  function unmount({ clear = true } = {}) {
+  function unmount({ clear = true, reset = false } = {}) {
+    // The sidebar owns a background queue load even when the queue view is absent.
+    // Other portal renders must not cancel that load or strand it in loading state.
+    if (!mountedRoot && !reset) return false;
     requestVersion += 1;
     verificationRequestVersion += 1;
     abortActiveRequest();
@@ -1322,6 +1325,10 @@
     actionContext = null;
     verificationContext = null;
     verificationGateCache.clear();
+    if (queue.phase === 'loading') {
+      queue = emptyQueue();
+      syncNavigationBadge(queue);
+    }
     return true;
   }
 
@@ -1392,10 +1399,14 @@
 
   function handleAuthChange(event) {
     const detail = event?.detail || event || {};
+    // Reset shared state on every auth transition, including when no view is mounted.
+    unmount({ reset: true });
+    filters = Object.freeze({ stage: 'all', search: '' });
+    feedback = Object.freeze({ type: '', message: '' });
+    setQueue(emptyQueue());
     if (!detail.session || !canOpenForRole(detail.access?.role)) {
-      if (mountedRoot) unmount();
       syncNavigationBadge(emptyQueue(), detail.access?.role);
-      return Promise.resolve(emptyQueue());
+      return Promise.resolve(currentQueue());
     }
     return refresh();
   }

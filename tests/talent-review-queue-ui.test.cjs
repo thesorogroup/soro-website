@@ -61,7 +61,7 @@ function installUi(t, options = {}) {
   const responseStatus = options.responseStatus || 200;
   const keys = [
     'soroCurrentAccess', 'soroSupabase', 'fetch', 'crypto', 'CustomEvent',
-    'dispatchEvent', 'addEventListener', 'soroTalentReviewQueue'
+    'dispatchEvent', 'addEventListener', 'soroTalentReviewQueue', 'document', 'setInterval'
   ];
   const previous = new Map(keys.map(key => [key, Object.prototype.hasOwnProperty.call(globalThis, key)
     ? { exists: true, descriptor: Object.getOwnPropertyDescriptor(globalThis, key) }
@@ -82,10 +82,14 @@ function installUi(t, options = {}) {
   };
   globalThis.dispatchEvent = event => { events.push(event); return true; };
   globalThis.addEventListener = () => {};
+  if (options.document) {
+    globalThis.document = options.document;
+    globalThis.setInterval = () => 0;
+  }
   globalThis.fetch = async (url, requestOptions = {}) => {
     const call = { url: String(url), options: requestOptions };
     calls.push(call);
-    const payload = typeof responsePayload === 'function' ? responsePayload(call, calls.length) : responsePayload;
+    const payload = await (typeof responsePayload === 'function' ? responsePayload(call, calls.length) : responsePayload);
     return {
       ok: responseStatus >= 200 && responseStatus < 300,
       status: responseStatus,
@@ -95,7 +99,7 @@ function installUi(t, options = {}) {
   delete require.cache[require.resolve(modulePath)];
   const ui = require(modulePath);
   t.after(() => {
-    ui.unmount({ clear: false });
+    ui.unmount({ clear: false, reset: true });
     delete require.cache[require.resolve(modulePath)];
     for (const [key, state] of previous) {
       if (state.exists) Object.defineProperty(globalThis, key, state.descriptor);
@@ -331,4 +335,95 @@ test('the review count refreshes while an authorized portal remains open', () =>
   assert.match(source, /reviewDialogOpen\(\)/);
   assert.match(source, /refresh\(\{ silent: true \}\)/);
   assert.match(source, /if \(silent && reviewDialogOpen\(\)\) return currentQueue\(\)/);
+});
+
+function navigationFixture() {
+  const badge = { textContent: '0', hidden: true };
+  const navigation = { setAttribute(name, value) { this[name] = value; } };
+  const document = {
+    visibilityState: 'visible', addEventListener() {}, querySelector() { return null; },
+    getElementById(id) { return id === 'talent-review-count' ? badge : id === 'talent-review-nav' ? navigation : null; }
+  };
+  return { badge, navigation, document };
+}
+
+test('initial auth fills the sidebar badge without mounting the queue despite other page renders', async t => {
+  const nav = navigationFixture();
+  const { ui, calls } = installUi(t, { document: nav.document });
+  const loading = ui.handleAuthChange({ detail: { session: {}, access: { role: 'admin' } } });
+  assert.equal(ui.currentQueue().phase, 'loading');
+  // operations.render invokes unmount on every page other than talent-review.
+  for (let render = 0; render < 5; render++) ui.unmount();
+  await loading;
+  assert.equal(calls.length, 1);
+  assert.equal(ui.currentQueue().phase, 'ready');
+  assert.equal(nav.badge.textContent, '1');
+  assert.equal(nav.badge.hidden, false);
+  assert.match(nav.navigation['aria-label'], /1 awaiting review/);
+});
+
+test('Talent Management gets the same initial badge and a real zero remains hidden', async t => {
+  const nav = navigationFixture();
+  const { ui } = installUi(t, { role: 'talent_management', document: nav.document, responsePayload: queuePayload('talent_management', []) });
+  await ui.handleAuthChange({ detail: { session: {}, access: { role: 'talent_management' } } });
+  assert.equal(ui.currentQueue().phase, 'ready');
+  assert.equal(nav.badge.textContent, '0');
+  assert.equal(nav.badge.hidden, true);
+});
+
+test('logout clears shared queue and notifications even with no mounted view', async t => {
+  const nav = navigationFixture();
+  const { ui, events } = installUi(t, { document: nav.document });
+  await ui.refresh();
+  globalThis.soroCurrentAccess = null;
+  await ui.handleAuthChange({ detail: { session: null, access: null } });
+  assert.equal(ui.currentQueue().phase, 'idle');
+  assert.equal(ui.currentQueue().applicants.length, 0);
+  assert.equal(nav.badge.hidden, true);
+  assert.equal(events.at(-1).detail.queue.phase, 'idle');
+});
+
+test('a late response cannot restore an old account badge after logout', async t => {
+  let complete;
+  const nav = navigationFixture();
+  const { ui } = installUi(t, { document: nav.document, responsePayload: () => new Promise(resolve => { complete = resolve; }) });
+  const loading = ui.handleAuthChange({ detail: { session: {}, access: { role: 'admin' } } });
+  await new Promise(setImmediate);
+  globalThis.soroCurrentAccess = null;
+  await ui.handleAuthChange({ detail: { session: null, access: null } });
+  complete(queuePayload());
+  await loading;
+  assert.equal(ui.currentQueue().phase, 'idle');
+  assert.equal(ui.currentQueue().applicants.length, 0);
+  assert.equal(nav.badge.hidden, true);
+});
+
+test('same-role account change discards the older pending response', async t => {
+  let completeFirst;
+  const nav = navigationFixture();
+  const { ui } = installUi(t, { document: nav.document, responsePayload: (call, count) => count === 1 ? new Promise(resolve => { completeFirst = resolve; }) : queuePayload('admin', []) });
+  globalThis.soroCurrentAccess = { role: 'admin', user_id: ownerId };
+  const first = ui.handleAuthChange({ detail: { session: {}, access: globalThis.soroCurrentAccess } });
+  await new Promise(setImmediate);
+  globalThis.soroCurrentAccess = { role: 'admin', user_id: requestId };
+  await ui.handleAuthChange({ detail: { session: {}, access: globalThis.soroCurrentAccess } });
+  completeFirst(queuePayload());
+  await first;
+  assert.equal(ui.currentQueue().phase, 'ready');
+  assert.equal(ui.currentQueue().applicants.length, 0);
+  assert.equal(nav.badge.hidden, true);
+});
+
+test('leaving the queue during its first load leaves retryable state rather than stuck loading', async t => {
+  let completeFirst;
+  const { ui } = installUi(t, { responsePayload: (call, count) => count === 1 ? new Promise(resolve => { completeFirst = resolve; }) : queuePayload() });
+  const target = { innerHTML: '', addEventListener() {}, removeEventListener() {}, querySelector() { return null; } };
+  ui.mount(target);
+  await new Promise(setImmediate);
+  ui.unmount();
+  assert.equal(ui.currentQueue().phase, 'idle');
+  completeFirst(queuePayload());
+  await new Promise(setImmediate);
+  await ui.refresh({ silent: true });
+  assert.equal(ui.currentQueue().phase, 'ready');
 });
