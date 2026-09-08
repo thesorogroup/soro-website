@@ -133,7 +133,8 @@ test('authenticated client placeholders are neutral and global search stays unav
     assert.equal(safeData.includes(internalName), false, `${internalName} must not appear in authenticated client-safe rows.`);
   });
   assert.match(safeData, /reports:\{[\s\S]*rows:\[\]/);
-  assert.match(source, /notificationsButton\.hidden=clientPortal/);
+  assert.match(source, /notificationsButton\.hidden=!actualRole/);
+  assert.equal(require('../operations/task-center').canLoad('client_admin'),false,'Support bell must not enable staff tasks');
   assert.match(source, /globalSearch\)globalSearch\.hidden=clientPortal\|\|accessRole==='virtual_assistant'/);
   assert.match(globalSearch, /const ROLE_TYPES = Object\.freeze\(\{[\s\S]*admin:[\s\S]*talent_management:[\s\S]*sales:[\s\S]*billing:/);
   assert.doesNotMatch(globalSearch, /\bclient_(?:admin|reviewer|billing)\s*:/);

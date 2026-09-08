@@ -14,6 +14,11 @@
   let state = emptyState();
   let requestVersion = 0;
   let reviewCount = 0;
+  let supportUnread = 0;
+  function setSupportNotifications(value) {
+    supportUnread = Math.max(0, Math.min(100000, Number(value?.unread) || 0));
+    updateShell();
+  }
 
   function emptyState(phase = 'idle', message = '') {
     return Object.freeze({ phase, message, tasks: [], notifications: [], assignees: [], summary: Object.freeze({ open: 0, overdue: 0, urgentUnread: 0 }) });
@@ -178,7 +183,7 @@
     if (tasksNav) tasksNav.setAttribute('aria-label', open ? `My Tasks, ${open} open` : 'My Tasks, none open');
 
     const accessibleReviewCount = canOpenReviewQueue() ? reviewCount : 0;
-    const notificationCount = state.phase === 'ready' ? state.summary.urgentUnread + accessibleReviewCount : accessibleReviewCount;
+    const notificationCount = (state.phase === 'ready' ? state.summary.urgentUnread : 0) + accessibleReviewCount + supportUnread;
     const bell = root?.document?.getElementById?.('notifications-button');
     const badge = root?.document?.getElementById?.('notifications-count');
     if (badge) {
@@ -209,7 +214,8 @@
       ? `<button type="button" data-notification-view="talent-review"><span class="notification-dot urgent"></span><span><strong>${escapeHtml(`${reviewCount} Talent ${reviewCount === 1 ? 'profile needs' : 'profiles need'} review`)}</strong><small>Open the live Talent Review Queue to continue.</small></span><b>Open</b></button>`
       : '';
     const taskItems = taskNotifications.map(item => `<button type="button" data-notification-view="tasks" data-notification-id="${escapeHtml(item.id)}"><span class="notification-dot"></span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.message)}</small></span><b>Open</b></button>`).join('');
-    list.innerHTML = `${queueItem}${taskItems}` || '<p class="notifications-empty">You have no notifications requiring attention.</p>';
+    const supportItem = supportUnread ? `<button type="button" data-notification-view="help"><span class="notification-dot"></span><span><strong>${supportUnread} support ${supportUnread === 1 ? 'ticket has' : 'tickets have'} unread updates</strong><small>Open Help & Support to read and respond.</small></span><b>Open</b></button>` : '';
+    list.innerHTML = `${queueItem}${taskItems}${supportItem}` || '<p class="notifications-empty">You have no notifications requiring attention.</p>';
   }
 
   function assigneeId(assignee) {
@@ -386,6 +392,7 @@
   }
 
   function handleAuthChange(event) {
+    supportUnread = 0;
     const access = event?.detail?.access || null;
     if (!access || !canLoad(access.role)) {
       requestVersion += 1;
@@ -419,6 +426,6 @@
 
   return Object.freeze({
     ENDPOINT, AUTO_REFRESH_MS, OPERATIONS_TIME_ZONE, PRIORITY_LABELS, canLoad, normalizePayload, currentState: () => state, reviewQueueCount,
-    dashboardData, renderPage, bindPage, bindDashboardMetric, refresh, updateTask, createTask, handleAuthChange, handleReviewQueueUpdate
+    dashboardData, renderPage, bindPage, bindDashboardMetric, refresh, updateTask, createTask, handleAuthChange, handleReviewQueueUpdate, setSupportNotifications
   });
 }));

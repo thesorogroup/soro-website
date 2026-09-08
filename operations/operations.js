@@ -258,10 +258,10 @@ function syncAuthorizedNavigation(access=window.soroCurrentAccess){
   if(payrollNav)payrollNav.hidden=actualRole!=='admin'||accessRole!=='admin';
   if(talentPayoutReviewNav)talentPayoutReviewNav.hidden=actualRole!=='talent_management'||accessRole!=='talent_management';
   document.querySelectorAll('[data-notification-view]').forEach(button=>{
-    button.hidden=clientPortal||!allowed.has(button.dataset.notificationView);
+    button.hidden=button.dataset.notificationView!=='help'&&(clientPortal||!allowed.has(button.dataset.notificationView));
   });
   const notificationsButton=document.getElementById('notifications-button');
-  if(notificationsButton)notificationsButton.hidden=clientPortal||accessRole==='virtual_assistant';
+  if(notificationsButton)notificationsButton.hidden=!actualRole;
   const globalSearch=document.getElementById('global-search')?.closest('.global-search');
   if(globalSearch)globalSearch.hidden=clientPortal||accessRole==='virtual_assistant'||(actualRole==='admin'&&accessRole!=='admin');
   const overviewNav=document.getElementById('overview-nav');
@@ -804,7 +804,7 @@ const initialPlacementHash=location.hash.match(/^#client-placement\/([^/]+)$/);
 if(initialTalentHash){current='talent-profile';selectedTalentId=initialTalentHash[1]}
 else if(initialClientHash){current='client-record';selectedClientId=initialClientHash[1]}
 else if(initialPlacementHash){current='client-placement';preferredHiringRequestId=initialPlacementHash[1]}
-else if(location.hash.slice(1) in data||['my-profile','client-talent-profile','client-candidate-review','client-shortlists','talent-my-profile','talent-review','available-talent'].includes(location.hash.slice(1))){current=location.hash.slice(1)}
+else if(location.hash.slice(1) in data||['help','my-profile','client-talent-profile','client-candidate-review','client-shortlists','talent-my-profile','talent-review','available-talent'].includes(location.hash.slice(1))){current=location.hash.slice(1)}
 render();
 
 function displayTalentName(value){

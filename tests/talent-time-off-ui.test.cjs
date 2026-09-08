@@ -333,7 +333,8 @@ test('Talent placeholders and staff-only notifications do not leak into the real
   const html = read('operations/index.html');
   const source = read('operations/talent-time-off.js');
 
-  assert.match(operations, /notificationsButton\.hidden\s*=\s*clientPortal\s*\|\|\s*accessRole===['"]virtual_assistant['"]/);
+  assert.match(operations, /notificationsButton\.hidden=!actualRole/);
+  assert.equal(require('../operations/task-center').canLoad('virtual_assistant'),false,'Talent support notifications must not enable staff tasks');
   assert.match(operations, /const talentSafeViewData\s*=\s*Object\.freeze\(/);
   assert.match(operations, /talentSafeViewData[\s\S]*tasks\s*:\s*\{[\s\S]*rows\s*:\s*\[\]/);
   assert.match(operations, /talentSafeViewData[\s\S]*documents\s*:\s*\{[\s\S]*rows\s*:\s*\[\]/);

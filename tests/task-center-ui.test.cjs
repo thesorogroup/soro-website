@@ -17,7 +17,7 @@ test('task and notification badges start empty and are owned by the live task ce
   assert.match(html, /id="talent-review-count" hidden>0</);
   assert.doesNotMatch(html, /aria-label="View 3 notifications"|My Tasks <b>5<\/b>/);
   assert.doesNotMatch(html, /billing verification is due tomorrow|Talent profiles need review/);
-  assert.match(source, /state\.summary\.urgentUnread \+ accessibleReviewCount/);
+  assert.match(source, /state\.summary\.urgentUnread : 0\) \+ accessibleReviewCount \+ supportUnread/);
   assert.match(source, /tasksBadge\.hidden = open === 0/);
 });
 

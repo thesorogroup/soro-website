@@ -2,7 +2,7 @@
 const crypto=require('node:crypto');
 const {fail,service,rpc,actor,uuid,json,config}=require('./lib/portal-service');
 const MAX_IMAGE_BYTES=3*1024*1024;
-const AREAS=['Sign-in and account access','Talent profiles and documents','Client records and placements','Tasks and notifications','Other technical issue'];
+const AREAS=['Sales, services and client accounts','Talent profiles and documents','Client records and placements','Sign-in and account access','Tasks and notifications','Billing and administrative questions','Other technical issue'];
 function exact(value,keys) {return value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).every(key=>keys.includes(key));}
 function parseImage(image) {
   if(image==null)return null;
@@ -28,11 +28,14 @@ function parseSubmission(event) {
   return {...body,image:parseImage(body.image)};
 }
 async function handler(event) {
-  if(!['GET','POST'].includes(event.httpMethod))return json(405,{message:'Method not allowed.'});
+  if(!['GET','POST','PATCH'].includes(event.httpMethod))return json(405,{message:'Method not allowed.'});
   try {
     const userId=await actor(event),query=event.queryStringParameters||{};
     if(event.httpMethod==='GET') {
-      if(Object.keys(query).some(key=>key!=='imageTicketId'))throw fail(400,'Unsupported request.');
+      if(Object.keys(query).some(key=>!['imageTicketId','ticketId','notifications','offset','status','team','assignment'].includes(key))||(['imageTicketId','ticketId','notifications'].some(k=>k in query)&&Object.keys(query).length!==1))throw fail(400,'Unsupported request.');
+      if('notifications' in query&&query.notifications!=='1')throw fail(400,'Unsupported request.');
+      if(query.notifications==='1')return json(200,await rpc('get_support_notifications',{p_actor_user_id:userId}));
+      if(query.ticketId){if(!uuid(query.ticketId))throw fail(400,'Choose a valid ticket.');return json(200,await rpc('get_support_ticket',{p_actor_user_id:userId,p_ticket_id:query.ticketId}));}
       if(query.imageTicketId) {
         if(!uuid(query.imageTicketId))throw fail(400,'Choose a valid ticket.');
         const image=await rpc('get_support_ticket_image',{p_actor_user_id:userId,p_ticket_id:query.imageTicketId});
@@ -42,9 +45,16 @@ async function handler(event) {
         if(!response.ok||typeof result?.signedURL!=='string')throw fail(503,'The screenshot could not be opened.');
         return json(200,{url:`${config().url}/storage/v1${result.signedURL}`});
       }
-      return json(200,await rpc('get_support_tickets',{p_actor_user_id:userId}));
+      if(!/^\d{1,7}$/.test(query.offset||'0')||Number(query.offset||0)>1000000)throw fail(400,'Invalid page.');
+      return json(200,await rpc('list_support_tickets',{p_actor_user_id:userId,p_offset:Number(query.offset||0),p_status:query.status||'',p_team:query.team||'',p_assignment:query.assignment||''}));
     }
     if(Object.keys(query).length)throw fail(400,'Unsupported request.');
+    if(event.httpMethod==='PATCH'){
+      const change=parseChange(event);
+      const result=await rpc('update_support_ticket',{p_actor_user_id:userId,p_ticket_id:change.ticketId,p_change:change});
+      if(result?.ticketId!==change.ticketId)throw fail(503,'The update could not be verified. Retry the same action safely.');
+      return json(200,{ticketId:result.ticketId});
+    }
     const body=parseSubmission(event);
     const access=await rpc('authorize_support_image_upload',{p_actor_user_id:userId});
     if(!uuid(access?.organizationId)||access.requesterUserId!==userId)throw fail(403,'Support access is unavailable.');
@@ -62,4 +72,16 @@ async function handler(event) {
     return json(200,ticket);
   }catch(error){return json(error.status||503,{message:error.status?error.message:'Support is temporarily unavailable. Please retry the same ticket.'});}
 }
-module.exports={handler,parseImage,parseSubmission,MAX_IMAGE_BYTES,AREAS};
+function parseChange(event){
+  if(event.isBase64Encoded||typeof event.body!=='string'||Buffer.byteLength(event.body)>24000)throw fail(400,'Invalid ticket update.');
+  let b;try{b=JSON.parse(event.body);}catch{throw fail(400,'Invalid ticket update.');}
+  const keys={reply:['body'],note:['body'],status:['status'],assign:['team','assigneeId'],claim:[],read:['seenEntryId']};
+  if(!b||!Object.hasOwn(keys,b.action)||!exact(b,['action','ticketId',...(b.action==='read'?[]:['requestId','expectedVersion']),...keys[b.action]])||!uuid(b.ticketId))throw fail(400,'Invalid ticket update.');
+  if(b.action==='read'){if(!Number.isSafeInteger(b.seenEntryId)||b.seenEntryId<0)throw fail(400,'Invalid read marker.');return b;}
+  if(!uuid(b.requestId)||!Number.isSafeInteger(b.expectedVersion)||b.expectedVersion<1)throw fail(400,'Refresh this ticket before updating it.');
+  if(['reply','note'].includes(b.action)){if(typeof b.body!=='string'||!b.body.trim()||b.body.trim().length>5000||/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(b.body))throw fail(400,'Enter a message of 1–5,000 characters.');b.body=b.body.trim();}
+  if(b.action==='status'&&!['open','in_progress','waiting_on_client','resolved'].includes(b.status))throw fail(400,'Choose an available status.');
+  if(b.action==='assign'&&(!['sales','talent_management','admin'].includes(b.team)||(b.assigneeId!==null&&!uuid(b.assigneeId))))throw fail(400,'Choose a team and eligible employee.');
+  return b;
+}
+module.exports={handler,parseImage,parseSubmission,parseChange,MAX_IMAGE_BYTES,AREAS};

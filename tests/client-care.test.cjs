@@ -19,7 +19,8 @@ test('Ticket inputs cannot inject identity, email recipient or storage path',()=
 test('Upload UI uses optional file control and safely escaped ticket text',()=>{
   assert.match(ui.uploadMarkup(),/>Upload Image</);assert.doesNotMatch(ui.uploadMarkup(),/required/);assert.match(ui.uploadMarkup(),/3 MB/);
   const html=ui.ticketMarkup({ticketNumber:'SUP-AABBCCDD',subject:'<script>bad</script>',details:'<img onerror=bad>',createdAt:'2026-09-07',hasImage:true,ticketId:id(1)});
-  assert.doesNotMatch(html,/<script>|<img/);assert.match(html,/View screenshot/);
+  assert.doesNotMatch(html,/<script>|<img/);assert.match(html,/Screenshot attached/);
+  assert.match(ui.detailMarkup({ticketId:id(1),hasImage:true,entries:[]}),/data-ticket-image=.*View screenshot/);
 });
 test('Website accepts a bare domain, arbitrary alphabetic extension and paths',()=>{
   for(const value of ['example.com','www.example.org/path','business.photography','http://example.net','bücher.de'])assert.match(profile.normalizePatch({company:{website:value}},'client_admin').companyUpdates.website,/^https?:\/\//);

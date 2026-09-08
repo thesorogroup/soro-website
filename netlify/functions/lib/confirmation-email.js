@@ -7,6 +7,10 @@ function content(eventType,payload={}) {
     if(!/^SUP-[A-F0-9]{8}$/.test(payload.ticketNumber||''))throw new Error('Invalid ticket reference');
     title='Your support ticket is saved.';subject='We received your Soro support ticket';
     message='Thank you for letting us know. Your support ticket has been received by Soro.';reference=`Ticket ${payload.ticketNumber}`;
+  }else if(['support_ticket_reply','support_ticket_resolved','support_ticket_assigned'].includes(eventType)) {
+    if(!/^SUP-[A-F0-9]{8}$/.test(payload.ticketNumber||''))throw new Error('Invalid ticket reference');
+    const copy={support_ticket_reply:['There is a new reply.','New reply on your Soro support ticket','A new reply is available in your support conversation. Sign in to read it and respond.'],support_ticket_resolved:['Your support ticket is resolved.','Your Soro support ticket was resolved','Soro marked your support ticket as resolved. If you still need help, reply to the ticket in your portal.'],support_ticket_assigned:['A support ticket needs attention.','Soro support ticket assignment','A support ticket is available for you in Help & Support. Sign in to review the details.']}[eventType];
+    [title,subject,message]=copy;reference=`Ticket ${payload.ticketNumber}`;
   }else if(eventType==='client_profile_updated') {
     title='Your changes are saved.';subject='Your Soro account information was updated';
     message='Your account information was updated in Soro Ops. If you did not make this change, open Help & Support in your portal.';

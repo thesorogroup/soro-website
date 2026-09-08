@@ -13,8 +13,8 @@ async function service(path,options={}) {
 async function rpc(name,body,timeout=12000) {
   const response=await service(`/rest/v1/rpc/${name}`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body),signal:AbortSignal.timeout(timeout)});
   const data=await response.json().catch(()=>null);
-  if(!response.ok)throw fail(data?.code==='42501'?403:data?.code==='23505'?409:['22023','23514'].includes(data?.code)?400:503,
-    data?.code==='23505'?'This submission changed. Start a new ticket before trying again.':data?.code==='42501'?'This account cannot access that ticket.':'The request could not be completed. Please try again.');
+  if(!response.ok)throw fail(data?.code==='42501'?403:['23505','40001'].includes(data?.code)?409:['22023','23514'].includes(data?.code)?400:503,
+    data?.code==='40001'?'This ticket was updated by someone else. Refresh the ticket, then try again.':data?.code==='23505'?'This submission changed. Start a new request before trying again.':data?.code==='42501'?'This account cannot perform that action on this ticket.':'The request could not be completed. Please try again.');
   return data;
 }
 async function actor(event) {
