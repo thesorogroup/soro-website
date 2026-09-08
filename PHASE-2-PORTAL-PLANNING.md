@@ -325,6 +325,12 @@ Continue planning one consequential decision at a time. After tangents, return t
 
 ## Important unresolved decisions
 
+### Support follow-up view — approved build September 8, 2026
+
+Add an internal Needs Attention view alongside All tickets in Help & Support. Show unresolved unassigned tickets and open/in-progress tickets awaiting a public Soro reply, oldest waiting first, with reason, elapsed waiting time, team and owner. Admin/Founder oversees every authorized team; teams retain their existing scope and assignment controls. Staff members' own tickets in another queue remain requester-only, not part of their staff attention view.
+
+Only public Soro replies answer a requester. Private notes, reads and reassignment do not reset the response clock; repeated requester messages retain the first unanswered time. Waiting-on-client tickets can still need an owner but are not awaiting Soro. No response deadlines, business-hours promises, timed escalation or new automatic emails are approved in this step. Payroll remains paused. The user approved this addition for production deployment on September 8, 2026.
+
 ### Client launch preparation — September 7, 2026
 
 The marketing-meeting preparation is the current priority; payroll remains paused. The current user decision is one active Client matching/interview/placement process per Talent at a time. The historical multiple-Client question below is not permission to broaden that restriction.

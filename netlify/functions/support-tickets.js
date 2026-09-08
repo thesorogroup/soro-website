@@ -32,7 +32,7 @@ async function handler(event) {
   try {
     const userId=await actor(event),query=event.queryStringParameters||{};
     if(event.httpMethod==='GET') {
-      if(Object.keys(query).some(key=>!['imageTicketId','ticketId','notifications','offset','status','team','assignment'].includes(key))||(['imageTicketId','ticketId','notifications'].some(k=>k in query)&&Object.keys(query).length!==1))throw fail(400,'Unsupported request.');
+      if(Object.keys(query).some(key=>!['imageTicketId','ticketId','notifications','offset','status','team','assignment','view','reason'].includes(key))||(['imageTicketId','ticketId','notifications'].some(k=>k in query)&&Object.keys(query).length!==1))throw fail(400,'Unsupported request.');
       if('notifications' in query&&query.notifications!=='1')throw fail(400,'Unsupported request.');
       if(query.notifications==='1')return json(200,await rpc('get_support_notifications',{p_actor_user_id:userId}));
       if(query.ticketId){if(!uuid(query.ticketId))throw fail(400,'Choose a valid ticket.');return json(200,await rpc('get_support_ticket',{p_actor_user_id:userId,p_ticket_id:query.ticketId}));}
@@ -46,7 +46,9 @@ async function handler(event) {
         return json(200,{url:`${config().url}/storage/v1${result.signedURL}`});
       }
       if(!/^\d{1,7}$/.test(query.offset||'0')||Number(query.offset||0)>1000000)throw fail(400,'Invalid page.');
-      return json(200,await rpc('list_support_tickets',{p_actor_user_id:userId,p_offset:Number(query.offset||0),p_status:query.status||'',p_team:query.team||'',p_assignment:query.assignment||''}));
+      const view=query.view||'all',reason=query.reason||'';
+      if(!['all','attention'].includes(view)||!['','unassigned','awaiting_reply'].includes(reason)||(view==='all'&&reason)||(view==='attention'&&query.status))throw fail(400,'Choose an available ticket view.');
+      return json(200,await rpc('list_support_workspace',{p_actor_user_id:userId,p_offset:Number(query.offset||0),p_status:query.status||'',p_team:query.team||'',p_assignment:query.assignment||'',p_view:view,p_reason:reason}));
     }
     if(Object.keys(query).length)throw fail(400,'Unsupported request.');
     if(event.httpMethod==='PATCH'){

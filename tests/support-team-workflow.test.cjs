@@ -62,7 +62,7 @@ test('Ticket endpoint derives actor, passes server filters, and rejects malforme
  assert.equal((await api.handler(event)).statusCode,200);assert.equal(calls[1].body.p_actor_user_id,id(10));
  result=null;assert.equal((await api.handler(event)).statusCode,503);
  calls=[];result={tickets:[]};assert.equal((await api.handler({httpMethod:'GET',headers:event.headers,queryStringParameters:{offset:'50',status:'open',team:'sales',assignment:'unassigned'}})).statusCode,200);
- assert.match(calls[1].url,/list_support_tickets$/);assert.deepEqual(calls[1].body,{p_actor_user_id:id(10),p_offset:50,p_status:'open',p_team:'sales',p_assignment:'unassigned'});
+ assert.match(calls[1].url,/list_support_workspace$/);assert.deepEqual(calls[1].body,{p_actor_user_id:id(10),p_offset:50,p_status:'open',p_team:'sales',p_assignment:'unassigned',p_view:'all',p_reason:''});
  assert.equal((await api.handler({httpMethod:'GET',headers:event.headers,queryStringParameters:{notifications:'1',ticketId:id(1)}})).statusCode,400);
 });
 test('Workflow schema closes legacy writes and returns strict authorization booleans',()=>{
