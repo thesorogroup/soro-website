@@ -5,7 +5,9 @@ async function dispatch(row,dependencies={rpc:(name,body)=>rpc(name,body,4000),f
   const finish=(outcome,id=null,error=null)=>dependencies.rpc('complete_confirmation',{p_outbox_id:row.outboxId,p_lease_token:row.leaseToken,p_outcome:outcome,p_provider_message_id:id,p_error_code:error});
   let body;
   try {
-    const proposed=row.requestBody||JSON.stringify({from:SENDER,to:[row.to],...content(row.eventType,row.payload)});
+    // Prepared deliveries, including greetings, remain byte-identical on retry.
+    const person=row.requestBody?{}:await dependencies.rpc('get_confirmation_greeting',{p_outbox_id:row.outboxId,p_lease_token:row.leaseToken});
+    const proposed=row.requestBody||JSON.stringify({from:SENDER,to:[row.to],...content(row.eventType,row.payload,person||{})});
     body=await dependencies.rpc('prepare_confirmation',{p_outbox_id:row.outboxId,p_lease_token:row.leaseToken,p_request_body:proposed});
     if(typeof body!=='string')throw new Error('Invalid prepared body');
   }catch{return 'not_prepared';} // Never send without a durable snapshot/lease.

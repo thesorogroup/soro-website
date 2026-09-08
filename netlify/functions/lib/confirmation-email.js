@@ -1,46 +1,52 @@
 'use strict';
-const PORTAL='https://thesorogroup.com/operations/';
-const SENDER='Soro Group <do-not-reply@thesorogroup.com>';
-const SHORTLIST_TYPES=new Set(['client_shortlist_ready','client_shortlist_response']);
-function shortlistContent(eventType,payload={}) {
-  const ready=eventType==='client_shortlist_ready';
-  const subject=ready?'Your Soro candidates are ready to review':'Your client has responded to a Soro candidate';
-  const title=ready?'Meet your potential next teammate.':'Your client has shared their feedback.';
-  const message=ready?'Your Soro team has prepared a candidate shortlist for you. Sign in to explore the profiles and let us know who you would like to meet.':'A client has responded to a candidate in their shortlist. Open the hiring request to see the response and coordinate the next step.';
-  const action=ready?'Review your candidates':'View client response';
-  if(payload.requestId!==undefined&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(payload.requestId))throw new Error('Invalid request reference');
-  const url=PORTAL+(payload.requestId?`${ready?'#client-candidate-review':'#client-placement'}/${payload.requestId}`:(ready?'#client-candidate-review':'#client-shortlists'));
-  const steps=ready?[
-    ['Explore the profiles','Review the skills, experience, and approved screening summaries.'],
-    ['Share your feedback','Express interest or request an interview. Client Admins can also pass on a candidate.']
-  ]:[
-    ['Review the response','See whether the client is interested, requests an interview, or has passed.'],
-    ['Coordinate the next step','Use the existing interview and selection workflow to keep everyone moving together.']
-  ];
-  const note=ready?'Candidate details are available only in your signed-in portal.':'Internal update for the assigned Sales associate. Client and candidate details stay in Soro Ops.';
-  const footer='This inbox is not monitored. Contact Soro through Help & Support in your portal.';
-  const text=[title,message,...steps.map(([heading,detail])=>`${heading}: ${detail}`),`${action}: ${url}`,note,'Soro Group',footer].join('\n\n');
-  const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${subject}</title></head><body style="margin:0;background:#fff7ed"><div style="display:none;max-height:0;overflow:hidden;mso-hide:all">${ready?'Your shortlist is ready. Review your candidates securely in Soro Ops.':'New candidate feedback is ready for you in Client Shortlists.'}</div><table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#fff7ed"><tr><td align="center" style="padding:28px 12px"><!--[if mso]><table role="presentation" width="640"><tr><td><![endif]--><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:20px;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif"><tr><td align="center" style="padding:32px 24px 26px;border-bottom:1px solid #edf0f4"><img src="https://thesorogroup.com/assets/soro-logo-final-transparent.png" width="200" alt="Soro Group" style="display:block;width:200px;max-width:100%;height:auto;border:0"></td></tr><tr><td style="padding:32px 28px 12px"><p style="margin:0 0 14px;color:#ba4419;font-size:12px;font-weight:700;letter-spacing:1.4px">${ready?'YOUR CANDIDATE SHORTLIST':'CLIENT REVIEW UPDATE'}</p><h1 style="margin:0 0 18px;color:#082d5c;font-family:Georgia,serif;font-size:32px;font-weight:400;line-height:1.2">${title}</h1><p style="margin:0;color:#35495f;font-size:16px;line-height:1.7">${message}</p></td></tr><tr><td style="padding:16px 28px 26px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f4f7fb" style="border:1px solid #e1e8f1;border-radius:12px">${steps.map(([heading,detail],index)=>`<tr><td valign="top" width="28" style="padding:${index?'0':'20px'} 0 20px 18px;color:#ba4419;font-size:16px;font-weight:700">${index+1}.</td><td style="padding:${index?'0':'20px'} 18px 20px 10px"><p style="margin:0 0 4px;color:#082d5c;font-size:15px;font-weight:700">${heading}</p><p style="margin:0;color:#4b5e73;font-size:14px;line-height:1.6">${detail}</p></td></tr>`).join('')}</table></td></tr><tr><td style="padding:0 28px 32px"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td bgcolor="#c9430b" style="border-radius:8px;text-align:center"><a href="${url}" style="display:inline-block;padding:16px 24px;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;mso-padding-alt:0"><!--[if mso]><i style="mso-font-width:150%;mso-text-raise:24pt" hidden>&emsp;</i><![endif]--><span style="mso-text-raise:12pt">${action}</span><!--[if mso]><i style="mso-font-width:150%" hidden>&emsp;&#8203;</i><![endif]--></a></td></tr></table><p style="margin:18px 0 0;color:#5a6c7e;font-size:13px;line-height:1.6">${note}</p></td></tr><tr><td align="center" bgcolor="#082d5c" style="padding:24px"><p style="margin:0 0 10px;color:#ffffff;font-size:14px;font-weight:600">Where businesses grow and talent thrives.</p><p style="margin:0;color:#d9e1e9;font-size:12px;line-height:1.7">${footer}</p></td></tr></table><!--[if mso]></td></tr></table><![endif]--></td></tr></table></body></html>`;
-  return {subject,text,html};
+const {renderEmail, PORTAL} = require('./branded-email');
+const SENDER = 'Soro Group <do-not-reply@thesorogroup.com>';
+const SHORTLIST_TYPES = new Set(['client_shortlist_ready', 'client_shortlist_response']);
+
+function shortlistContent(eventType, payload = {}, person = {}) {
+  const ready = eventType === 'client_shortlist_ready';
+  if (payload.requestId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(payload.requestId)) throw new Error('Invalid request reference');
+  const url = PORTAL + (payload.requestId ? `${ready ? '#client-candidate-review' : '#client-placement'}/${payload.requestId}` : (ready ? '#client-candidate-review' : '#client-shortlists'));
+  return renderEmail({
+    subject: ready ? 'Your Soro candidates are ready to review' : 'Your client has responded to a Soro candidate',
+    eyebrow: ready ? 'YOUR CANDIDATE SHORTLIST' : 'CLIENT REVIEW UPDATE',
+    title: ready ? 'Meet your potential next teammate.' : 'Your client has shared their feedback.',
+    person,
+    paragraphs: [ready ? 'Your Soro team has prepared a candidate shortlist for you. Sign in to explore the profiles and let us know who you would like to meet.' : 'A client has responded to a candidate in their shortlist. Open the hiring request to see the response and coordinate the next step.'],
+    steps: ready ? [
+      ['Explore the profiles', 'Review the skills, experience, and approved screening summaries.'],
+      ['Share your feedback', 'Express interest or request an interview. Client Admins can also pass on a candidate.']
+    ] : [
+      ['Review the response', 'See whether the client is interested, requests an interview, or has passed.'],
+      ['Coordinate the next step', 'Use the existing interview and selection workflow to keep everyone moving together.']
+    ],
+    action: {label: ready ? 'Review your candidates' : 'View client response', url},
+    note: ready ? 'Candidate details are available only in your signed-in portal.' : 'Internal update for the assigned Sales associate. Client and candidate details stay in Soro Ops.'
+  });
 }
-function content(eventType,payload={}) {
-  if(SHORTLIST_TYPES.has(eventType))return shortlistContent(eventType,payload);
-  let title,message,subject,reference='';
-  if(eventType==='support_ticket_created') {
-    if(!/^SUP-[A-F0-9]{8}$/.test(payload.ticketNumber||''))throw new Error('Invalid ticket reference');
-    title='Your support ticket is saved.';subject='We received your Soro support ticket';
-    message='Thank you for letting us know. Your support ticket has been received by Soro.';reference=`Ticket ${payload.ticketNumber}`;
-  }else if(['support_ticket_reply','support_ticket_resolved','support_ticket_assigned'].includes(eventType)) {
-    if(!/^SUP-[A-F0-9]{8}$/.test(payload.ticketNumber||''))throw new Error('Invalid ticket reference');
-    const copy={support_ticket_reply:['There is a new reply.','New reply on your Soro support ticket','A new reply is available in your support conversation. Sign in to read it and respond.'],support_ticket_resolved:['Your support ticket is resolved.','Your Soro support ticket was resolved','Soro marked your support ticket as resolved. If you still need help, reply to the ticket in your portal.'],support_ticket_assigned:['A support ticket needs attention.','Soro support ticket assignment','A support ticket is available for you in Help & Support. Sign in to review the details.']}[eventType];
-    [title,subject,message]=copy;reference=`Ticket ${payload.ticketNumber}`;
-  }else if(eventType==='client_profile_updated') {
-    title='Your changes are saved.';subject='Your Soro account information was updated';
-    message='Your account information was updated in Soro Ops. If you did not make this change, open Help & Support in your portal.';
-  }else throw new Error('Unsupported confirmation');
-  // Only fixed copy and the validated, generated ticket reference enter email.
-  const text=[title,message,reference,`Open Soro Ops: ${PORTAL}`,'Soro Group','This inbox is not monitored. Contact Soro through Help & Support in your portal.'].filter(Boolean).join('\n\n');
-  const html=`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#fff7ed"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#fff7ed"><tr><td align="center" style="padding:32px 14px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:660px;background:#fff;border-radius:24px;overflow:hidden;font-family:'Segoe UI',Arial,sans-serif"><tr><td align="center" style="padding:32px 28px 20px"><img src="https://thesorogroup.com/assets/soro-logo-final-transparent.png" width="210" alt="Soro Group" style="display:block;width:210px;max-width:100%;height:auto;border:0"></td></tr><tr><td style="padding:12px 32px 32px"><p style="margin:0 0 12px;color:#f45a1f;font-size:12px;font-weight:700;letter-spacing:1px">SORO OPS CONFIRMATION</p><h1 style="margin:0 0 18px;color:#082d5c;font-family:Georgia,serif;font-size:30px;font-weight:400;line-height:1.2">${title}</h1><p style="margin:0 0 22px;color:#35495f;font-size:16px;line-height:1.7">${message}</p>${reference?`<p style="padding:14px 18px;background:#fff8f2;border-left:4px solid #f45a1f;color:#082d5c;font-weight:700">${reference}</p>`:''}<table role="presentation" cellspacing="0" cellpadding="0"><tr><td bgcolor="#f45a1f" style="border-radius:24px"><a href="${PORTAL}" style="display:inline-block;padding:15px 24px;color:#fff;text-decoration:none;font-size:15px;font-weight:700">Open Soro Ops</a></td></tr></table></td></tr><tr><td align="center" bgcolor="#082d5c" style="padding:24px 28px"><p style="margin:0 0 8px;color:#fff;font-size:13px;font-weight:700">Where businesses grow and talent thrives.</p><p style="margin:0;color:#d9e1e9;font-size:12px;line-height:1.6">This inbox is not monitored. Contact Soro through Help & Support in your portal.</p></td></tr></table></td></tr></table></body></html>`;
-  return {subject,text,html};
+
+function content(eventType, payload = {}, person = {}) {
+  if (SHORTLIST_TYPES.has(eventType)) return shortlistContent(eventType, payload, person);
+  let title, message, subject, reference = '';
+  if (eventType === 'support_ticket_created') {
+    title = 'Your support ticket is saved.'; subject = 'We received your Soro support ticket';
+    message = 'Thank you for letting us know. Your support ticket has been received by Soro.';
+  } else if (['support_ticket_reply', 'support_ticket_resolved', 'support_ticket_assigned'].includes(eventType)) {
+    [title, subject, message] = {
+      support_ticket_reply: ['There is a new reply.', 'New reply on your Soro support ticket', 'A new reply is available in your support conversation. Sign in to read it and respond.'],
+      support_ticket_resolved: ['Your support ticket is resolved.', 'Your Soro support ticket was resolved', 'Soro marked your support ticket as resolved. If you still need help, reply to the ticket in your portal.'],
+      support_ticket_assigned: ['A support ticket needs attention.', 'Soro support ticket assignment', 'A support ticket is available for you in Help & Support. Sign in to review the details.']
+    }[eventType];
+  } else if (eventType === 'client_profile_updated') {
+    title = 'Your changes are saved.'; subject = 'Your Soro account information was updated';
+    message = 'Your account information was updated in Soro Ops. If you did not make this change, open Help & Support in your portal.';
+  } else throw new Error('Unsupported confirmation');
+  if (eventType.startsWith('support_ticket_')) {
+    if (!/^SUP-[A-F0-9]{8}$/.test(payload.ticketNumber || '')) throw new Error('Invalid ticket reference');
+    reference = `Ticket ${payload.ticketNumber}`;
+  }
+  // Only fixed copy, validated references and separately resolved recipient names.
+  // Ticket text, attachments, client/candidate data and links never enter this body.
+  return renderEmail({subject, title, person, eyebrow: 'SORO OPS CONFIRMATION', paragraphs: [message], reference, action: {label: 'Open Soro Ops', url: PORTAL}});
 }
-module.exports={content,SENDER};
+module.exports = {content, SENDER};

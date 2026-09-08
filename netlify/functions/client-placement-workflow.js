@@ -1,3 +1,4 @@
+const {interviewEmail} = require('./lib/branded-email');
 const configuredUrl = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_URL = /^https:\/\/[^/]+\.supabase\.co\/?$/.test(configuredUrl)
   ? configuredUrl.replace(/\/$/, '')
@@ -406,7 +407,7 @@ function graphEventBody(command) {
   if (command.action === 'create') {
     event.body = {
       contentType: 'HTML',
-      content: '<p>Soro Client interview. Manage private candidate notes and the final decision in Soro.</p>'
+      content: interviewEmail('Client').html
     };
     event.isOnlineMeeting = true;
     event.onlineMeetingProvider = 'teamsForBusiness';

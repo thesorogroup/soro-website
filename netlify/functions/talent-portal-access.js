@@ -1,5 +1,6 @@
 /* Secure Admin/Talent Management lifecycle controls for Talent portal access. */
 const crypto = require('node:crypto');
+const {accessEmail} = require('./lib/branded-email');
 
 const configuredUrl = (process.env.SUPABASE_URL || '').trim();
 const SUPABASE_URL = /^https:\/\/[^/]+\.supabase\.co\/?$/.test(configuredUrl)
@@ -153,7 +154,7 @@ function emailSentTooRecently(value) {
 async function fetchApplicant(manager, applicantId) {
   if (!validUuid(applicantId)) throw httpError(400, 'invalid_applicant', 'Choose a valid Talent profile.');
   const fields = [
-    'id', 'organization_id', 'auth_user_id', 'full_name', 'email', 'archived_at',
+    'id', 'organization_id', 'auth_user_id', 'full_name', 'preferred_name', 'email', 'archived_at',
     'portal_login_email', 'portal_access_status', 'portal_invite_sent_at',
     'portal_access_activated_at', 'portal_last_password_reset_sent_at',
     'portal_email_changed_at', 'portal_access_updated_by'
@@ -236,15 +237,7 @@ async function generateRecoveryLink(email) {
 
 async function sendAccessEmail({ applicant, to, actionLink, kind }) {
   ensureEmailDeliveryConfigured();
-  const firstName = String(applicant.full_name || 'there').trim().split(/\s+/)[0] || 'there';
-  const setup = kind !== 'password_reset';
-  const subject = setup ? 'Set up your Soro VA Portal access' : 'Reset your Soro VA Portal password';
-  const instruction = setup
-    ? 'Use the secure button below to create your private password and finish setting up your Soro VA Portal access.'
-    : 'Use the secure button below to choose a new password for your Soro VA Portal account.';
-  const button = setup ? 'Finish account setup' : 'Reset password';
-  const text = `Hi ${firstName},\n\n${instruction}\n\n${actionLink}\n\nIf you were not expecting this email, contact Soro Group. Do not forward this secure one-use link.\n\nSoro Group`;
-  const html = `<p>Hi ${escapeHtml(firstName)},</p><p>${escapeHtml(instruction)}</p><p><a href="${escapeHtml(actionLink)}">${escapeHtml(button)}</a></p><p><small>If you were not expecting this email, contact Soro Group. Do not forward this secure one-use link.</small></p><p>Soro Group</p>`;
+  const {subject, text, html} = accessEmail({person: applicant, actionLink, kind, audience: 'Talent'});
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },

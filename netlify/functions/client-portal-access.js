@@ -1,6 +1,7 @@
 /* Secure Admin/Sales lifecycle controls for Client portal accounts. */
 
 const crypto = require('node:crypto');
+const {accessEmail} = require('./lib/branded-email');
 
 const configuredUrl = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_URL = /^https:\/\/[^/]+\.supabase\.co\/?$/.test(configuredUrl)
@@ -442,15 +443,7 @@ async function generateRecoveryLink(email) {
 
 function accessEmailPayload({ contact, to, actionLink, kind }) {
   ensureEmailDeliveryConfigured();
-  const firstName = String(contact.full_name || 'there').trim().split(/\s+/)[0] || 'there';
-  const setup = kind !== 'password_reset';
-  const subject = setup ? 'Set up your Soro Client Portal access' : 'Reset your Soro Client Portal password';
-  const instruction = setup
-    ? 'Use the secure button below to create your private password and finish setting up your Soro Client Portal access.'
-    : 'Use the secure button below to choose a new password for your Soro Client Portal account.';
-  const button = setup ? 'Finish account setup' : 'Reset password';
-  const text = `Hi ${firstName},\n\n${instruction}\n\n${actionLink}\n\nIf you were not expecting this email, contact Soro Group. Do not forward this secure one-use link.\n\nSoro Group`;
-  const html = `<p>Hi ${escapeHtml(firstName)},</p><p>${escapeHtml(instruction)}</p><p><a href="${escapeHtml(actionLink)}">${escapeHtml(button)}</a></p><p><small>If you were not expecting this email, contact Soro Group. Do not forward this secure one-use link.</small></p><p>Soro Group</p>`;
+  const {subject, text, html} = accessEmail({person: contact, actionLink, kind, audience: 'Client'});
   return { from: FROM_EMAIL, to: [to], subject, text, html };
 }
 

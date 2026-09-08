@@ -6,6 +6,7 @@
  * and writes the final application only after the mandatory checklist passes.
  */
 const crypto = require('node:crypto');
+const {renderEmail} = require('./lib/branded-email');
 
 const configuredUrl = (process.env.SUPABASE_URL || '').trim();
 const SUPABASE_URL = /^https:\/\/[^/]+\.supabase\.co\/?$/.test(configuredUrl)
@@ -217,24 +218,27 @@ async function sendEmail({ to, subject, text, html, replyTo }) {
 async function sendApplicationNotifications(data) {
   const applicantName = applicantDisplayName(data) || 'New Talent applicant';
   const applicantEmail = email(data.email);
-  const firstName = cleanText(data.firstName, 80) || 'there';
-  const safeName = escapeHtml(applicantName);
-  const safeEmail = escapeHtml(applicantEmail);
-  const safePortalUrl = escapeHtml(APPLICATION_PORTAL_URL);
   const results = await Promise.allSettled([
     sendEmail({
       to: APPLICATION_NOTIFICATION_EMAIL,
       replyTo: applicantEmail,
-      subject: `New Talent application: ${applicantName}`,
-      text: `A new Talent application was submitted.\n\nApplicant: ${applicantName}\nEmail: ${applicantEmail}\n\nReview the complete application and private files in Soro Ops: ${APPLICATION_PORTAL_URL}\n\nFor privacy, this notification does not include attachments or file links.`,
-      html: `<p>A new Talent application was submitted.</p><p><strong>Applicant:</strong> ${safeName}<br><strong>Email:</strong> ${safeEmail}</p><p><a href="${safePortalUrl}">Review securely in Soro Ops</a></p><p><em>For privacy, this notification does not include attachments or file links.</em></p>`
+      ...renderEmail({
+        subject: `New Talent application: ${applicantName}`, eyebrow: 'TALENT MANAGEMENT',
+        title: 'A new application is ready to review.',
+        paragraphs: [`Applicant: ${applicantName}`, `Email: ${applicantEmail}`, 'Review the complete application and private files in Soro Ops.'],
+        action: {label: 'Review securely in Soro Ops', url: APPLICATION_PORTAL_URL},
+        note: 'For privacy, this notification does not include attachments or file links.'
+      })
     }),
     sendEmail({
       to: applicantEmail,
       replyTo: APPLICATION_NOTIFICATION_EMAIL,
-      subject: 'We received your Soro Group application',
-      text: `Hi ${firstName},\n\nThank you for taking this first step with Soro Group. We received your application and stored your information privately. Talent Management will contact you if there is a next step.\n\nSoro Group`,
-      html: `<p>Hi ${escapeHtml(firstName)},</p><p>Thank you for taking this first step with Soro Group. We received your application and stored your information privately. Talent Management will contact you if there is a next step.</p><p>Soro Group</p>`
+      ...renderEmail({
+        subject: 'We received your Soro Group application', eyebrow: 'APPLICATION RECEIVED',
+        title: 'Your next chapter starts here.', person: data,
+        paragraphs: ['Thank you for taking this first step with Soro Group. We received your application and stored your information privately.', 'Talent Management will contact you if there is a next step.'],
+        footer: 'Questions about your application? Reply to this email to reach Soro Talent Management.'
+      })
     })
   ]);
   const talentNotificationSent = results[0].status === 'fulfilled' && results[0].value.delivered;

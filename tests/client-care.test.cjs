@@ -46,7 +46,7 @@ const row={outboxId:id(4),leaseToken:id(5),to:'client@example.com',eventType:'su
 test('Dispatcher sends only the durable snapshot and stable key',async()=>{
   const calls=[],saved=JSON.stringify({from:SENDER,to:[row.to],subject:'Saved original',text:'Original'});
   const result=await dispatch(row,{rpc:async(name,body)=>{calls.push({name,body});return name==='prepare_confirmation'?saved:{};},fetch:async(url,options)=>{calls.push({url,options});return {ok:true,json:async()=>({id:'provider-id'})};}},'test-key');
-  assert.equal(result,'accepted');assert.equal(calls[1].options.body,saved);assert.equal(calls[1].options.headers['Idempotency-Key'],`soro-confirmation/${row.outboxId}`);assert.equal(calls[2].body.p_outcome,'sent');
+  assert.equal(result,'accepted');const sent=calls.find(call=>call.options);assert.equal(sent.options.body,saved);assert.equal(sent.options.headers['Idempotency-Key'],`soro-confirmation/${row.outboxId}`);assert.equal(calls.find(call=>call.name==='complete_confirmation').body.p_outcome,'sent');
 });
 test('No email leaves when snapshot preparation fails',async()=>{let sent=0;assert.equal(await dispatch(row,{rpc:async()=>{throw Error('lease');},fetch:async()=>{sent++;}},'test'),'not_prepared');assert.equal(sent,0);});
 test('Network failures retry without failing a saved ticket, deterministic errors require review',async()=>{
