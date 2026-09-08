@@ -483,8 +483,8 @@
       : documentLabels[type] || titleCase(type);
   }
 
-  function secureSourceButton(source) {
-    const category = sourceCategoryLabel(source);
+  function secureSourceButton(source, label = '') {
+    const category = label || sourceCategoryLabel(source);
     return `<button class="screening-source-button open-private-document" type="button" data-storage-path="${escapeHtml(source.storage_path)}"><span class="screening-source-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h6m-6 4h4"/></svg></span><span class="screening-source-file-copy"><small>${escapeHtml(category)}</small><strong>${escapeHtml(source.file_name || category)}</strong></span><span class="screening-source-open">Open securely</span></button>`;
   }
 
@@ -510,10 +510,10 @@
   function renderProfileResumeLinks(documents, applicant) {
     const target = document.querySelector('[data-profile-resume]');
     if (!target) return;
-    const resumes = documents.filter(document => classifyDocument(document) === 'resume' && document.storage_path);
+    const resumes = documents.filter(document => classifyDocument(document) === 'resume' && document.storage_path && document.status !== 'rejected');
     const legacyResumeUrl = !resumes.length && canVerifyTalentSkills() ? trustedLegacyResumeUrl(applicant?.resume_url) : '';
     if (resumes.length) {
-      target.innerHTML = `<span>Attached résumé${resumes.length === 1 ? '' : 's'}</span><div class="screening-source-file-list">${resumes.map(source => secureSourceButton(source)).join('')}</div>`;
+      target.innerHTML = `<span>Current résumé</span><div class="screening-source-file-list">${secureSourceButton(resumes[0], 'Latest uploaded résumé')}</div>${resumes.length > 1 ? `<details class="profile-resume-history"><summary>Previous résumés (${resumes.length - 1})</summary><div class="screening-source-file-list">${resumes.slice(1).map(source => secureSourceButton(source, 'Previous résumé')).join('')}</div></details>` : ''}`;
     } else if (legacyResumeUrl) {
       target.innerHTML = '<span>Résumé</span><div class="screening-source-file-list"><button class="screening-source-button open-legacy-resume" type="button"><span class="screening-source-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v5h5M10 13h6m-6 4h4"/></svg></span><span class="screening-source-file-copy"><small>Original application résumé</small><strong>Legacy Google Drive file</strong></span><span class="screening-source-open">Open original</span></button></div>';
       target.querySelector('.open-legacy-resume')?.addEventListener('click', () => openLegacyResume(applicant.resume_url));
@@ -623,6 +623,10 @@
     root.innerHTML = profilePage(applicant);
     root.querySelector('.talent-profile-page')?.classList.add('talent-self-profile-page');
     removeOwnProfileManagementActions(root);
+    window.SoroTalentSelfUploads?.mount(root, applicant, {
+      isCurrent: () => isOwnTalentProfileView() && selectedProfileApplicant()?.id === applicant.id,
+      onUploaded: () => loadTalentProfileDocuments()
+    });
     bindView();
     bindPrivateProfileDetailsEditor();
     bindScreeningResultsEditor();
@@ -701,12 +705,17 @@
     const applicant = selectedProfileApplicant();
     const target = document.getElementById('profile-documents');
     if (!applicant || !target || !window.soroSupabase) return;
-    const { data: documents, error } = await window.soroSupabase.from('documents').select('id,file_name,document_type,status,created_at,storage_path').eq('applicant_id', applicant.id).order('created_at', { ascending: false });
+    const access = window.soroCurrentAccess;
+    const accessUserId = access?.user_id, accessOrgId = access?.organization_id;
+    const stillCurrent = () => document.getElementById('profile-documents') === target && selectedProfileApplicant()?.id === applicant.id && window.soroCurrentAccess?.user_id === accessUserId && window.soroCurrentAccess?.organization_id === accessOrgId;
+    const { data: documents, error } = await window.soroSupabase.from('documents').select('id,file_name,document_type,status,created_at,storage_path').eq('applicant_id', applicant.id).order('created_at', { ascending: false }).order('id', { ascending: false });
+    if (!stillCurrent()) return;
     if (error) { target.innerHTML = '<p>Documents could not be loaded for this Talent profile.</p>'; return; }
     const all = documents || [];
-    const photo = all.find(d => classifyDocument(d) === 'profile_photo');
+    const photo = all.find(d => classifyDocument(d) === 'profile_photo' && d.status !== 'rejected');
     if (photo?.storage_path) {
       const { data: signed } = await window.soroSupabase.storage.from('soro-private-documents').createSignedUrl(photo.storage_path, 3600);
+      if (!stillCurrent()) return;
       if (signed?.signedUrl) { const h = document.getElementById('talent-headshot'); if (h) h.innerHTML = `<img src="${escapeHtml(signed.signedUrl)}" alt="${escapeHtml(applicant.full_name)} headshot" />`; }
     }
     const groups = new Map();

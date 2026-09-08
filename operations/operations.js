@@ -652,6 +652,7 @@ async function openTalentReviewResume(applicantId){
       .neq('status','rejected')
       .not('storage_path','is',null)
       .order('created_at',{ascending:false})
+      .order('id',{ascending:false})
       .limit(1);
     const storagePath=documents?.[0]?.storage_path;
     if(documentError||!storagePath)throw new Error('resume_missing');
