@@ -19,3 +19,18 @@ The importer can alternatively use the following three OAuth variables when a se
 Do not put any of these values in `operations/supabase-config.js`, browser JavaScript, or a public repository. The browser sends only the signed-in Admin session to `/.netlify/functions/import-google-drive`; the function checks the Soro role before it runs.
 
 Loom recording archival needs no additional account connection: the importer uses each applicant's existing public Loom link. Files above Supabase Storage's 50 MB per-file limit are reported for manual handling instead of being exposed as public links.
+
+## Portal confirmation emails
+
+`portal-confirmations` processes the private receipt outbox once per minute.
+After verifying the Resend sending domain and reviewing queued messages, set
+`SORO_RECEIPTS=1` in the production deploy context only and redeploy. It reuses
+the existing `RESEND_API_KEY`; no invitation sender settings change. Other
+values or an absent flag leave it disabled. The sender is fixed to
+`Soro Group <do-not-reply@thesorogroup.com>` in code and the database.
+
+Remove the superseded `PORTAL_CONFIRMATIONS_ENABLED` and
+`PORTAL_CONFIRMATION_FROM_EMAIL` variables when upgrading; they are no longer
+read. One compact flag avoids duplicating the sender in Lambda's size-limited
+environment. To pause sending, remove the production `SORO_RECEIPTS` value and
+redeploy; preserve the outbox and all provider idempotency snapshots.

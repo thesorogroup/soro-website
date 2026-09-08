@@ -19,8 +19,9 @@ async function dispatch(row,dependencies={rpc:(name,body)=>rpc(name,body,4000),f
   }catch{await finish('retry',null,'delivery_unconfirmed').catch(()=>{});return 'retry';}
 }
 async function handler() {
-  // Sender activation is explicit and separate from all invitation mailers.
-  if(process.env.PORTAL_CONFIRMATIONS_ENABLED!=='true'||process.env.PORTAL_CONFIRMATION_FROM_EMAIL!=='do-not-reply@thesorogroup.com'||!process.env.RESEND_API_KEY)return {statusCode:200,body:'Confirmations disabled'};
+  // Production-only opt-in; the sender is pinned in the template and database.
+  // Keep one compact flag within Lambda's shared environment size limit.
+  if(process.env.SORO_RECEIPTS!=='1'||!process.env.RESEND_API_KEY)return {statusCode:200,body:'Confirmations disabled'};
   const rows=await rpc('claim_confirmation_outbox',{p_limit:3},4000);
   await Promise.all(rows.map(row=>dispatch(row)));
   return {statusCode:200,body:'Confirmation batch processed'};

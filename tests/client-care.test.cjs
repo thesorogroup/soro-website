@@ -54,7 +54,25 @@ test('Network failures retry without failing a saved ticket, deterministic error
     assert.equal(result,scenario==='timeout'?'retry':'review');assert.equal(completion.p_outcome,result);
   }
 });
-test('Unconfigured confirmation dispatcher is inert',async()=>{const old=process.env.PORTAL_CONFIRMATIONS_ENABLED;delete process.env.PORTAL_CONFIRMATIONS_ENABLED;try{assert.match((await dispatchHandler()).body,/disabled/);}finally{if(old!==undefined)process.env.PORTAL_CONFIRMATIONS_ENABLED=old;}});
+test('Confirmation dispatcher requires the compact explicit opt-in and key',async t=>{
+  const names=['SORO_RECEIPTS','RESEND_API_KEY','SUPABASE_URL','SUPABASE_SERVICE_ROLE_KEY','PORTAL_CONFIRMATIONS_ENABLED','PORTAL_CONFIRMATION_FROM_EMAIL'];
+  const previous=Object.fromEntries(names.map(name=>[name,process.env[name]])),oldFetch=global.fetch;
+  t.after(()=>{global.fetch=oldFetch;for(const name of names){if(previous[name]===undefined)delete process.env[name];else process.env[name]=previous[name];}});
+  process.env.SUPABASE_URL='https://example.supabase.co';process.env.SUPABASE_SERVICE_ROLE_KEY='test';
+  process.env.PORTAL_CONFIRMATIONS_ENABLED='true';process.env.PORTAL_CONFIRMATION_FROM_EMAIL='do-not-reply@thesorogroup.com';
+  let claims=0;
+  global.fetch=async(url,options)=>{assert.equal(url,'https://example.supabase.co/rest/v1/rpc/claim_confirmation_outbox');assert.deepEqual(JSON.parse(options.body),{p_limit:3});claims++;return {ok:true,json:async()=>[]};};
+  for(const [flag,key] of [[undefined,'test'],['','test'],['0','test'],['true','test'],[' 1','test'],['1',''],['1',undefined]]){
+    if(flag===undefined)delete process.env.SORO_RECEIPTS;else process.env.SORO_RECEIPTS=flag;
+    if(key===undefined)delete process.env.RESEND_API_KEY;else process.env.RESEND_API_KEY=key;
+    assert.match((await dispatchHandler()).body,/disabled/);
+  }
+  assert.equal(claims,0,'disabled or legacy settings must not claim queued mail');
+  process.env.SORO_RECEIPTS='1';process.env.RESEND_API_KEY='test';
+  process.env.PORTAL_CONFIRMATION_FROM_EMAIL='unapproved@example.com';
+  assert.equal((await dispatchHandler()).body,'Confirmation batch processed');assert.equal(claims,1);
+  assert.equal(SENDER,'Soro Group <do-not-reply@thesorogroup.com>');
+});
 test('Support route uses server-derived actor and keeps malformed receipts retryable',async t=>{
   const oldFetch=global.fetch,oldUrl=process.env.SUPABASE_URL,oldKey=process.env.SUPABASE_SERVICE_ROLE_KEY;
   process.env.SUPABASE_URL='https://example.supabase.co';process.env.SUPABASE_SERVICE_ROLE_KEY='test';
