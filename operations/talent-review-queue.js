@@ -635,7 +635,7 @@
 
   function setQueue(value) {
     queue = value;
-    if (activeReview && !findApplicant(activeReview.applicantId)) activeReview = null;
+    if (activeReview && !findApplicant(activeReview.applicantId)) activeReview.applicantId = '';
     syncNavigationBadge(queue);
     dispatchUpdated();
     render();
@@ -651,6 +651,7 @@
     const silent = options.silent === true && queue.phase === 'ready';
     const version = ++requestVersion;
     if (!silent) {
+      activeReview = null;
       feedback = Object.freeze({ type: '', message: '' });
       queue = freezeQueue({ phase: 'loading', generatedAt: '', viewerRole: actualRole(), summary: emptySummary(), applicants: [] });
       syncNavigationBadge(queue);
@@ -698,8 +699,10 @@
 
   function visibleApplicants() {
     const query = filters.search.toLowerCase();
+    const rank = new Map((activeReview?.order || []).map((id, index) => [id, index]));
     const matches = queue.applicants.filter(applicant => {
-      if (applicant.applicantId === activeReview?.applicantId) return true;
+      // Keep only fresh, authorized records, in the order already on screen.
+      if (rank.has(applicant.applicantId)) return true;
       if (filters.stage !== 'all' && filterStage(applicant) !== filters.stage) return false;
       if (!query) return true;
       return [applicant.fullName, applicant.preferredName, applicant.email, applicant.owner.name]
@@ -711,33 +714,23 @@
       return (filters.sort === 'oldest' ? -dateOrder : dateOrder) || a.applicantId.localeCompare(b.applicantId);
     });
     if (!activeReview) return matches;
-    const rank = new Map(activeReview.order.map((id, index) => [id, index]));
     return matches.sort((a, b) => (rank.get(a.applicantId) ?? Infinity) - (rank.get(b.applicantId) ?? Infinity));
   }
 
   function holdReview(applicantId) {
     const applicant = findApplicant(applicantId);
     if (!applicant || !canOpenForRole()) return false;
-    if (activeReview?.applicantId !== applicant.applicantId) activeReview = { applicantId: applicant.applicantId, order: visibleApplicants().map(item => item.applicantId) };
+    activeReview = { applicantId: applicant.applicantId, order: visibleApplicants().map(item => item.applicantId) };
     return true;
   }
-
-  function releaseReview() { activeReview = null; render(); }
 
   function setSort(value) {
     return applyFilters({ ...filters, sort: ['newest', 'oldest', 'name', 'stage'].includes(value) ? value : 'newest' });
   }
 
   function applyFilters(next) {
-    const held = activeReview;
-    const index = held ? visibleApplicants().findIndex(item => item.applicantId === held.applicantId) : -1;
     filters = Object.freeze(next);
     activeReview = null;
-    if (held && findApplicant(held.applicantId)) {
-      const order = visibleApplicants().map(item => item.applicantId).filter(id => id !== held.applicantId);
-      order.splice(Math.min(Math.max(index, 0), order.length), 0, held.applicantId);
-      activeReview = {applicantId:held.applicantId, order};
-    }
     render();
     return filters;
   }
@@ -800,8 +793,7 @@
     const guardedActions = applicant.allowedActions.filter(action => SECONDARY_ACTIONS.has(action));
     const displayedStage = filterStage(applicant);
     const gate = verificationGateCache.get(applicant.applicantId);
-    const outsideFilter = (filters.stage !== 'all' && displayedStage !== filters.stage) || (filters.search && ![applicant.fullName,applicant.preferredName,applicant.email,applicant.owner.name].join(' ').toLowerCase().includes(filters.search.toLowerCase()));
-    return `<article class="talent-review-card${activeReview?.applicantId === applicant.applicantId ? ' is-current-review' : ''}" data-review-applicant="${escapeHtml(applicant.applicantId)}">
+    return `<article class="talent-review-card" data-review-applicant="${escapeHtml(applicant.applicantId)}">
       <header class="talent-review-card-heading">
         <span class="talent-review-avatar" aria-hidden="true">${escapeHtml(initials(applicant.fullName))}</span>
         <div class="talent-review-person">
@@ -816,7 +808,6 @@
         <span class="talent-review-owner"><span class="talent-review-owner-copy"><small>Review owner</small><strong title="${escapeHtml(applicant.owner.name)}">${escapeHtml(applicant.owner.name)}</strong></span>${!notStarted && actualRole() === 'admin' ? `<button type="button" class="button talent-review-owner-edit" data-review-reassign="${escapeHtml(applicant.applicantId)}" aria-label="Edit review owner for ${escapeHtml(applicant.fullName)}">Edit</button>` : ''}</span>
         <span><small>Last updated</small><strong>${escapeHtml(formatDate(applicant.updatedAt))}</strong></span>
       </div>
-      ${activeReview?.applicantId === applicant.applicantId && outsideFilter ? '<p class="talent-review-filter-exception">Current review · kept here outside the selected filters</p>' : ''}
       ${checklistMarkup(applicant)}
       ${!notStarted && gate ? `<div class="talent-review-readiness"><strong>Bench readiness</strong><span>${gate.benchReadyEligible ? 'Interview and reference requirements addressed. Complete the checklist before moving to Bench Ready.' : gate.blockers.map(escapeHtml).join(' · ')}</span></div>` : ''}
       <footer class="talent-review-card-actions">
@@ -1013,9 +1004,8 @@
       ${feedback.message ? `<div class="talent-review-feedback${feedback.type === 'error' ? ' is-error' : ''}" role="status">${escapeHtml(feedback.message)}</div>` : ''}
       ${summaryMarkup()}
       <section class="panel talent-review-workspace">
-        <div class="talent-review-toolbar"><label><span aria-hidden="true">⌕</span><input type="search" data-review-search value="${escapeHtml(filters.search)}" maxlength="120" placeholder="Search Talent, email, or owner" autocomplete="off"></label><label class="talent-review-sort">Sort by<select data-review-sort>${[['newest','Newest applications'],['oldest','Oldest applications'],['name','Name A–Z'],['stage','Review stage']].map(([value,label]) => `<option value="${value}"${filters.sort === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label><small>Updated ${escapeHtml(formatDate(queue.generatedAt))}</small></div>
+        <div class="talent-review-toolbar"><label class="talent-review-search"><span aria-hidden="true">⌕</span><input type="search" data-review-search value="${escapeHtml(filters.search)}" maxlength="120" placeholder="Search Talent, email, or owner" autocomplete="off" aria-label="Search Talent, email, or owner"></label><label class="talent-review-sort"><span>Sort by</span><select data-review-sort>${[['newest','Newest applications'],['oldest','Oldest applications'],['name','Name A–Z'],['stage','Review stage']].map(([value,label]) => `<option value="${value}"${filters.sort === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label><small>Updated ${escapeHtml(formatDate(queue.generatedAt))}</small></div>
         ${stageChipsMarkup()}
-        ${activeReview && findApplicant(activeReview.applicantId) ? `<div class="talent-review-active-note" role="status"><span>Reviewing <strong>${escapeHtml(findApplicant(activeReview.applicantId).fullName)}</strong> · position held while you work</span><button type="button" class="button" data-review-release>Done for now</button></div>` : ''}
         ${queueMarkup()}
       </section>
       ${actionDialogMarkup()}
@@ -1054,8 +1044,15 @@
       if (workspace) workspace.scrollTop = workspaceScroll;
       return true;
     }
-    const anchorSelector = activeReview ? `[data-review-applicant="${activeReview.applicantId}"]` : '';
+    // Anchor the viewport, even when the last edited card has been scrolled away.
+    const visibleCard = activeReview && [...(mountedRoot.querySelectorAll?.('[data-review-applicant]') || [])].find(card => {
+      const bounds = card.getBoundingClientRect();
+      return bounds.bottom > 0 && bounds.top < (root.innerHeight || Infinity);
+    });
+    const anchorId = visibleCard?.dataset?.reviewApplicant || activeReview?.applicantId;
+    const anchorSelector = anchorId ? `[data-review-applicant="${anchorId}"]` : '';
     const top = anchorSelector ? mountedRoot.querySelector?.(anchorSelector)?.getBoundingClientRect?.().top : null;
+    const pageScroll = activeReview ? root.scrollY : null;
     const bodyScroll = mountedRoot.querySelector?.('.talent-verification-body')?.scrollTop || 0;
     stopResumeViewer();
     mountedRoot.innerHTML = pageMarkup();
@@ -1073,6 +1070,7 @@
     mountResumeViewer();
     const after = anchorSelector ? mountedRoot.querySelector?.(anchorSelector)?.getBoundingClientRect?.().top : null;
     if (Number.isFinite(top) && Number.isFinite(after) && typeof root.scrollBy === 'function') root.scrollBy({top: after - top, behavior:'instant'});
+    else if (Number.isFinite(pageScroll)) root.scrollTo?.({top:pageScroll, behavior:'instant'});
     return true;
   }
 
@@ -1318,7 +1316,6 @@
   }
 
   async function handleClick(event) {
-    if (event.target.closest?.('[data-review-release]')) { event.preventDefault(); releaseReview(); return; }
     const evidenceRetry = event.target.closest?.('[data-evidence-retry]');
     if (evidenceRetry) { event.preventDefault(); loadEvidence(evidenceRetry.dataset.evidenceRetry === 'resume' ? 'resume' : 'skills'); return; }
     const refreshButton = event.target.closest?.('[data-review-refresh]');
@@ -1651,7 +1648,6 @@
     setStageFilter,
     setSearch,
     setSort,
-    releaseReview,
     openResume,
     openVerification,
     changeApplicant,

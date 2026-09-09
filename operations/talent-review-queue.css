@@ -49,7 +49,7 @@
   margin-bottom: 14px;
 }
 
-.talent-review-toolbar label {
+.talent-review-search {
   display: flex;
   align-items: center;
   width: min(430px, 100%);
@@ -264,12 +264,10 @@
 .talent-review-verification small { display: block; }
 .talent-review-verification strong { font-size: 12px; }
 .talent-review-verification small { margin-top: 1px; color: #667b90; font-size: 9px; font-weight: 650; }
-.talent-review-card.is-current-review { border-color: #7598b9; box-shadow: 0 0 0 2px #e6eef6; }
-.talent-review-active-note { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin: 14px 0; padding: 12px 16px; border-radius: 10px; background: #edf4fa; color: #274b6f; font-size: 14px; }
-.talent-review-filter-exception { margin: 10px 18px 0; color: #496f91; font-size: 13px; }
 .talent-review-readiness { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 10px 18px; color: #4b647d; background: #f5f8fb; font-size: 13px; }
-.talent-review-sort { display: flex !important; gap: 8px; align-items: center; width: auto !important; white-space: nowrap; font-size: 14px; }
-.talent-review-sort select { padding: 9px 12px; border: 1px solid #cbd8e5; border-radius: 8px; background: white; color: var(--navy); font: inherit; }
+.talent-review-sort { display: flex; gap: 10px; align-items: center; flex-shrink: 0; white-space: nowrap; font-size: 14px; color: #61748a; }
+.talent-review-sort select { min-height: 42px; padding: 9px 12px; border: 1px solid #ccd9e7; border-radius: 10px; background: white; color: var(--navy); font: inherit; cursor: pointer; }
+.talent-review-sort select:focus-visible { outline: 2px solid #245d91; outline-offset: 2px; }
 .talent-verification-workspace { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr); }
 .talent-verification-dialog.has-resume { width: min(1460px, 100vw); }
 .has-resume .talent-verification-workspace { grid-template-columns: minmax(320px, .95fr) minmax(430px, 1fr); }
@@ -308,7 +306,6 @@
   .has-resume .talent-verification-body { overflow: visible; }
   .review-evidence-resume { overflow: visible; border-right: 0; border-bottom: 1px solid #dce5ee; }
   .private-pdf-pages { max-height: 55vh; min-height: 280px; }
-  .talent-review-active-note { align-items: flex-start; flex-direction: column; }
 }
 .talent-review-action-divider { align-self: center; width: 1px; height: 25px; margin: 0 2px; background: #dce4ec; }
 .talent-review-action { padding: 8px 11px; font-size: 12px; }
@@ -538,7 +535,8 @@
   .talent-review-toolbar,
   .talent-review-card-actions { align-items: stretch; flex-direction: column; }
   .talent-review-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .talent-review-toolbar label { width: 100%; }
+  .talent-review-search { width: 100%; }
+  .talent-review-sort select { flex: 1; min-width: 0; }
   .talent-review-toolbar small { white-space: normal; }
   .talent-review-card-heading { grid-template-columns: auto minmax(0,1fr); }
   .talent-review-stage { grid-column: 2; justify-self: start; }

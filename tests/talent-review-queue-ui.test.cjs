@@ -20,7 +20,7 @@ test('review action row shares a flexible height without changing dropdown actio
   assert.match(css,/\.talent-review-action-divider \{ align-self: center/);
   assert.match(css,/\.talent-review-secondary\[open\] > summary::after/);
   assert.match(css,/@media \(max-width: 430px\)[\s\S]*\.talent-review-verification \{ flex: 1 1 100%; \}/);
-  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260909-action-height/);
+  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260909-quiet-position/);
 });
 
 const APPLICANT_KEYS = Object.freeze([
@@ -76,20 +76,83 @@ test('newest applications sort first across stages, with user-controlled alterna
   ui.setSort('name'); assert.equal(ui.visibleApplicants()[0].fullName,'A Newer');
 });
 
-test('Start Review holds the fresh record through stage, search, sort and background changes until released', async t => {
+test('review keeps multiple worked cards in place until an explicit filter or refresh', async t => {
   let rows=[applicant(),applicant({applicantId:requestId,fullName:'Older',applicationReceivedAt:'2026-08-01T10:00:00Z'})];
   const {ui} = installUi(t,{responsePayload:call=>{
-    if(call.options.method==='POST') rows=rows.map(x=>x.applicantId===applicantId?{...x,stage:'in_review',allowedActions:['request_more_info','mark_bench_ready']}:x).reverse();
+    if(call.options.method==='POST') rows=rows.map(x=>x.applicantId===JSON.parse(call.options.body).applicantId?{...x,stage:'in_review',allowedActions:['request_more_info','mark_bench_ready']}:x).reverse();
     return queuePayload('admin',rows);
   }});
   await ui.refresh(); ui.setStageFilter('submitted');
   await ui.changeApplicant({applicantId,expectedUpdatedAt:updatedAt,action:'begin_review'});
   assert.equal(ui.visibleApplicants()[0].applicantId,applicantId);
   assert.equal(ui.visibleApplicants()[0].stage,'in_review');
-  ui.setSearch('no matching name'); assert.deepEqual(ui.visibleApplicants().map(x=>x.applicantId),[applicantId]);
-  ui.setSort('oldest'); assert.equal(ui.visibleApplicants()[0].applicantId,applicantId);
+  await ui.changeApplicant({applicantId:requestId,expectedUpdatedAt:updatedAt,action:'begin_review'});
+  assert.deepEqual(ui.visibleApplicants().map(x=>x.applicantId),[applicantId,requestId]);
+  const newest=applicant({applicantId:ownerId,fullName:'Newest arrival',applicationReceivedAt:'2026-09-09T10:00:00Z'});
+  rows.unshift(newest);
+  await ui.refresh({silent:true});
+  assert.deepEqual(ui.visibleApplicants().map(x=>x.applicantId),[applicantId,requestId,ownerId]);
+  assert.equal(ui.visibleApplicants()[1].stage,'in_review');
+  ui.setStageFilter('submitted');
+  assert.deepEqual(ui.visibleApplicants().map(x=>x.applicantId),[ownerId]);
+  ui.setStageFilter('all');
+  assert.deepEqual(ui.visibleApplicants().map(x=>x.applicantId),[ownerId,applicantId,requestId]);
+  ui.setSort('oldest'); assert.equal(ui.visibleApplicants()[0].applicantId,requestId);
+  ui.setSearch('no matching name'); assert.equal(ui.visibleApplicants().length,0);
+});
+
+test('explicit refresh releases quiet ordering; a removed record is never restored', async t => {
+  let rows=[applicant(),applicant({applicantId:requestId,applicationReceivedAt:'2026-08-01T10:00:00Z'})];
+  const {ui}=installUi(t,{responsePayload:call=>{
+    if(call.options.method==='POST')rows=rows.map(x=>x.applicantId===applicantId?{...x,stage:'in_review'}:x);
+    return queuePayload('admin',rows);
+  }});
+  await ui.refresh();ui.setStageFilter('submitted');
+  await ui.changeApplicant({applicantId,expectedUpdatedAt:updatedAt,action:'begin_review'});
   await ui.refresh({silent:true}); assert.equal(ui.visibleApplicants()[0].applicantId,applicantId);
-  ui.releaseReview(); assert.equal(ui.visibleApplicants().length,0);
+  await ui.refresh();assert.deepEqual(ui.visibleApplicants().map(x=>x.applicantId),[requestId]);
+  ui.setStageFilter('all');ui.openResume(applicantId);
+  rows=rows.filter(x=>x.applicantId!==applicantId);
+  await ui.refresh({silent:true});assert.deepEqual(ui.visibleApplicants().map(x=>x.applicantId),[requestId]);
+});
+
+for(const control of ['stage','search','sort'])test(`${control} deliberately clears quiet review state`,async t=>{
+  let row=applicant();
+  const {ui}=installUi(t,{responsePayload:call=>{
+    if(call.options.method==='POST')row={...row,stage:'in_review'};
+    return queuePayload('admin',[row]);
+  }});
+  await ui.refresh();ui.setStageFilter('submitted');
+  await ui.changeApplicant({applicantId,expectedUpdatedAt:updatedAt,action:'begin_review'});
+  assert.equal(ui.visibleApplicants().length,1);
+  if(control==='stage')ui.setStageFilter('submitted');
+  if(control==='search')ui.setSearch('no match');
+  if(control==='sort')ui.setSort('oldest');
+  await ui.refresh({silent:true});assert.equal(ui.visibleApplicants().length,0);
+});
+
+test('a pending review response cannot reinstate a hold cleared by the search control',async t=>{
+  let resolveSave;
+  const {ui}=installUi(t,{responsePayload:call=>call.options.method==='POST'?new Promise(resolve=>{resolveSave=resolve;}):queuePayload()});
+  await ui.refresh();
+  const saving=ui.changeApplicant({applicantId,expectedUpdatedAt:updatedAt,action:'begin_review'});
+  await new Promise(resolve=>setImmediate(resolve));
+  ui.setSearch('no matching name');
+  resolveSave(queuePayload('admin',[applicant({stage:'in_review'})]));
+  await saving;assert.equal(ui.visibleApplicants().length,0);
+});
+
+test('silent updates preserve the first visible card rather than an offscreen last-worked card',async t=>{
+  const rows=[applicant({stage:'in_review'}),applicant({applicantId:requestId,applicationReceivedAt:'2026-08-01T10:00:00Z'})];
+  const {ui}=installUi(t,{responsePayload:queuePayload('admin',rows)});
+  let after=false,markup='',moves=[];
+  const offscreen={dataset:{reviewApplicant:applicantId},getBoundingClientRect:()=>({top:after?-800:-1000,bottom:-500})};
+  const visible={dataset:{reviewApplicant:requestId},getBoundingClientRect:()=>({top:after?20:-30,bottom:500})};
+  const target={get innerHTML(){return markup;},set innerHTML(value){markup=value;after=true;},addEventListener(){},removeEventListener(){},querySelectorAll:()=>[offscreen,visible],querySelector:selector=>selector===`[data-review-applicant="${applicantId}"]`?offscreen:selector===`[data-review-applicant="${requestId}"]`?visible:null};
+  globalThis.innerHeight=800;globalThis.scrollY=1000;globalThis.scrollBy=options=>moves.push(options.top);
+  ui.mount(target);await new Promise(resolve=>setImmediate(resolve));
+  ui.openResume(applicantId);after=false;moves=[];
+  await ui.refresh({silent:true});assert.deepEqual(moves,[50]);
 });
 
 test('submitted action row contains only Start review and expands only after the saved transition', async t => {
@@ -105,6 +168,11 @@ test('submitted action row contains only Start review and expands only after the
   assert.doesNotMatch(actions(),/data-review-resume|data-review-verification|data-review-interview|More actions/);
   await ui.changeApplicant({applicantId,expectedUpdatedAt:updatedAt,action:'begin_review'});
   assert.match(actions(),/data-review-verification/); assert.match(actions(),/data-review-interview/); assert.match(actions(),/Open résumé/);
+  assert.doesNotMatch(target.innerHTML,/Done for now|position held|is-current-review|talent-review-active-note|talent-review-filter-exception|data-review-release/);
+  assert.match(target.innerHTML,/<label class="talent-review-sort"><span>Sort by<\/span><select data-review-sort>/);
+  const css=read('operations/talent-review-queue.css');
+  assert.doesNotMatch(css,/\.talent-review-toolbar label\s*\{|talent-review-active-note|is-current-review|talent-review-filter-exception/);
+  assert.match(css,/\.talent-review-search \{[\s\S]*?border: 1px solid/);
 });
 
 for (const [role,stage,expected] of [['admin','in_review',true],['admin','submitted',false],['talent_management','in_review',false]]) {
@@ -147,7 +215,8 @@ function installUi(t, options = {}) {
   const responseStatus = options.responseStatus || 200;
   const keys = [
     'soroCurrentAccess', 'soroSupabase', 'fetch', 'crypto', 'CustomEvent',
-    'dispatchEvent', 'addEventListener', 'soroTalentReviewQueue', 'document', 'setInterval'
+    'dispatchEvent', 'addEventListener', 'soroTalentReviewQueue', 'document', 'setInterval',
+    'scrollBy', 'scrollTo', 'scrollY', 'innerHeight'
   ];
   const previous = new Map(keys.map(key => [key, Object.prototype.hasOwnProperty.call(globalThis, key)
     ? { exists: true, descriptor: Object.getOwnPropertyDescriptor(globalThis, key) }
