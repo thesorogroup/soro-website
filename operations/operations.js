@@ -1,5 +1,5 @@
 const data={overview:{title:'Admin Panel',caption:'Here is what needs your attention.',metrics:[['Tasks needing attention','—','Loading your assigned tasks…',''],['Client pipeline','—','Open Clients for current records',''],['Active Talent today','—','Loading live attendance…',''],['Talent Review Queue','—','Loading live applications…','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Soro at a glance',secondaryMessage:'Summary reporting has not been configured.'},tasks:{title:'My Tasks',caption:'Your active work, in priority order.',table:['Task','Related to','Due','Owner'],rows:[]},clients:{title:'Client Pipeline',caption:'Every client, lead, and next action in one place.',table:['Client','Stage','Next action','Owner'],rows:[]},vas:{title:'Talent Directory',caption:'Search, filter, and open a complete Talent profile from any row.',table:['Talent','Application status','Work status','Location & time zone','Readiness','Owner'],rows:[]},placements:{title:'Placement Journey',caption:'Client and Talent readiness, side by side.',table:['Client','Talent','Status','Next action'],rows:[]},documents:{title:'Document Center',caption:'Assigned forms, uploads, and signed agreements.',table:['Document','Related to','Status','Action'],rows:[]},reports:{title:'Reports',caption:'Saved reports and quick builds, only for data you are authorized to see.',table:['Report','Last run','Owner','Action'],rows:[]}};
-let current='overview',role='admin',liveApplicants=[],selectedTalentId=null,selectedClientId=null,preferredHiringRequestId='',preferredClientTalentId='',talentSearch='',talentStatus='all',ownTalentProfile=null,ownTalentProfileState='idle',ownTalentProfileRequest=0;
+let current='overview',role='admin',liveApplicants=[],selectedTalentId=null,selectedClientId=null,preferredHiringRequestId='',preferredClientTalentId='',talentSearch='',talentStatus='all',ownTalentProfile=null,ownTalentProfileState='idle',ownTalentProfileRequest=0,liveApplicantsRequest=0,liveApplicantsScope='';
 const roleConfig={admin:{label:'The Founder',person:'Matt',className:'role-admin'},sales:{label:'Sales Associate',person:'Sales workspace',className:'role-sales'},talent:{label:'Talent Management',person:'Talent Management workspace',className:'role-talent'},client:{label:'Client Administrator',person:'Client workspace',className:'role-client'},va:{label:'Talent',person:'Talent workspace',className:'role-va'}};
 const roleDashboards={sales:{title:'Sales Panel',caption:'Your priority client work is ready.',metrics:[['Tasks needing attention','—','Loading your assigned tasks…',''],['My client pipeline','—','Not configured',''],['Open hiring requests','—','Not configured',''],['My available Talent','—','Not configured','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Pipeline movement',secondaryMessage:'No live summary is available for this view.'},talent:{title:'Talent Management Panel',caption:'Your Talent readiness and support work is ready.',metrics:[['Talent actions needing attention','—','Loading your assigned tasks…',''],['Active Talent today','—','Loading live attendance…',''],['Talent Review Queue','—','Loading live applications…',''],['Upcoming reviews','—','Not configured','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Talent readiness',secondaryMessage:'No live summary is available for this view.'},client:{title:'Client Portal',caption:'Your active Talent support and Soro actions are all in one place.',metrics:[['Action needed','—','Not configured',''],['Your current Talent','—','Not configured',''],['Open hiring requests','—','Not configured',''],['Invoices','—','Not configured','']],primary:'Action needed',items:[],emptyMessage:'No actions are assigned right now.',secondary:'Your current Talent',secondaryMessage:'No live summary is available for this view.'},va:{title:'Talent Portal',caption:'Your workday, progress, and support are all here.',metrics:[['Today’s work','—','Current placement status will appear here',''],['Dream Pathway','—','Not configured',''],['Next payout','—','Not configured',''],['Documents','—','Not configured','']],primary:'Action needed',items:[],emptyMessage:'No actions are assigned right now.',secondary:'Your progress',secondaryMessage:'No live summary is available for this view.'}};
 const root=document.getElementById('view-root'),nav=document.getElementById('main-nav');
@@ -602,7 +602,49 @@ window.SoroGlobalSearch?.init?.({
   navigateResult:navigateGlobalSearchResult,
   getEffectiveRole:()=>adminPreviewingNonAdminWorkspace()?'':currentAuthenticatedRole()
 });
-async function loadLiveApplicants(){if(!window.soroSupabase||!viewAllowedForAuthenticatedRole('vas')){liveApplicants=[];return}const {data:applicants,error}=await window.soroSupabase.from('applicants').select(talentProfileSelectFields).is('archived_at',null).order('application_received_at',{ascending:false});if(error){liveApplicants=[];return}liveApplicants=applicants||[];if(current==='vas'||current==='talent-profile')render()}
+function applicantRenderFingerprint(applicant){
+  if(!applicant)return '';
+  const normalize=value=>Array.isArray(value)?value.map(normalize):value&&typeof value==='object'
+    ?Object.fromEntries(Object.keys(value).sort().map(key=>[key,normalize(value[key])])):value;
+  // A bookkeeping timestamp alone is not a visible profile change. Compare
+  // every other field, including nested legacy values, without JSON key-order noise.
+  const {updated_at,...visibleRecord}=applicant;
+  return JSON.stringify(normalize(visibleRecord));
+}
+function applyLiveApplicants(applicants){
+  const previous=liveApplicants.find(item=>String(item.id)===String(selectedTalentId));
+  const next=applicants.find(item=>String(item.id)===String(selectedTalentId));
+  const profileChanged=applicantRenderFingerprint(previous)!==applicantRenderFingerprint(next);
+  liveApplicants=applicants;
+  if(current==='vas'||(current==='talent-profile'&&profileChanged))render();
+}
+function liveApplicantAccessScope(value=window.soroCurrentAccess){
+  return JSON.stringify([value?.user_id,value?.organization_id,actualAuthenticatedRole(value),value?.active,value?.must_change_password]);
+}
+async function refreshLiveApplicants(selectFields=talentProfileSelectFields,fallbackFields=null){
+  const request=++liveApplicantsRequest;
+  const client=window.soroSupabase,access=window.soroCurrentAccess||{};
+  const scope=liveApplicantAccessScope(access);
+  if(!client||!access.user_id||!access.organization_id||access.active===false||access.must_change_password===true||!viewAllowedForAuthenticatedRole('vas')){liveApplicantsScope='';applyLiveApplicants([]);return;}
+  if(liveApplicantsScope!==scope){
+    const hadRecords=liveApplicants.length>0;
+    liveApplicants=[];liveApplicantsScope=scope;
+    if(hadRecords&&(current==='vas'||current==='talent-profile'))render();
+  }
+  const stillCurrent=()=>request===liveApplicantsRequest&&window.soroSupabase===client
+    &&scope===liveApplicantAccessScope(window.soroCurrentAccess)&&viewAllowedForAuthenticatedRole('vas');
+  const read=fields=>client.from('applicants').select(fields).eq('organization_id',access.organization_id)
+    .is('archived_at',null).order('application_received_at',{ascending:false});
+  let result;
+  try{
+    result=await read(selectFields);
+    if(!stillCurrent())return;
+    if(result.error&&fallbackFields){result=await read(fallbackFields);if(!stillCurrent())return;}
+  }catch{if(stillCurrent())applyLiveApplicants([]);return;}
+  if(!stillCurrent())return;
+  applyLiveApplicants(result.error||!Array.isArray(result.data)?[]:result.data);
+}
+async function loadLiveApplicants(){return refreshLiveApplicants();}
 async function loadOwnTalentProfile(){
   const access=window.soroCurrentAccess||{};
   const request=++ownTalentProfileRequest;
@@ -774,6 +816,8 @@ window.addEventListener('soro:task-center-error',event=>{
   toast(event.detail?.message||'The task could not be updated.');
 });
 window.addEventListener('soro-auth-changed',event=>{
+  liveApplicantsRequest+=1;
+  liveApplicants=[];liveApplicantsScope='';
   syncAuthorizedNavigation(event.detail.access);
   if(event.detail.session&&viewAllowedForAuthenticatedRole('vas'))loadLiveApplicants();else liveApplicants=[];
   if(event.detail.session&&actualAuthenticatedRole(event.detail.access)==='virtual_assistant')loadOwnTalentProfile();

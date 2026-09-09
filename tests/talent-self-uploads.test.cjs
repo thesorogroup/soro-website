@@ -61,7 +61,7 @@ test('Talent can upload a replacement video through the same own-profile immutab
  assert.deepEqual(h.calls.map(c=>c.stage),['prepare','put','complete']);assert.equal(h.refreshes,1);
  assert.equal(JSON.parse(h.calls[0].opts.body).kind,'introduction_video');
  assert.equal(h.calls[1].opts.headers['x-upsert'],'false');
- assert.match(h.controls[2].status.textContent,/Previous videos are still available/);
+ assert.match(h.controls[2].status.textContent,/Previous Soro uploads are still available/);
  assert.match(h.api.markup('introduction_video'),/Upload video/);
  assert.match(h.api.markup('introduction_video'),/H.264 MP4/);
 });

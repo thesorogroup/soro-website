@@ -2,7 +2,7 @@
 (function(root,factory){const api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.SoroTalentSelfUploads=api;})(typeof window!=='undefined'?window:globalThis,function(root){
  'use strict';
  const ENDPOINT='/.netlify/functions/talent-profile-files';
- const RULES={profile_photo:{max:5242880,extensions:['jpg','jpeg','png'],accept:'.jpg,.jpeg,.png',label:'Upload headshot',help:'JPG or PNG · up to 5 MB'},resume:{max:10485760,extensions:['pdf','docx'],accept:'.pdf,.docx',label:'Upload updated résumé',help:'PDF or DOCX · up to 10 MB. Previous résumés are kept.'},introduction_video:{max:99614720,extensions:['mp4','webm','mov'],accept:'.mp4,.webm,.mov',label:'Upload video',help:'MP4, WebM, or MOV · up to 95 MiB. H.264 MP4 is recommended. Your newest upload replaces the introduction shown here; previous videos are kept privately.'}};
+ const RULES={profile_photo:{max:5242880,extensions:['jpg','jpeg','png'],accept:'.jpg,.jpeg,.png',label:'Upload headshot',help:'JPG or PNG · up to 5 MB'},resume:{max:10485760,extensions:['pdf','docx'],accept:'.pdf,.docx',label:'Upload updated résumé',help:'PDF or DOCX · up to 10 MB. Previous résumés are kept.'},introduction_video:{max:99614720,extensions:['mp4','webm','mov'],accept:'.mp4,.webm,.mov',label:'Upload video',help:'MP4, WebM, or MOV · up to 95 MiB. H.264 MP4 is recommended. Your newest upload replaces the introduction shown here; previous Soro uploads are kept privately.'}};
  const MIME={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',pdf:'application/pdf',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',mp4:'video/mp4',webm:'video/webm',mov:'video/quicktime'};
  let active=null,epoch=0;
  function canUpload(access,applicant){return access?.role==='virtual_assistant'&&!!access.user_id&&!!access.organization_id&&applicant?.auth_user_id===access.user_id&&applicant?.organization_id===access.organization_id;}
@@ -54,7 +54,7 @@
      }
      if(pending){status.textContent='Verifying and attaching…';await api({action:'complete',fileId:pending.fileId});guard();pending=null;}
      attached=true;await options.onUploaded?.();guard();
-     status.textContent=info.kind==='profile_photo'?'Your headshot is updated.':info.kind==='introduction_video'?'Your introduction video is updated. Previous videos are still available in your private documents.':'Your updated résumé is saved. Previous résumés are still available.';
+     status.textContent=info.kind==='profile_photo'?'Your headshot is updated.':info.kind==='introduction_video'?'Your introduction video is updated. Previous Soro uploads are still available in your private documents.':'Your updated résumé is saved. Previous résumés are still available.';
     }catch(e){if(current()&&c.epoch===epoch){if([400,403,409].includes(e.status))pending=null;status.textContent=attached?'Your file was saved. Refresh this page to view it.':(e.message||'The upload could not be completed. Try again.')+(pending?' Your file is uploaded. Select Finish upload to retry attaching it without uploading again.':'');}}
     finally{if(active===c)active=null;if(current()){controls.forEach(x=>x.querySelector('button').disabled=false);button.textContent=pending?'Finish upload':RULES[control.dataset.selfUpload].label;}}
    };

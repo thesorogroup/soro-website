@@ -2,7 +2,6 @@
 (function () {
   const originalProfilePage = profilePage;
   const originalRender = render;
-  const originalLoadLiveApplicants = loadLiveApplicants;
   const originalClassifyDocument = classifyDocument;
 
   function authenticatedRole() {
@@ -77,20 +76,9 @@
 
   document.addEventListener('focusin', event => enableWritingAssistance(event.target.closest('form, dialog') || document));
 
-  // Selecting all columns keeps this preview compatible before and after the
-  // private-address migration is applied to Supabase.
+  // Preserve the all-column private-profile query and its schema fallback while
+  // sharing the request/scope guards and change-aware rendering with the base loader.
   loadLiveApplicants = async function () {
-    if (typeof viewAllowedForAuthenticatedRole === 'function' && !viewAllowedForAuthenticatedRole('vas')) {
-      liveApplicants = [];
-      return;
-    }
-    if (!window.soroSupabase) return originalLoadLiveApplicants();
-    const { data: applicants, error } = await window.soroSupabase
-      .from('applicants')
-      .select('*')
-      .order('application_received_at', { ascending: false });
-    if (error) return originalLoadLiveApplicants();
-    liveApplicants = applicants || [];
-    if (current === 'vas' || current === 'talent-profile') render();
+    return refreshLiveApplicants('*', talentProfileSelectFields);
   };
 })();
