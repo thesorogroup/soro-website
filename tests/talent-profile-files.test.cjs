@@ -179,7 +179,10 @@ const SIGNATURE_FIXTURES = [
   ['PDF', 'resume', 'application/pdf', PDF_BYTES],
   ['JPEG', 'profile_photo', 'image/jpeg', Buffer.from([255, 216, 255, 224, 0, 16, 74, 70, 73, 70])],
   ['PNG', 'profile_photo', 'image/png', Buffer.from([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0])],
-  ['DOCX', 'resume', DOCX, Buffer.from('PK\x03\x04[Content_Types].xml word/document.xml')]
+  ['DOCX', 'resume', DOCX, Buffer.from('PK\x03\x04[Content_Types].xml word/document.xml')],
+  ['MP4', 'introduction_video', 'video/mp4', Buffer.from('000000186674797069736f6d0000000069736f6d6d7034326d65646961','hex')],
+  ['MOV', 'introduction_video', 'video/quicktime', Buffer.from('0000001866747970717420200000000071742020717420206d65646961','hex')],
+  ['WebM', 'introduction_video', 'video/webm', Buffer.concat([Buffer.from([0x1a,0x45,0xdf,0xa3]),Buffer.from('DocType webm fixture')])]
 ];
 for (const [label, kind, type, bytes] of SIGNATURE_FIXTURES) test(`${label} completion checks stored bytes and supplies a server-derived SHA-256`, async t => {
   const f = reservation({ kind, type, size: bytes.length });

@@ -7,6 +7,7 @@
  */
 const crypto = require('node:crypto');
 const {renderEmail} = require('./lib/branded-email');
+const {TALENT_EMAIL, APPLICATION_CONFIRMATION_FROM, applicationConfirmationEmail} = require('./lib/application-confirmation-email');
 
 const configuredUrl = (process.env.SUPABASE_URL || '').trim();
 const SUPABASE_URL = /^https:\/\/[^/]+\.supabase\.co\/?$/.test(configuredUrl)
@@ -189,13 +190,13 @@ function escapeHtml(value) {
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[character]));
 }
-async function sendEmail({ to, subject, text, html, replyTo }) {
-  if (!RESEND_API_KEY || !APPLICATION_FROM_EMAIL || !isEmail(to)) {
+async function sendEmail({ to, subject, text, html, replyTo, from = APPLICATION_FROM_EMAIL }) {
+  if (!RESEND_API_KEY || !from || !isEmail(to)) {
     return {
       delivered: false,
       reason: !RESEND_API_KEY
         ? 'RESEND_API_KEY is not configured.'
-        : !APPLICATION_FROM_EMAIL
+        : !from
           ? 'APPLICATION_FROM_EMAIL is not configured.'
           : 'The destination email address is invalid.'
     };
@@ -204,7 +205,7 @@ async function sendEmail({ to, subject, text, html, replyTo }) {
     method: 'POST',
     headers: { Authorization: `Bearer ${RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: APPLICATION_FROM_EMAIL,
+      from,
       to: [email(to)],
       subject,
       text,
@@ -232,13 +233,9 @@ async function sendApplicationNotifications(data) {
     }),
     sendEmail({
       to: applicantEmail,
-      replyTo: APPLICATION_NOTIFICATION_EMAIL,
-      ...renderEmail({
-        subject: 'We received your Soro Group application', eyebrow: 'APPLICATION RECEIVED',
-        title: 'Your next chapter starts here.', person: data,
-        paragraphs: ['Thank you for taking this first step with Soro Group. We received your application and stored your information privately.', 'Talent Management will contact you if there is a next step.'],
-        footer: 'Questions about your application? Reply to this email to reach Soro Talent Management.'
-      })
+      from: APPLICATION_CONFIRMATION_FROM,
+      replyTo: TALENT_EMAIL,
+      ...applicationConfirmationEmail(data)
     })
   ]);
   const talentNotificationSent = results[0].status === 'fulfilled' && results[0].value.delivered;

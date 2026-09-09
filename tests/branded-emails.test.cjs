@@ -11,8 +11,8 @@ const Module = require('node:module');
 
 // Expose only in this isolated test module, not in the deployed function exports.
 function loadSender(t, file, localFunction) {
-  const previous=Object.fromEntries(['RESEND_API_KEY','APPLICATION_FROM_EMAIL','TALENT_ACCESS_FROM_EMAIL','CLIENT_ACCESS_FROM_EMAIL','CLIENT_ACCESS_LINK_TTL_SECONDS'].map(key=>[key,process.env[key]]));
-  for(const key of Object.keys(previous))process.env[key]=key==='RESEND_API_KEY'?'test-only-key':key==='CLIENT_ACCESS_LINK_TTL_SECONDS'?'3600':'Soro Group <sender@example.com>';
+  const previous=Object.fromEntries(['RESEND_API_KEY','APPLICATION_FROM_EMAIL','APPLICATION_NOTIFICATION_EMAIL','TALENT_ACCESS_FROM_EMAIL','CLIENT_ACCESS_FROM_EMAIL','CLIENT_ACCESS_LINK_TTL_SECONDS'].map(key=>[key,process.env[key]]));
+  for(const key of Object.keys(previous))process.env[key]=key==='RESEND_API_KEY'?'test-only-key':key==='CLIENT_ACCESS_LINK_TTL_SECONDS'?'3600':key==='APPLICATION_NOTIFICATION_EMAIL'?'internal-notice@example.com':'Soro Group <sender@example.com>';
   t.after(()=>{for(const [key,value] of Object.entries(previous)){if(value===undefined)delete process.env[key];else process.env[key]=value;}});
   const filename=path.join(__dirname,'../netlify/functions',file);
   const mod=new Module(filename,module);mod.filename=filename;mod.paths=Module._nodeModulePaths(path.dirname(filename));
@@ -112,7 +112,7 @@ test('Talent sender and Client durable payload actually render Gabriel correctly
   for(const body of bodies){assert.match(body.html,/Hi Gabriel,/);assert.match(body.text,/Hi Gabriel,/);assert.match(body.html,/soro-logo-final-transparent.png/);assert.deepEqual(body.to,['preview@example.com']);}
 });
 
-test('Application receipt and internal notice are branded with their existing recipient and reply-to routing', async t => {
+test('Application receipt comes from the Talent mailbox while internal notice routing stays unchanged', async t => {
   const send=loadSender(t,'talent-application.js','sendApplicationNotifications');
   const oldFetch=global.fetch;const bodies=[];t.after(()=>{global.fetch=oldFetch;});
   global.fetch=async(url,options)=>{assert.equal(url,'https://api.resend.com/emails');bodies.push(JSON.parse(options.body));return {ok:true,json:async()=>({id:'test-only'})};};
@@ -120,7 +120,12 @@ test('Application receipt and internal notice are branded with their existing re
   const receipt=bodies.find(body=>body.to[0]==='gabriel@example.com');
   const internal=bodies.find(body=>body.to[0]!=='gabriel@example.com');
   assert.match(receipt.html,/Hi Gabriel,/);assert.doesNotMatch(receipt.html,/,,/);assert.equal(internal.reply_to,'gabriel@example.com');
-  assert.equal(receipt.reply_to,internal.to[0]);
+  assert.equal(receipt.from,'The Soro Group <talents@thesorogroup.com>');
+  assert.equal(receipt.reply_to,'talents@thesorogroup.com');
+  assert.equal(internal.from,'Soro Group <sender@example.com>');
+  assert.deepEqual(internal.to,['internal-notice@example.com']);
+  assert.match(receipt.text,/Please reply with your preferred interview date and time/);
+  assert.match(receipt.html,/Philippine Time \(UTC\+08:00\)/);
   for(const body of bodies) {assert.match(body.html,/soro-logo-final-transparent.png/);assert.equal(body.attachments,undefined);}
 });
 

@@ -45,25 +45,33 @@ function canEditProfileDetails() {
 
   const originalLoadTalentProfileDocuments = loadTalentProfileDocuments;
   loadTalentProfileDocuments = async function () {
-    await originalLoadTalentProfileDocuments();
     const applicant = selectedProfileApplicant();
     const target = document.getElementById('profile-introduction-video');
+    const accessUserId = window.soroCurrentAccess?.user_id;
+    const accessOrgId = window.soroCurrentAccess?.organization_id;
+    const stillCurrent = () => document.getElementById('profile-introduction-video') === target
+      && selectedProfileApplicant()?.id === applicant.id
+      && window.soroCurrentAccess?.user_id === accessUserId
+      && window.soroCurrentAccess?.organization_id === accessOrgId;
+    await originalLoadTalentProfileDocuments();
     if (!applicant || !target || !window.soroSupabase) return;
+    if (!stillCurrent()) return;
 
     await loadSkillsAndExperience(applicant);
+    if (!stillCurrent()) return;
 
     const { data: documents, error } = await window.soroSupabase
       .from('documents')
-      .select('file_name,document_type,storage_path,created_at')
+      .select('id,file_name,document_type,status,storage_path,external_url,created_at')
       .eq('applicant_id', applicant.id)
-      .order('created_at', { ascending: false });
-    if (error) return;
+      .order('created_at', { ascending: false }).order('id', { ascending: false });
+    if (!stillCurrent() || error) return;
 
     const introVideo = (documents || []).find(document =>
-      classifyDocument(document) === 'introduction_video' && document.storage_path
+      classifyDocument(document) === 'introduction_video' && document.storage_path && document.status !== 'rejected'
     );
     const interviewVideo = (documents || []).find(document =>
-      classifyDocument(document) === 'interview_video' && document.storage_path
+      classifyDocument(document) === 'interview_video' && document.storage_path && document.status !== 'rejected'
     );
     const videoCards = await Promise.all([
       ['Introduction video', introVideo],
@@ -75,12 +83,23 @@ function canEditProfileDetails() {
       if (signingError || !signed?.signedUrl) return '';
       return `<section class="profile-introduction-video"><div><p class="eyebrow">${label}</p><strong>${escapeHtml(document.file_name)}</strong></div><video controls preload="metadata" playsinline src="${escapeHtml(signed.signedUrl)}" aria-label="${escapeHtml(applicant.full_name)} ${label.toLowerCase()}">Your browser does not support video playback.</video><p class="profile-video-error" hidden>This upload uses a video format this browser cannot play. Replace it with an H.264 MP4 or WebM file.</p><small>Private Soro file</small></section>`;
     }));
+    if (!stillCurrent()) return;
+
+    // Legacy applications already own their submitted Loom URL. Show it only
+    // in existing private-profile views, and never replace a newer Soro upload.
+    const loom = window.SoroLoomIntroduction;
+    if (!introVideo && loom?.canView(window.soroCurrentAccess, applicant)) {
+      const source = loom.source(applicant, documents || []);
+      if (source) videoCards.unshift(loom.markup(source));
+      else if (applicant.loom_video_url) videoCards.unshift('<section class="profile-introduction-video profile-video-empty"><p class="eyebrow">Introduction video</p><strong>The saved Loom link needs correction</strong><small>Contact the Talent team or upload a new introduction video.</small></section>');
+    }
 
     if (!videoCards.filter(Boolean).length) {
-      target.innerHTML = '<section class="profile-introduction-video profile-video-empty"><p class="eyebrow">Video interviews</p><strong>No private video attached yet</strong><small>Long-form interview recordings will use secure video hosting before upload.</small></section>';
+      target.innerHTML = '<section class="profile-introduction-video profile-video-empty"><p class="eyebrow">Introduction video</p><strong>No introduction video attached yet</strong><small>Introduction recordings appear here when available.</small></section>';
       return;
     }
     target.innerHTML = videoCards.join('');
+    loom?.bind(target, stillCurrent);
     target.querySelectorAll('video').forEach(video => {
       video.addEventListener('error', () => {
         const errorMessage = video.closest('.profile-introduction-video')?.querySelector('.profile-video-error');
