@@ -59,6 +59,7 @@
   let actionContext = null;
   let verificationContext = null;
   let evidence = { skills: null, resume: null };
+  let resumeViewer = null;
   let evidenceVersion = 0;
   const evidenceRequests = {skills:0,resume:0};
   let pendingStageAction = false;
@@ -1056,6 +1057,7 @@
     const anchorSelector = activeReview ? `[data-review-applicant="${activeReview.applicantId}"]` : '';
     const top = anchorSelector ? mountedRoot.querySelector?.(anchorSelector)?.getBoundingClientRect?.().top : null;
     const bodyScroll = mountedRoot.querySelector?.('.talent-verification-body')?.scrollTop || 0;
+    stopResumeViewer();
     mountedRoot.innerHTML = pageMarkup();
     const body = mountedRoot.querySelector?.('.talent-verification-body');
     if (body) body.scrollTop = bodyScroll;
@@ -1068,6 +1070,7 @@
       }, { once: true });
       if (typeof dialog.showModal === 'function' && !dialog.open) dialog.showModal();
     }
+    mountResumeViewer();
     const after = anchorSelector ? mountedRoot.querySelector?.(anchorSelector)?.getBoundingClientRect?.().top : null;
     if (Number.isFinite(top) && Number.isFinite(after) && typeof root.scrollBy === 'function') root.scrollBy({top: after - top, behavior:'instant'});
     return true;
@@ -1126,6 +1129,27 @@
     }
   }
 
+  function stopResumeViewer() {
+    resumeViewer?.destroy();
+    resumeViewer = null;
+  }
+
+  function mountResumeViewer() {
+    const state = evidence.resume, service = root.soroTalentReviewEvidence;
+    const host = mountedRoot?.querySelector?.('[data-private-pdf-viewer]');
+    if (!host || state?.kind !== 'pdf' || !service?.authorized() || !root.soroPrivatePdfViewer) return;
+    stopResumeViewer();
+    const version = evidenceVersion, request = evidenceRequests.resume, accessScope = service.scope();
+    const client = root.soroSupabase, id = verificationContext?.applicantId;
+    resumeViewer = root.soroPrivatePdfViewer.mount(host, {
+      url: state.url, storageOrigin: client.supabaseUrl,
+      isCurrent: () => version === evidenceVersion && request === evidenceRequests.resume &&
+        evidence.resume === state && verificationContext?.applicantId === id && verificationContext.mode !== 'interview' &&
+        service.authorized() && service.scope() === accessScope && root.soroSupabase === client &&
+        mountedRoot?.querySelector?.('[data-private-pdf-viewer]') === host
+    });
+  }
+
   async function loadEvidence(kind) {
     if (kind === 'skills' && skillsSaving) return;
     const service = root.soroTalentReviewEvidence, id = verificationContext?.applicantId;
@@ -1133,6 +1157,7 @@
     const version = evidenceVersion;
     const request = ++evidenceRequests[kind];
     const accessScope = service.scope();
+    if (kind === 'resume') stopResumeViewer();
     evidence[kind] = null;
     const panel = () => mountedRoot?.querySelector?.(`[data-review-${kind === 'resume' ? 'resume' : 'skills'}-panel]`);
     if (panel()) panel().innerHTML = kind === 'resume' ? service.resumeMarkup(null) : service.skillsMarkup(null);
@@ -1145,6 +1170,7 @@
     if (request !== evidenceRequests[kind] || version !== evidenceVersion || verificationContext?.applicantId !== id || service.scope() !== accessScope || !service.authorized()) return;
     evidence[kind] = result;
     if (panel()) panel().innerHTML = kind === 'resume' ? service.resumeMarkup(evidence[kind]) : service.skillsMarkup(evidence[kind]);
+    if (kind === 'resume') mountResumeViewer();
   }
 
   function openVerification(applicantId, mode = 'verification') {
@@ -1152,6 +1178,7 @@
     const applicant = findApplicant(applicantId);
     if (!applicant || (applicant.stage === 'submitted' && !applicant.archived)) return false;
     holdReview(applicant.applicantId);
+    stopResumeViewer();
     evidenceVersion += 1;
     evidence = {skills:null,resume:null};
     loadVerification(applicant.applicantId, {mode});
@@ -1160,6 +1187,7 @@
   }
 
   function closeVerification() {
+    stopResumeViewer();
     evidenceVersion += 1;
     evidence = {skills:null,resume:null};
     skillsSaving = false;
@@ -1477,6 +1505,7 @@
     // The sidebar owns a background queue load even when the queue view is absent.
     // Other portal renders must not cancel that load or strand it in loading state.
     if (!mountedRoot && !reset) return false;
+    stopResumeViewer();
     requestVersion += 1;
     verificationRequestVersion += 1;
     evidenceVersion += 1;

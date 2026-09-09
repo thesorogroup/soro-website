@@ -257,7 +257,18 @@
 .review-evidence-resume h3 { margin: 0; color: var(--navy); font-size: 20px; }
 .review-evidence-resume .eyebrow { margin: 0 0 5px; }
 .review-evidence-resume > .button { align-self: flex-start; }
-.review-evidence-resume iframe { flex: 1; width: 100%; min-height: 380px; border: 1px solid #cbd8e5; background: white; border-radius: 8px; }
+.private-pdf-viewer { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 10px; }
+.private-pdf-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 14px; }
+.private-pdf-toolbar .button { min-height: 36px; padding: 7px 10px; }
+.private-pdf-toolbar label { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.private-pdf-toolbar select { font: inherit; padding: 7px; border: 1px solid #cbd8e5; border-radius: 6px; background: white; color: var(--navy); }
+.private-pdf-toolbar button:disabled { opacity: .5; cursor: default; }
+.private-pdf-pages { min-height: 380px; max-height: 65vh; overflow: auto; scrollbar-gutter: stable; padding: 12px; border: 1px solid #cbd8e5; background: #dce5ee; border-radius: 8px; }
+.private-pdf-pages canvas { display: block; margin: 0 auto; background: white; box-shadow: 0 2px 8px #0b264233; }
+.private-pdf-viewer [data-pdf-status] { font-size: 14px; margin: 0; }
+.private-pdf-text { font-size: 14px; }
+.private-pdf-text summary { cursor: pointer; color: #164b7c; }
+.private-pdf-text [data-pdf-text] { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; padding: 12px; margin-top: 8px; background: white; }
 .review-evidence-resume img { display: block; max-width: 100%; height: auto; object-fit: contain; }
 .review-evidence-file-name { margin: 0; overflow-wrap: anywhere; color: #4c6680; font-size: 14px; }
 .review-evidence-resume small { color: #5c7288; font-size: 13px; }
@@ -275,7 +286,7 @@
   .has-resume .talent-verification-workspace { grid-template-columns: minmax(0,1fr); overflow-y: auto; }
   .has-resume .talent-verification-body { overflow: visible; }
   .review-evidence-resume { overflow: visible; border-right: 0; border-bottom: 1px solid #dce5ee; }
-  .review-evidence-resume iframe { flex: none; height: 400px; }
+  .private-pdf-pages { max-height: 55vh; min-height: 280px; }
   .talent-review-active-note { align-items: flex-start; flex-direction: column; }
 }
 .talent-review-action-divider { width: 1px; height: 25px; margin: 0 2px; background: #dce4ec; }
