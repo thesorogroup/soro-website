@@ -243,6 +243,41 @@
 .talent-review-verification small { display: block; }
 .talent-review-verification strong { font-size: 12px; }
 .talent-review-verification small { margin-top: 1px; color: #667b90; font-size: 9px; font-weight: 650; }
+.talent-review-card.is-current-review { border-color: #7598b9; box-shadow: 0 0 0 2px #e6eef6; }
+.talent-review-active-note { display: flex; justify-content: space-between; align-items: center; gap: 14px; margin: 14px 0; padding: 12px 16px; border-radius: 10px; background: #edf4fa; color: #274b6f; font-size: 14px; }
+.talent-review-filter-exception { margin: 10px 18px 0; color: #496f91; font-size: 13px; }
+.talent-review-readiness { display: flex; flex-wrap: wrap; gap: 6px 12px; padding: 10px 18px; color: #4b647d; background: #f5f8fb; font-size: 13px; }
+.talent-review-sort { display: flex !important; gap: 8px; align-items: center; width: auto !important; white-space: nowrap; font-size: 14px; }
+.talent-review-sort select { padding: 9px 12px; border: 1px solid #cbd8e5; border-radius: 8px; background: white; color: var(--navy); font: inherit; }
+.talent-verification-workspace { display: grid; min-height: 0; grid-template-columns: minmax(0,1fr); }
+.talent-verification-dialog.has-resume { width: min(1460px, 100vw); }
+.has-resume .talent-verification-workspace { grid-template-columns: minmax(320px, .95fr) minmax(430px, 1fr); }
+.review-evidence-resume { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 22px; overflow: auto; border-right: 1px solid #dce5ee; background: #eef3f8; }
+.review-evidence-resume header { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.review-evidence-resume h3 { margin: 0; color: var(--navy); font-size: 20px; }
+.review-evidence-resume .eyebrow { margin: 0 0 5px; }
+.review-evidence-resume > .button { align-self: flex-start; }
+.review-evidence-resume iframe { flex: 1; width: 100%; min-height: 380px; border: 1px solid #cbd8e5; background: white; border-radius: 8px; }
+.review-evidence-resume img { display: block; max-width: 100%; height: auto; object-fit: contain; }
+.review-evidence-file-name { margin: 0; overflow-wrap: anywhere; color: #4c6680; font-size: 14px; }
+.review-evidence-resume small { color: #5c7288; font-size: 13px; }
+.review-evidence-skills { display: grid; gap: 10px; margin: 18px 0; }
+.review-evidence-skill { display: grid; grid-template-columns: minmax(0,1fr) 75px; align-items: center; gap: 14px; padding: 12px; border: 1px solid #dce5ee; border-radius: 9px; background: #f8fafc; }
+.review-evidence-skill label:first-child { display: flex; align-items: center; gap: 10px; }
+.review-evidence-skill label:last-child { display: grid; gap: 4px; }
+.review-evidence-skill input[type=checkbox] { width: 18px; height: 18px; flex: 0 0 auto; accent-color: #164b7c; }
+.review-evidence-skill input[type=number] { width: 100%; padding: 8px; border: 1px solid #cbd8e5; border-radius: 6px; font: inherit; }
+.has-resume .talent-verification-body { padding: 20px; font-size: 14px; }
+.has-resume .talent-verification-body .talent-verification-section:first-child { margin-top: 0; }
+.has-resume .talent-verification-form label, .has-resume .talent-verification-form input, .has-resume .talent-verification-form textarea, .has-resume .talent-verification-reference-contact { font-size: 14px; }
+.has-resume [data-review-skills-form] > p { color: #536a80; line-height: 1.5; }
+@media (max-width: 850px) {
+  .has-resume .talent-verification-workspace { grid-template-columns: minmax(0,1fr); overflow-y: auto; }
+  .has-resume .talent-verification-body { overflow: visible; }
+  .review-evidence-resume { overflow: visible; border-right: 0; border-bottom: 1px solid #dce5ee; }
+  .review-evidence-resume iframe { flex: none; height: 400px; }
+  .talent-review-active-note { align-items: flex-start; flex-direction: column; }
+}
 .talent-review-action-divider { width: 1px; height: 25px; margin: 0 2px; background: #dce4ec; }
 .talent-review-action { padding: 8px 11px; font-size: 12px; }
 .talent-review-action:disabled { opacity: .52; cursor: not-allowed; filter: grayscale(.25); }

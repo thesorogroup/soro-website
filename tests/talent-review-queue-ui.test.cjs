@@ -55,6 +55,65 @@ function queuePayload(role = 'admin', rows = [applicant()], overrides = {}) {
   };
 }
 
+test('newest applications sort first across stages, with user-controlled alternatives', async t => {
+  const older = applicant({applicantId:requestId, fullName:'Z Older',stage:'needs_more_info',applicationReceivedAt:'2026-08-01T10:00:00Z'});
+  const latest = applicant({fullName:'A Newer'});
+  const {ui} = installUi(t,{responsePayload:queuePayload('admin',[older,latest])});
+  await ui.refresh();
+  assert.deepEqual(ui.visibleApplicants().map(x=>x.applicantId),[applicantId,requestId]);
+  ui.setSort('oldest'); assert.deepEqual(ui.visibleApplicants().map(x=>x.applicantId),[requestId,applicantId]);
+  ui.setSort('name'); assert.equal(ui.visibleApplicants()[0].fullName,'A Newer');
+});
+
+test('Start Review holds the fresh record through stage, search, sort and background changes until released', async t => {
+  let rows=[applicant(),applicant({applicantId:requestId,fullName:'Older',applicationReceivedAt:'2026-08-01T10:00:00Z'})];
+  const {ui} = installUi(t,{responsePayload:call=>{
+    if(call.options.method==='POST') rows=rows.map(x=>x.applicantId===applicantId?{...x,stage:'in_review',allowedActions:['request_more_info','mark_bench_ready']}:x).reverse();
+    return queuePayload('admin',rows);
+  }});
+  await ui.refresh(); ui.setStageFilter('submitted');
+  await ui.changeApplicant({applicantId,expectedUpdatedAt:updatedAt,action:'begin_review'});
+  assert.equal(ui.visibleApplicants()[0].applicantId,applicantId);
+  assert.equal(ui.visibleApplicants()[0].stage,'in_review');
+  ui.setSearch('no matching name'); assert.deepEqual(ui.visibleApplicants().map(x=>x.applicantId),[applicantId]);
+  ui.setSort('oldest'); assert.equal(ui.visibleApplicants()[0].applicantId,applicantId);
+  await ui.refresh({silent:true}); assert.equal(ui.visibleApplicants()[0].applicantId,applicantId);
+  ui.releaseReview(); assert.equal(ui.visibleApplicants().length,0);
+});
+
+test('submitted action row contains only Start review and expands only after the saved transition', async t => {
+  let row=applicant();
+  const {ui}=installUi(t,{responsePayload:call=>{
+    if(call.options.method==='POST') row={...row,stage:'in_review',allowedActions:['request_more_info','mark_bench_ready','decline']};
+    return queuePayload('admin',[row]);
+  }});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target); await new Promise(resolve=>setImmediate(resolve));
+  const actions=()=>target.innerHTML.match(/<footer class="talent-review-card-actions">([\s\S]*?)<\/footer>/)[1];
+  assert.match(actions(),/data-review-action="begin_review"/);
+  assert.doesNotMatch(actions(),/data-review-resume|data-review-verification|data-review-interview|More actions/);
+  await ui.changeApplicant({applicantId,expectedUpdatedAt:updatedAt,action:'begin_review'});
+  assert.match(actions(),/data-review-verification/); assert.match(actions(),/data-review-interview/); assert.match(actions(),/Open résumé/);
+});
+
+test('verification and interview drawers contain independent controls', async t => {
+  const row=applicant({stage:'in_review'});
+  const {ui}=installUi(t,{responsePayload:call=>call.url.includes('talent-verification') ? {
+    generatedAt:updatedAt,viewerRole:'admin',applicant:{applicantId,fullName:row.fullName,email:row.email,stage:'in_review',updatedAt},
+    gate:{interviewAddressed:false,referencesAddressed:false,benchReadyEligible:false,blockers:['Interview pending','References pending']},
+    interview:null,references:[],interviewers:[{id:ownerId,name:'Interviewer'}],calendarIntegration:{configured:false,organizerLabel:'Soro'}
+  } : queuePayload('admin',[row])});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(r=>setImmediate(r));
+  ui.openVerification(applicantId);await new Promise(r=>setImmediate(r));
+  const dialog=()=>target.innerHTML.slice(target.innerHTML.indexOf('<dialog'));
+  assert.match(dialog(),/data-review-resume-panel/);assert.match(dialog(),/Verify skills/);assert.match(dialog(),/Employment references/);
+  assert.doesNotMatch(dialog(),/data-verification-form="schedule_interview"|Internal interview/);
+  ui.openVerification(applicantId,'interview');await new Promise(r=>setImmediate(r));
+  assert.match(dialog(),/data-verification-form="schedule_interview"/);
+  assert.doesNotMatch(dialog(),/data-review-resume-panel|Employment references|Verify skills/);
+});
+
 function installUi(t, options = {}) {
   const role = options.role || 'admin';
   const responsePayload = options.responsePayload || queuePayload(role);

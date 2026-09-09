@@ -38,7 +38,7 @@
     closed: 'Closed'
   });
   const ACTION_LABELS = Object.freeze({
-    begin_review: 'Start review',
+    begin_review: 'Start Review',
     request_more_info: 'Request more information',
     mark_bench_ready: 'Mark bench ready',
     return_to_review: 'Return to review',
@@ -50,13 +50,19 @@
 
   let mountedRoot = null;
   let queue = emptyQueue();
-  let filters = Object.freeze({ stage: 'all', search: '' });
+  let filters = Object.freeze({ stage: 'all', search: '', sort: 'newest' });
+  let activeReview = null;
   let activeController = null;
   let activeVerificationController = null;
   let requestVersion = 0;
   let verificationRequestVersion = 0;
   let actionContext = null;
   let verificationContext = null;
+  let evidence = { skills: null, resume: null };
+  let evidenceVersion = 0;
+  const evidenceRequests = {skills:0,resume:0};
+  let pendingStageAction = false;
+  let skillsSaving = false;
   const verificationGateCache = new Map();
   let feedback = Object.freeze({ type: '', message: '' });
 
@@ -80,6 +86,15 @@
 
   function actualUserId(access = root?.soroCurrentAccess) {
     return validUuid(access?.user_id || access?.userId, { optional: true });
+  }
+
+  function accessFingerprint() {
+    const access = root.soroCurrentAccess || {};
+    return JSON.stringify([access.user_id || access.userId, access.organization_id, access.role, access.active, access.must_change_password]);
+  }
+
+  function checkRequestScope(scope) {
+    if (scope !== accessFingerprint() || !canOpenForRole() || root.soroCurrentAccess?.active === false || root.soroCurrentAccess?.must_change_password === true) throw new Error('Your review access changed. Reopen the review queue.');
   }
 
   function canOpenForRole(roleValue = actualRole()) {
@@ -419,7 +434,9 @@
   }
 
   async function requestQueue({ method = 'GET', body = null } = {}) {
+    const scope = accessFingerprint();
     const token = await sessionToken();
+    checkRequestScope(scope);
     const controller = typeof root?.AbortController === 'function' ? new root.AbortController() : null;
     abortActiveRequest();
     activeController = controller;
@@ -450,6 +467,7 @@
     try { payload = responseText ? JSON.parse(responseText) : null; }
     catch { throw new Error(`The Talent review service returned an unexpected response (${response.status}).`); }
     if (!response.ok) throw new Error(text(payload?.message, 280) || 'The Talent review request could not be completed.');
+    checkRequestScope(scope);
     return normalizePayload(payload);
   }
 
@@ -462,7 +480,9 @@
     if (!canOpenForRole()) throw new Error('Only Admin and Talent Management can access Talent verification.');
     const id = validUuid(applicantId);
     if (!id) throw new Error('Choose a valid Talent application and try again.');
+    const scope = accessFingerprint();
     const token = await sessionToken();
+    checkRequestScope(scope);
     const controller = typeof root?.AbortController === 'function' ? new root.AbortController() : null;
     abortVerificationRequest();
     activeVerificationController = controller;
@@ -493,6 +513,7 @@
     try { payload = responseText ? JSON.parse(responseText) : null; }
     catch { throw new Error(`The verification service returned an unexpected response (${response.status}).`); }
     if (!response.ok) throw new Error(text(payload?.message, 280) || 'The verification update could not be completed.');
+    checkRequestScope(scope);
     return normalizeVerificationPayload(payload, id);
   }
 
@@ -613,6 +634,7 @@
 
   function setQueue(value) {
     queue = value;
+    if (activeReview && !findApplicant(activeReview.applicantId)) activeReview = null;
     syncNavigationBadge(queue);
     dispatchUpdated();
     render();
@@ -624,7 +646,7 @@
   }
 
   async function refresh(options = {}) {
-    if (!canOpenForRole()) return currentQueue();
+    if (!canOpenForRole() || pendingStageAction) return currentQueue();
     const silent = options.silent === true && queue.phase === 'ready';
     const version = ++requestVersion;
     if (!silent) {
@@ -675,12 +697,48 @@
 
   function visibleApplicants() {
     const query = filters.search.toLowerCase();
-    return queue.applicants.filter(applicant => {
+    const matches = queue.applicants.filter(applicant => {
+      if (applicant.applicantId === activeReview?.applicantId) return true;
       if (filters.stage !== 'all' && filterStage(applicant) !== filters.stage) return false;
       if (!query) return true;
       return [applicant.fullName, applicant.preferredName, applicant.email, applicant.owner.name]
         .filter(Boolean).join(' ').toLowerCase().includes(query);
+    }).sort((a, b) => {
+      const dateOrder = (Date.parse(b.applicationReceivedAt) || 0) - (Date.parse(a.applicationReceivedAt) || 0);
+      if (filters.sort === 'name') return a.fullName.localeCompare(b.fullName) || a.applicantId.localeCompare(b.applicantId);
+      if (filters.sort === 'stage') return STAGES.indexOf(filterStage(a)) - STAGES.indexOf(filterStage(b)) || dateOrder || a.applicantId.localeCompare(b.applicantId);
+      return (filters.sort === 'oldest' ? -dateOrder : dateOrder) || a.applicantId.localeCompare(b.applicantId);
     });
+    if (!activeReview) return matches;
+    const rank = new Map(activeReview.order.map((id, index) => [id, index]));
+    return matches.sort((a, b) => (rank.get(a.applicantId) ?? Infinity) - (rank.get(b.applicantId) ?? Infinity));
+  }
+
+  function holdReview(applicantId) {
+    const applicant = findApplicant(applicantId);
+    if (!applicant || !canOpenForRole()) return false;
+    if (activeReview?.applicantId !== applicant.applicantId) activeReview = { applicantId: applicant.applicantId, order: visibleApplicants().map(item => item.applicantId) };
+    return true;
+  }
+
+  function releaseReview() { activeReview = null; render(); }
+
+  function setSort(value) {
+    return applyFilters({ ...filters, sort: ['newest', 'oldest', 'name', 'stage'].includes(value) ? value : 'newest' });
+  }
+
+  function applyFilters(next) {
+    const held = activeReview;
+    const index = held ? visibleApplicants().findIndex(item => item.applicantId === held.applicantId) : -1;
+    filters = Object.freeze(next);
+    activeReview = null;
+    if (held && findApplicant(held.applicantId)) {
+      const order = visibleApplicants().map(item => item.applicantId).filter(id => id !== held.applicantId);
+      order.splice(Math.min(Math.max(index, 0), order.length), 0, held.applicantId);
+      activeReview = {applicantId:held.applicantId, order};
+    }
+    render();
+    return filters;
   }
 
   function summaryMarkup() {
@@ -728,16 +786,21 @@
   }
 
   function verificationButtonMarkup(applicant) {
-    const gate = verificationGateCache.get(applicant.applicantId);
-    const state = gate?.benchReadyEligible ? 'Ready' : gate ? `${gate.blockers.length} follow-up${gate.blockers.length === 1 ? '' : 's'}` : 'Interview & references';
-    return `<button type="button" class="button talent-review-verification${gate?.benchReadyEligible ? ' is-ready' : ''}" data-review-verification="${escapeHtml(applicant.applicantId)}" aria-label="Open verification for ${escapeHtml(applicant.fullName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v3h3v15H5V6h3z"/><path d="M9 13l2 2 4-5M9 8h6"/></svg><span><strong>Verification</strong><small>${escapeHtml(state)}</small></span></button>`;
+    return `<button type="button" class="button talent-review-verification" data-review-verification="${escapeHtml(applicant.applicantId)}" aria-label="Open verification for ${escapeHtml(applicant.fullName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v3h3v15H5V6h3z"/><path d="M9 13l2 2 4-5M9 8h6"/></svg><span><strong>Verification</strong><small>Skills &amp; references</small></span></button>`;
+  }
+
+  function interviewButtonMarkup(applicant) {
+    return `<button type="button" class="button talent-review-verification" data-review-interview="${escapeHtml(applicant.applicantId)}" aria-label="Schedule interview for ${escapeHtml(applicant.fullName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM8 2v6m8-6v6M4 10h16"/></svg><span><strong>Schedule Interview</strong><small>Appointment &amp; outcome</small></span></button>`;
   }
 
   function applicantMarkup(applicant) {
+    const notStarted = applicant.stage === 'submitted' && !applicant.archived;
     const primaryActions = applicant.allowedActions.filter(action => !SECONDARY_ACTIONS.has(action));
     const guardedActions = applicant.allowedActions.filter(action => SECONDARY_ACTIONS.has(action));
     const displayedStage = filterStage(applicant);
-    return `<article class="talent-review-card" data-review-applicant="${escapeHtml(applicant.applicantId)}">
+    const gate = verificationGateCache.get(applicant.applicantId);
+    const outsideFilter = (filters.stage !== 'all' && displayedStage !== filters.stage) || (filters.search && ![applicant.fullName,applicant.preferredName,applicant.email,applicant.owner.name].join(' ').toLowerCase().includes(filters.search.toLowerCase()));
+    return `<article class="talent-review-card${activeReview?.applicantId === applicant.applicantId ? ' is-current-review' : ''}" data-review-applicant="${escapeHtml(applicant.applicantId)}">
       <header class="talent-review-card-heading">
         <span class="talent-review-avatar" aria-hidden="true">${escapeHtml(initials(applicant.fullName))}</span>
         <div class="talent-review-person">
@@ -752,10 +815,12 @@
         <span><small>Review owner</small><strong>${escapeHtml(applicant.owner.name)}</strong></span>
         <span><small>Last updated</small><strong>${escapeHtml(formatDate(applicant.updatedAt))}</strong></span>
       </div>
+      ${activeReview?.applicantId === applicant.applicantId && outsideFilter ? '<p class="talent-review-filter-exception">Current review · kept here outside the selected filters</p>' : ''}
       ${checklistMarkup(applicant)}
+      ${!notStarted && gate ? `<div class="talent-review-readiness"><strong>Bench readiness</strong><span>${gate.benchReadyEligible ? 'Interview and reference requirements addressed. Complete the checklist before moving to Bench Ready.' : gate.blockers.map(escapeHtml).join(' · ')}</span></div>` : ''}
       <footer class="talent-review-card-actions">
-        <div class="talent-review-card-main-actions">${resumeButtonMarkup(applicant)}${verificationButtonMarkup(applicant)}<span class="talent-review-action-divider" aria-hidden="true"></span>${primaryActions.length ? primaryActions.map(action => actionButtonMarkup(action, applicant)).join('') : '<span class="talent-review-no-actions">No stage action needed</span>'}</div>
-        ${guardedActions.length ? `<details class="talent-review-secondary"><summary>More actions</summary><div>${guardedActions.map(action => actionButtonMarkup(action, applicant)).join('')}</div></details>` : ''}
+        <div class="talent-review-card-main-actions">${notStarted ? (applicant.allowedActions.includes('begin_review') ? actionButtonMarkup('begin_review', applicant) : '') : `${resumeButtonMarkup(applicant)}${verificationButtonMarkup(applicant)}${interviewButtonMarkup(applicant)}<span class="talent-review-action-divider" aria-hidden="true"></span>${primaryActions.length ? primaryActions.map(action => actionButtonMarkup(action, applicant)).join('') : '<span class="talent-review-no-actions">No stage action needed</span>'}`}</div>
+        ${!notStarted && guardedActions.length ? `<details class="talent-review-secondary"><summary>More actions</summary><div>${guardedActions.map(action => actionButtonMarkup(action, applicant)).join('')}</div></details>` : ''}
       </footer>
     </article>`;
   }
@@ -916,11 +981,12 @@
     if (!verificationContext) return '';
     const applicant = findApplicant(verificationContext.applicantId);
     const name = verificationContext.data?.applicant?.fullName || applicant?.fullName || 'Talent applicant';
+    const interviewMode = verificationContext.mode === 'interview';
     let content = '';
-    if (verificationContext.phase === 'loading') content = '<div class="talent-verification-loading" role="status">Loading interview and reference verification…</div>';
+    if (verificationContext.phase === 'loading') content = `<div class="talent-verification-loading" role="status">Loading ${interviewMode ? 'interview details' : 'skills and reference verification'}…</div>`;
     else if (verificationContext.phase === 'error') content = `<div class="talent-verification-error" role="alert"><strong>Verification unavailable</strong><p>${escapeHtml(verificationContext.error)}</p><button type="button" class="button" data-verification-retry>Try again</button></div>`;
-    else if (verificationContext.data) content = `${verificationContext.status ? `<div class="talent-verification-feedback ${verificationContext.statusType === 'error' ? 'is-error' : ''}" role="status">${escapeHtml(verificationContext.status)}</div>` : ''}${gateMarkup(verificationContext.data)}${interviewMarkup(verificationContext.data)}${referencesMarkup(verificationContext.data)}`;
-    return `<dialog class="talent-verification-dialog" data-verification-dialog aria-labelledby="talent-verification-title"><div class="talent-verification-shell"><header class="talent-verification-header"><div><p class="eyebrow">Talent verification</p><h2 id="talent-verification-title">${escapeHtml(name)}</h2><p>Schedule the internal interview, document references, and resolve Bench Ready requirements.</p></div><button type="button" data-verification-close aria-label="Close verification">×</button></header><div class="talent-verification-body">${content}</div></div></dialog>`;
+    else if (verificationContext.data) content = `${verificationContext.status ? `<div class="talent-verification-feedback ${verificationContext.statusType === 'error' ? 'is-error' : ''}" role="status">${escapeHtml(verificationContext.status)}</div>` : ''}${interviewMode ? interviewMarkup(verificationContext.data) : `<section class="talent-verification-section"><div class="talent-verification-section-heading"><div><p class="eyebrow">Applicant-reported skills</p><h3>Verify skills &amp; experience</h3></div></div><div data-review-skills-panel>${root.soroTalentReviewEvidence?.skillsMarkup(evidence.skills) || '<p>Skill review is unavailable. Refresh the page.</p>'}</div></section>${referencesMarkup(verificationContext.data)}`}`;
+    return `<dialog class="talent-verification-dialog${interviewMode ? '' : ' has-resume'}" data-verification-dialog data-verification-owner="${escapeHtml(verificationContext.applicantId)}" data-verification-mode="${interviewMode ? 'interview' : 'verification'}" aria-labelledby="talent-verification-title"><div class="talent-verification-shell"><header class="talent-verification-header"><div><p class="eyebrow">${interviewMode ? 'Schedule Interview' : 'Skills &amp; reference verification'}</p><h2 id="talent-verification-title">${escapeHtml(name)}</h2><p>${interviewMode ? 'Schedule or manage the appointment and record the interview outcome.' : 'Review the résumé alongside the reported skills and employment references.'}</p></div><button type="button" data-verification-close aria-label="Close verification">×</button></header><div class="talent-verification-workspace">${interviewMode ? '' : `<aside class="review-evidence-resume" data-review-resume-panel>${root.soroTalentReviewEvidence?.resumeMarkup(evidence.resume) || '<p>Résumé preview is unavailable.</p>'}</aside>`}<div class="talent-verification-body">${content}</div></div></div></dialog>`;
   }
 
   function actionDialogMarkup() {
@@ -946,8 +1012,9 @@
       ${feedback.message ? `<div class="talent-review-feedback${feedback.type === 'error' ? ' is-error' : ''}" role="status">${escapeHtml(feedback.message)}</div>` : ''}
       ${summaryMarkup()}
       <section class="panel talent-review-workspace">
-        <div class="talent-review-toolbar"><label><span aria-hidden="true">⌕</span><input type="search" data-review-search value="${escapeHtml(filters.search)}" maxlength="120" placeholder="Search Talent, email, or owner" autocomplete="off"></label><small>Updated ${escapeHtml(formatDate(queue.generatedAt))}</small></div>
+        <div class="talent-review-toolbar"><label><span aria-hidden="true">⌕</span><input type="search" data-review-search value="${escapeHtml(filters.search)}" maxlength="120" placeholder="Search Talent, email, or owner" autocomplete="off"></label><label class="talent-review-sort">Sort by<select data-review-sort>${[['newest','Newest applications'],['oldest','Oldest applications'],['name','Name A–Z'],['stage','Review stage']].map(([value,label]) => `<option value="${value}"${filters.sort === value ? ' selected' : ''}>${label}</option>`).join('')}</select></label><small>Updated ${escapeHtml(formatDate(queue.generatedAt))}</small></div>
         ${stageChipsMarkup()}
+        ${activeReview && findApplicant(activeReview.applicantId) ? `<div class="talent-review-active-note" role="status"><span>Reviewing <strong>${escapeHtml(findApplicant(activeReview.applicantId).fullName)}</strong> · position held while you work</span><button type="button" class="button" data-review-release>Done for now</button></div>` : ''}
         ${queueMarkup()}
       </section>
       ${actionDialogMarkup()}
@@ -967,7 +1034,31 @@
 
   function render() {
     if (!mountedRoot) return false;
+    const existing = mountedRoot.querySelector?.('[data-verification-dialog]');
+    if (existing && verificationContext && existing.dataset.verificationOwner === verificationContext.applicantId && existing.dataset.verificationMode === verificationContext.mode && root.document?.createElement) {
+      // Leave the résumé browsing context mounted. Keep any unsaved skill choices
+      // while a reference or interview update refreshes its own controls.
+      const template = root.document.createElement('template');
+      template.innerHTML = verificationDialogMarkup();
+      const nextBody = template.content.querySelector('.talent-verification-body');
+      const body = existing.querySelector('.talent-verification-body');
+      const draft = body.querySelector('[data-review-skills-form]');
+      const scroll = body.scrollTop;
+      const workspace = existing.querySelector('.talent-verification-workspace');
+      const workspaceScroll = workspace?.scrollTop || 0;
+      body.innerHTML = nextBody.innerHTML;
+      const nextDraft = body.querySelector('[data-review-skills-form]');
+      if (draft && nextDraft) nextDraft.replaceWith(draft);
+      body.scrollTop = scroll;
+      if (workspace) workspace.scrollTop = workspaceScroll;
+      return true;
+    }
+    const anchorSelector = activeReview ? `[data-review-applicant="${activeReview.applicantId}"]` : '';
+    const top = anchorSelector ? mountedRoot.querySelector?.(anchorSelector)?.getBoundingClientRect?.().top : null;
+    const bodyScroll = mountedRoot.querySelector?.('.talent-verification-body')?.scrollTop || 0;
     mountedRoot.innerHTML = pageMarkup();
+    const body = mountedRoot.querySelector?.('.talent-verification-body');
+    if (body) body.scrollTop = bodyScroll;
     const dialog = mountedRoot.querySelector?.('[data-review-dialog], [data-verification-dialog]');
     if (dialog) {
       dialog.addEventListener?.('cancel', event => {
@@ -977,21 +1068,20 @@
       }, { once: true });
       if (typeof dialog.showModal === 'function' && !dialog.open) dialog.showModal();
     }
+    const after = anchorSelector ? mountedRoot.querySelector?.(anchorSelector)?.getBoundingClientRect?.().top : null;
+    if (Number.isFinite(top) && Number.isFinite(after) && typeof root.scrollBy === 'function') root.scrollBy({top: after - top, behavior:'instant'});
     return true;
   }
 
   function setStageFilter(value) {
     const stage = text(value, 40).toLowerCase();
-    filters = Object.freeze({ ...filters, stage: stage === 'all' || FILTER_STAGE_SET.has(stage) ? stage : 'all' });
-    render();
-    return filters;
+    return applyFilters({ ...filters, stage: stage === 'all' || FILTER_STAGE_SET.has(stage) ? stage : 'all' });
   }
 
   function setSearch(value) {
-    filters = Object.freeze({ ...filters, search: text(value, 120) });
-    render();
+    applyFilters({ ...filters, search: text(value, 120) });
     const input = mountedRoot?.querySelector?.('[data-review-search]');
-    input?.focus?.();
+    input?.focus?.({preventScroll:true});
     input?.setSelectionRange?.(filters.search.length, filters.search.length);
     return filters;
   }
@@ -1007,47 +1097,77 @@
     if (!canOpenForRole() || typeof root?.CustomEvent !== 'function') return false;
     const applicant = findApplicant(applicantId);
     if (!applicant?.resume?.available) return false;
+    holdReview(applicant.applicantId);
     root.dispatchEvent?.(new root.CustomEvent('soro:talent-review-open-resume', {
       detail: { applicantId: applicant.applicantId }
     }));
     return true;
   }
 
-  async function loadVerification(applicantId, { preserveStatus = false } = {}) {
+  async function loadVerification(applicantId, { preserveStatus = false, mode = verificationContext?.mode || 'verification' } = {}) {
     if (!canOpenForRole()) return false;
     const applicant = findApplicant(applicantId);
     if (!applicant) return false;
     const version = ++verificationRequestVersion;
-    verificationContext = Object.freeze({ applicantId: applicant.applicantId, phase: 'loading', data: preserveStatus ? verificationContext?.data || null : null, error: '', status: '', statusType: '' });
+    verificationContext = Object.freeze({ applicantId: applicant.applicantId, mode, phase: 'loading', data: preserveStatus ? verificationContext?.data || null : null, error: '', status: '', statusType: '' });
     render();
     try {
       const data = await requestVerification(applicant.applicantId);
       if (version !== verificationRequestVersion || verificationContext?.applicantId !== applicant.applicantId || !canOpenForRole()) return false;
       verificationGateCache.set(applicant.applicantId, data.gate);
-      verificationContext = Object.freeze({ applicantId: applicant.applicantId, phase: 'ready', data, error: '', status: '', statusType: '' });
+      verificationContext = Object.freeze({ applicantId: applicant.applicantId, mode, phase: 'ready', data, error: '', status: '', statusType: '' });
       render();
       return true;
     } catch (error) {
       if (version !== verificationRequestVersion || verificationContext?.applicantId !== applicant.applicantId) return false;
-      verificationContext = Object.freeze({ applicantId: applicant.applicantId, phase: 'error', data: null, error: error.message || 'Verification could not be loaded.', status: '', statusType: '' });
+      verificationContext = Object.freeze({ applicantId: applicant.applicantId, mode, phase: 'error', data: null, error: error.message || 'Verification could not be loaded.', status: '', statusType: '' });
       render();
       return false;
     }
   }
 
-  function openVerification(applicantId) {
+  async function loadEvidence(kind) {
+    if (kind === 'skills' && skillsSaving) return;
+    const service = root.soroTalentReviewEvidence, id = verificationContext?.applicantId;
+    if (!service || !id || verificationContext.mode === 'interview') return;
+    const version = evidenceVersion;
+    const request = ++evidenceRequests[kind];
+    const accessScope = service.scope();
+    evidence[kind] = null;
+    const panel = () => mountedRoot?.querySelector?.(`[data-review-${kind === 'resume' ? 'resume' : 'skills'}-panel]`);
+    if (panel()) panel().innerHTML = kind === 'resume' ? service.resumeMarkup(null) : service.skillsMarkup(null);
+    let result;
+    try { result = await (kind === 'resume' ? service.loadResume(id) : service.loadSkills(id)); }
+    catch (error) {
+      if (request !== evidenceRequests[kind] || version !== evidenceVersion || verificationContext?.applicantId !== id || service.scope() !== accessScope || !service.authorized()) return;
+      result = {error: error.message};
+    }
+    if (request !== evidenceRequests[kind] || version !== evidenceVersion || verificationContext?.applicantId !== id || service.scope() !== accessScope || !service.authorized()) return;
+    evidence[kind] = result;
+    if (panel()) panel().innerHTML = kind === 'resume' ? service.resumeMarkup(evidence[kind]) : service.skillsMarkup(evidence[kind]);
+  }
+
+  function openVerification(applicantId, mode = 'verification') {
     if (!canOpenForRole()) return false;
     const applicant = findApplicant(applicantId);
-    if (!applicant) return false;
-    loadVerification(applicant.applicantId);
+    if (!applicant || (applicant.stage === 'submitted' && !applicant.archived)) return false;
+    holdReview(applicant.applicantId);
+    evidenceVersion += 1;
+    evidence = {skills:null,resume:null};
+    loadVerification(applicant.applicantId, {mode});
+    if (mode !== 'interview') { loadEvidence('skills'); loadEvidence('resume'); }
     return true;
   }
 
   function closeVerification() {
+    evidenceVersion += 1;
+    evidence = {skills:null,resume:null};
+    skillsSaving = false;
     verificationRequestVersion += 1;
     abortVerificationRequest();
     verificationContext = null;
     render();
+    refresh({silent:true});
     return true;
   }
 
@@ -1082,15 +1202,17 @@
 
   async function postVerificationAction(action, values) {
     if (!verificationContext?.data || !canOpenForRole()) throw new Error('Refresh this verification record and try again.');
-    const body = buildVerificationAction(action, { applicantId: verificationContext.applicantId, ...values });
+    const context = verificationContext, version = verificationRequestVersion;
+    const body = buildVerificationAction(action, { applicantId: context.applicantId, ...values });
     if (['schedule_interview', 'reschedule_interview'].includes(body.action) && !verificationContext.data.interviewers.some(item => item.id === body.interviewerUserId)) {
       throw new Error('Choose an eligible interviewer from the current staff list.');
     }
     const data = await requestVerification(verificationContext.applicantId, { body });
+    if (version !== verificationRequestVersion || verificationContext?.applicantId !== context.applicantId || !canOpenForRole()) return data;
     verificationGateCache.set(verificationContext.applicantId, data.gate);
     verificationContext = Object.freeze({
-      applicantId: verificationContext.applicantId, phase: 'ready', data, error: '',
-      status: 'Verification saved.', statusType: 'success'
+      applicantId: context.applicantId, mode: context.mode, phase: 'ready', data, error: '',
+      status: context.mode === 'interview' ? 'Interview saved.' : 'Reference verification saved.', statusType: 'success'
     });
     render();
     return data;
@@ -1116,6 +1238,7 @@
   }
 
   async function changeApplicant({ applicantId, expectedUpdatedAt, action, note = '' } = {}) {
+    if (pendingStageAction) throw new Error('Please wait for the current review update to finish.');
     if (!canOpenForRole()) throw new Error('Only Admin and Talent Management can update Talent review records.');
     const id = validUuid(applicantId);
     const expected = validTimestamp(expectedUpdatedAt);
@@ -1129,10 +1252,14 @@
       throw new Error('That review action is not currently available. Refresh the queue and try again.');
     }
     if (NOTE_REQUIRED_ACTIONS.has(normalizedAction) && !normalizedNote) throw new Error('Add a review note before continuing.');
-    const next = await requestQueue({
-      method: 'POST',
-      body: { requestId: makeRequestId(), applicantId: id, expectedUpdatedAt: expected, action: normalizedAction, note: normalizedNote }
-    });
+    holdReview(id);
+    const version = ++requestVersion;
+    pendingStageAction = version;
+    let next;
+    try {
+      next = await requestQueue({ method:'POST', body:{ requestId:makeRequestId(), applicantId:id, expectedUpdatedAt:expected, action:normalizedAction, note:normalizedNote } });
+    } finally { if (pendingStageAction === version) pendingStageAction = false; }
+    if (version !== requestVersion) return currentQueue();
     if (mountedRoot) return setQueue(next);
     queue = next;
     syncNavigationBadge(queue);
@@ -1163,6 +1290,9 @@
   }
 
   async function handleClick(event) {
+    if (event.target.closest?.('[data-review-release]')) { event.preventDefault(); releaseReview(); return; }
+    const evidenceRetry = event.target.closest?.('[data-evidence-retry]');
+    if (evidenceRetry) { event.preventDefault(); loadEvidence(evidenceRetry.dataset.evidenceRetry === 'resume' ? 'resume' : 'skills'); return; }
     const refreshButton = event.target.closest?.('[data-review-refresh]');
     if (refreshButton) { event.preventDefault(); refresh(); return; }
     const stageButton = event.target.closest?.('[data-review-stage]');
@@ -1175,6 +1305,8 @@
     }
     const verificationButton = event.target.closest?.('[data-review-verification]');
     if (verificationButton) { event.preventDefault(); openVerification(verificationButton.dataset.reviewVerification); return; }
+    const interviewButton = event.target.closest?.('[data-review-interview]');
+    if (interviewButton) { event.preventDefault(); openVerification(interviewButton.dataset.reviewInterview, 'interview'); return; }
     const verificationClose = event.target.closest?.('[data-verification-close]');
     if (verificationClose) { event.preventDefault(); closeVerification(); return; }
     const verificationRetry = event.target.closest?.('[data-verification-retry]');
@@ -1183,9 +1315,11 @@
     if (verificationQuickAction && verificationContext?.data?.interview) {
       event.preventDefault();
       const interview = verificationContext.data.interview;
+      const context = verificationContext, version = verificationRequestVersion;
       verificationQuickAction.disabled = true;
       try { await postVerificationAction(verificationQuickAction.dataset.verificationQuickAction, { interviewId: interview.interviewId, expectedUpdatedAt: interview.updatedAt }); }
       catch (error) {
+        if (version !== verificationRequestVersion || verificationContext?.applicantId !== context.applicantId) return;
         verificationContext = Object.freeze({ ...verificationContext, status: error.message || 'Calendar sync could not be retried.', statusType: 'error' });
         render();
       }
@@ -1196,10 +1330,12 @@
       event.preventDefault();
       const referenceId = removeReference.closest?.('[data-verification-reference]')?.dataset.verificationReference;
       const reference = verificationContext.data.references.find(item => item.referenceId === referenceId);
+      const context = verificationContext, version = verificationRequestVersion;
       if (!reference || !root?.confirm?.(`Remove ${reference.name} from this verification record?`)) return;
       removeReference.disabled = true;
       try { await postVerificationAction('remove_reference', { referenceId, expectedUpdatedAt: reference.updatedAt }); }
       catch (error) {
+        if (version !== verificationRequestVersion || verificationContext?.applicantId !== context.applicantId) return;
         verificationContext = Object.freeze({ ...verificationContext, status: error.message || 'The reference could not be removed.', statusType: 'error' });
         render();
       }
@@ -1231,8 +1367,35 @@
     if (search) setSearch(search.value);
   }
 
+  function handleChange(event) {
+    const sort = event.target.closest?.('[data-review-sort]');
+    if (sort) setSort(sort.value);
+  }
+
+  async function saveReviewSkills(form) {
+    const service = root.soroTalentReviewEvidence, context = verificationContext, snapshot = evidence.skills, version = evidenceVersion;
+    if (skillsSaving || !service || context?.mode === 'interview' || !snapshot?.record) return;
+    skillsSaving = true;
+    evidenceRequests.skills += 1;
+    const names = service.skillNames(snapshot.record);
+    const selected = [...form.querySelectorAll('[name="verified_skill"]:checked')].map(input => ({name: names[Number(input.value)], years: form.elements[`skill_years_${input.value}`]?.value || ''}));
+    const status = form.querySelector('[data-review-skills-status]'), submit = form.querySelector('[type="submit"]');
+    if (submit) submit.disabled = true;
+    if (status) status.textContent = 'Saving verified skills…';
+    try {
+      const saved = await service.saveSkills(context.applicantId, snapshot, selected);
+      if (version !== evidenceVersion || verificationContext?.applicantId !== context.applicantId || !service.authorized()) return;
+      evidence.skills = saved;
+      if (status) status.textContent = 'Verified skills saved to the Talent profile.';
+    } catch (error) {
+      if (version !== evidenceVersion || verificationContext?.applicantId !== context.applicantId) return;
+      if (status) status.textContent = error.message || 'Skills could not be saved.';
+    } finally { if (version === evidenceVersion) skillsSaving = false; if (submit?.isConnected) submit.disabled = false; }
+  }
+
   async function handleVerificationSubmit(form) {
     if (!verificationContext?.data) return false;
+    const context = verificationContext, version = verificationRequestVersion;
     const action = text(form.dataset.verificationForm, 50).toLowerCase();
     const values = formValues(form);
     const interview = verificationContext.data.interview;
@@ -1271,6 +1434,7 @@
     if (submit) submit.disabled = true;
     try { await postVerificationAction(action, bodyValues); }
     catch (error) {
+      if (version !== verificationRequestVersion || verificationContext?.applicantId !== context.applicantId) return false;
       if (submit) submit.disabled = false;
       verificationContext = Object.freeze({ ...verificationContext, status: error.message || 'The verification update could not be saved.', statusType: 'error' });
       render();
@@ -1279,6 +1443,8 @@
   }
 
   async function handleSubmit(event) {
+    const skillsForm = event.target.closest?.('[data-review-skills-form]');
+    if (skillsForm) { event.preventDefault(); await saveReviewSkills(skillsForm); return; }
     const verificationForm = event.target.closest?.('[data-verification-form]');
     if (verificationForm) {
       event.preventDefault();
@@ -1313,11 +1479,17 @@
     if (!mountedRoot && !reset) return false;
     requestVersion += 1;
     verificationRequestVersion += 1;
+    evidenceVersion += 1;
+    evidence = {skills:null,resume:null};
+    skillsSaving = false;
+    activeReview = null;
+    pendingStageAction = false;
     abortActiveRequest();
     abortVerificationRequest();
     if (mountedRoot) {
       mountedRoot.removeEventListener?.('click', handleClick);
       mountedRoot.removeEventListener?.('input', handleInput);
+      mountedRoot.removeEventListener?.('change', handleChange);
       mountedRoot.removeEventListener?.('submit', handleSubmit);
       if (clear) mountedRoot.innerHTML = '';
     }
@@ -1338,11 +1510,13 @@
     mountedRoot = target;
     target.removeEventListener('click', handleClick);
     target.removeEventListener('input', handleInput);
+    target.removeEventListener('change', handleChange);
     target.removeEventListener('submit', handleSubmit);
     target.addEventListener('click', handleClick);
     target.addEventListener('input', handleInput);
+    target.addEventListener('change', handleChange);
     target.addEventListener('submit', handleSubmit);
-    filters = Object.freeze({ stage: 'all', search: '' });
+    filters = Object.freeze({ stage: 'all', search: '', sort: 'newest' });
     queue = emptyQueue();
     render();
     refresh();
@@ -1401,7 +1575,7 @@
     const detail = event?.detail || event || {};
     // Reset shared state on every auth transition, including when no view is mounted.
     unmount({ reset: true });
-    filters = Object.freeze({ stage: 'all', search: '' });
+    filters = Object.freeze({ stage: 'all', search: '', sort: 'newest' });
     feedback = Object.freeze({ type: '', message: '' });
     setQueue(emptyQueue());
     if (!detail.session || !canOpenForRole(detail.access?.role)) {
@@ -1440,6 +1614,8 @@
     visibleApplicants,
     setStageFilter,
     setSearch,
+    setSort,
+    releaseReview,
     openResume,
     openVerification,
     changeApplicant,
