@@ -460,7 +460,7 @@
   };
 
   function supportPage() {
-    return `<main class="page support-page"><div class="page-heading"><div><p class="eyebrow">Soro Ops support</p><h1>Help & Support</h1><p class="eyebrow" style="margin-top:9px">Ask a question, follow a ticket, or respond to your Soro team.</p></div></div><div class="support-grid"><section class="panel"><div class="panel-head"><div><p class="eyebrow">New support ticket</p><h2>Tell us what happened</h2></div></div><form id="help-ticket-form" class="support-form"><label>What do you need help with?<input name="subject" required maxlength="120" placeholder="Example: I cannot open a Talent document" /></label><label>Issue type<select name="area"><option>Sign-in and account access</option><option>Talent profiles and documents</option><option>Client records and placements</option><option>Tasks and notifications</option><option>Other technical issue</option></select></label><label>What happened?<textarea name="details" required placeholder="Include what you were trying to do, what you expected, and any message you saw."></textarea></label><small>Do not include passwords, payment details, or other sensitive information in a ticket.</small><button class="button primary" type="submit">Submit support ticket</button><div id="ticket-confirmation" aria-live="polite"></div></form></section><aside class="panel support-contact"><div><p class="eyebrow">Before submitting</p><h2>Quick checks</h2></div><article><h3>Document will not open?</h3><p>Allow pop-ups for Soro Ops, then select the file’s View button again.</p></article><article><h3>Can’t sign in?</h3><p>Use Forgot password on the sign-in screen. Admin and Talent Management can also send a secure reset link.</p></article><article><h3>Need an urgent workaround?</h3><p>Include the Talent or client name and the action that is blocked so the team can triage it quickly.</p></article></aside></div></main>`;
+    return `<main class="page support-page"><div class="page-heading"><div><p class="eyebrow">Soro Ops support</p><h1>Help & Support</h1><p class="eyebrow" style="margin-top:9px">Ask a question, follow a ticket, or respond to your Soro team.</p></div></div><div class="support-grid"><section class="panel"><div class="panel-head"><div><p class="eyebrow">New support ticket</p><h2>Tell us what happened</h2></div></div><form id="help-ticket-form" class="support-form"><label>What do you need help with?<input name="subject" required maxlength="120" placeholder="Example: I need help opening a document" /></label><label>Issue type<select name="area"><option value="" disabled selected>Choose an issue</option></select></label><label>What happened?<textarea name="details" required placeholder="Include what you were trying to do, what you expected, and any message you saw."></textarea></label><small>Do not include passwords, payment details, or other sensitive information in a ticket.</small><button class="button primary" type="submit">Submit support ticket</button><div id="ticket-confirmation" aria-live="polite"></div></form></section><aside class="panel support-contact"><div><p class="eyebrow">Before submitting</p><h2>Quick checks</h2></div><article><h3>Document will not open?</h3><p>Allow pop-ups for Soro Ops, then select the file’s View button again.</p></article><article><h3>Can’t sign in?</h3><p>Use Forgot password on the sign-in screen. Admin and Talent Management can also send a secure reset link.</p></article><article><h3>Need an urgent workaround?</h3><p>Include the relevant name and the action that is blocked so the team can triage it quickly. Never include passwords or payment details.</p></article></aside></div></main>`;
   }
 
   function strictLegacyAssessmentType(source) {
@@ -605,6 +605,7 @@
   window.soroRemoveOwnProfileManagementActions = removeOwnProfileManagementActions;
 
   render = function () {
+    window.SoroFeedback?.unmount?.();
     window.SoroDocumentCenter?.unmount?.();
     window.SoroSupportTickets?.unmount?.();
     if(typeof adminPreviewingNonAdminWorkspace==='function'&&adminPreviewingNonAdminWorkspace())return baseRender();
@@ -622,7 +623,7 @@
       window.soroClientShortlistWorkflow?.unmount?.({ clear: false });
       window.SoroClientDashboard?.unmount?.({ clear: false });
       root.innerHTML = supportPage();
-      window.SoroSupportTickets?.mount?.(root);
+      window.SoroSupportTickets?.mount?.(root,{role:currentAuthenticatedRole()});
       return;
     }
     if (current === 'talent-my-profile') {

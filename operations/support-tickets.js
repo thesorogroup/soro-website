@@ -5,8 +5,41 @@
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const emptyFilters=()=>({status:'',team:'',assignment:'',offset:0,view:'all',reason:''});
   let node=null,version=0,options={},mountedActor='',selectedTicket=null,workspace=null,detailVersion=0,bindings=null,filters=emptyFilters();
-  const STATUSES={open:'New',in_progress:'In progress',waiting_on_client:'Waiting on client',resolved:'Resolved',closed:'Resolved'};
+  const STATUSES={open:'New',in_progress:'In progress',waiting_on_client:'Waiting on requester',resolved:'Resolved',closed:'Resolved'};
   const TEAMS={sales:'Sales',talent_management:'Talent Management',admin:'Admin'};
+  // These values are the existing API/database categories. Portal wording is
+  // presentation only: never send a friendly label in place of its stored value.
+  const ISSUE_TYPES=Object.freeze([
+    {value:'Sales, services and client accounts',client:'My account or services',talent:'Questions about Soro services',hideFromTalent:true},
+    {value:'Talent profiles and documents',client:'My VA’s information or documents',talent:'My profile, documents or work',hideFromClient:true},
+    {value:'Client records and placements',client:'Hiring or working with my VA',talent:'My client or assignment',hideFromTalent:true},
+    {value:'Sign-in and account access',client:'Signing in to my portal',talent:'Signing in to my portal'},
+    {value:'Tasks and notifications',client:'Notifications and updates',talent:'Tasks, notifications and updates'},
+    {value:'Billing and administrative questions',client:'Invoices or billing',talent:'Pay or account administration'},
+    {value:'Other technical issue',client:'Something else',talent:'Something else'}
+  ].map(Object.freeze));
+  function issueAudience(role){
+    if(['admin','sales','sales_management','talent_management','billing'].includes(role))return 'staff';
+    if(['client_admin','client_reviewer','client_billing'].includes(role))return 'client';
+    return role==='virtual_assistant'?'talent':null;
+  }
+  function issueChoices(role){
+    const audience=issueAudience(role);if(!audience)return [];
+    return ISSUE_TYPES.filter(issue=>audience==='staff'||!(audience==='client'?issue.hideFromClient:issue.hideFromTalent))
+      .map(issue=>({value:issue.value,label:audience==='staff'?issue.value:issue[audience]}));
+  }
+  function areaLabel(area,role){
+    const audience=issueAudience(role),issue=ISSUE_TYPES.find(item=>item.value===area);
+    if(audience==='staff')return area||'Not specified';
+    // Older tickets remain readable even if their category is no longer offered
+    // in this portal. Unknown categories do not expose internal terminology.
+    return issue&&audience?issue[audience]:'Other support question';
+  }
+  function issueOptionsMarkup(role){
+    return '<option value="" disabled selected>Choose an issue</option>'+issueChoices(role)
+      .map(issue=>`<option value="${escape(issue.value)}">${escape(issue.label)}</option>`).join('');
+  }
+  const viewerRole=()=>options.role??root.soroCurrentAccess?.role;
   // Navigation only; the server still enforces organization and team access.
   const canReviewRole=role=>['admin','sales','sales_management','talent_management'].includes(role);
   function pendingRequest(actor,hash,remove=false){
@@ -58,7 +91,8 @@
     if(t.canManage)return {title:'You can move this forward',text:'Reply with the next step, update the status, or keep a staff-only note for your team.'};
     return {title:t.canReadInternal===true?'Following with your team':'Your request is with Soro',text:t.canReadInternal===true?`${t.assigneeName||'The assigned owner'} handles replies and status changes. Your whole team can follow this ticket.`:'You can follow updates here and add more information at any time.'};
   }
-  function detailMarkup(t){
+  function detailMarkup(t,role=viewerRole()){
+    t={...t,area:areaLabel(t.area,role)};
     const visible=(t.entries||[]).filter(e=>e.visibility==='public'||(e.visibility==='internal'&&t.canReadInternal===true));
     const replies=visible.filter(e=>e.kind==='reply').length,next=nextStep(t);
     const entries=visible.filter(e=>e.kind!=='created').map(e=>{
@@ -121,8 +155,7 @@
     unmount();node=container;options=config;bindings=new root.AbortController();const listenerOptions={signal:bindings.signal};mountedActor=root.soroCurrentAccess?.user_id||'';const captured=version,actor=mountedActor;
     if(config.initialView==='attention')filters.view='attention';
     const form=node.querySelector('#help-ticket-form');if(!form)return;
-    const areas=['Sales, services and client accounts','Talent profiles and documents','Client records and placements','Sign-in and account access','Tasks and notifications','Billing and administrative questions','Other technical issue'];
-    form.elements.area.innerHTML='<option value="" disabled selected>Choose an issue</option>'+areas.map(area=>`<option>${area}</option>`).join('');form.elements.area.required=true;
+    form.elements.area.innerHTML=issueOptionsMarkup(viewerRole());form.elements.area.required=true;
     form.elements.subject.minLength=3;form.elements.details.minLength=5;form.elements.details.maxLength=5000;
     form.querySelector('[type="submit"]').insertAdjacentHTML('beforebegin',uploadMarkup());
     const grid=node.querySelector('.support-grid');
@@ -205,5 +238,5 @@
   if(root.document){root.addEventListener?.('focus',refreshNotifications);root.setInterval?.(()=>{if(root.document.visibilityState!=='hidden')refreshNotifications();},30000);}
   // The owning enhancement renderer invalidates this module before each route
   // or auth render. A second auth listener here would clear its new Help view.
-  return Object.freeze({canReviewRole,uploadMarkup,ticketMarkup,detailMarkup,summaryMarkup,attentionMarkup,viewMarkup,elapsed,readImage,pendingRequest,mount,unmount,refreshNotifications,MAX_BYTES,STATUSES,TEAMS});
+  return Object.freeze({canReviewRole,issueChoices,areaLabel,issueOptionsMarkup,uploadMarkup,ticketMarkup,detailMarkup,summaryMarkup,attentionMarkup,viewMarkup,elapsed,readImage,pendingRequest,mount,unmount,refreshNotifications,MAX_BYTES,STATUSES,TEAMS});
 }));

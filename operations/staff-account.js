@@ -102,7 +102,7 @@
   }
   function syncNav(){
     let item=document.getElementById('founder-account-nav');
-    if(!item){item=document.createElement('button');item.id='founder-account-nav';item.className='nav-link';item.type='button';item.textContent='My Account';document.querySelector('.sidebar nav')?.append(item);item.addEventListener('click',openAccount);}
+    if(!item){item=document.createElement('button');item.id='founder-account-nav';item.className='nav-link';item.type='button';item.textContent='My Account';const footer=document.getElementById('sidebar-nav-footer');if(footer)footer.insertBefore(item,document.getElementById('feedback-nav'));else document.querySelector('.sidebar nav')?.append(item);item.addEventListener('click',openAccount);}
     item.hidden=!isFounder();
   }
   root.addEventListener('soro-auth-changed',()=>{generation++;for(const dialog of dialogs)dialog.close();syncNav();});

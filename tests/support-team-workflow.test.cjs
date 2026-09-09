@@ -34,6 +34,18 @@ test('Status summary uses explicit server totals and explains its filter scope',
  assert.doesNotMatch(ui.summaryMarkup({...data,summary:{open:'<img onerror=x>'}}),/<img/);
 });
 
+test('Waiting status uses requester wording while preserving stored status compatibility',()=>{
+ const ticket={status:'waiting_on_client',team:'sales',ticketNumber:'SUP-AABBCCDD',canManage:true,entries:[{kind:'status',visibility:'public',status:'waiting_on_client'}]};
+ const detail=ui.detailMarkup(ticket);
+ for(const html of [ui.ticketMarkup(ticket),ui.summaryMarkup({summary:{waiting_on_client:1}}),detail]){
+  assert.match(html,/Waiting on requester/);
+  assert.doesNotMatch(html,/Waiting on client/);
+ }
+ assert.match(detail,/<option value="waiting_on_client" selected>Waiting on requester<\/option>/);
+ assert.match(detail,/Status changed to Waiting on requester/);
+ assert.equal(parse({...base(),action:'status',status:'waiting_on_client'}).status,'waiting_on_client');
+});
+
 test('Detail separates case controls from conversation and describes reopen behavior accurately',()=>{
  const t={status:'resolved',team:'sales',entries:[],canReply:true,canManage:true,isAdmin:true};
  const html=ui.detailMarkup(t);assert.match(html,/support-case-sidebar/);assert.match(html,/support-thread-main/);assert.match(html,/A new reply from the requester reopens/);assert.match(html,/Original request/);assert.match(html,/data-assignment-form/);

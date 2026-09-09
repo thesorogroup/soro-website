@@ -58,7 +58,8 @@ test('body-mounted staff dialogs are invalidated on auth changes and refresh com
  for(const fn of ['showRequiredPasswordChange','showPasswordRecovery'])assert.match(auth.slice(auth.indexOf(`function ${fn}(`),auth.indexOf(`function ${fn}(`)+400),/soro-auth-changed/);
 });
 test('navigation releases the queue root before Employees and other wrapper views render',()=>{
- assert.match(read('operations/operations.js'),/function setActive\(\)\{\s*if\(current!=='talent-review'\)window.soroTalentReviewQueue\?\.unmount/);
+ const active=read('operations/operations.js').split('function setActive(){')[1].split('function goToMyProfile')[0];
+ assert.match(active,/if\(current!=='talent-review'\)window.soroTalentReviewQueue\?\.unmount/);
  assert.match(read('operations/admin-employee-management.js'),/version !== employeeLoadVersion \|\| scope !== employeeScope/);
  assert.match(read('operations/talent-review-queue.js'),/!notStarted && actualRole\(\) === 'admin'/);
  assert.match(read('operations/talent-review-queue.js'),/holdReview\(reassignButton.dataset.reviewReassign\)/);
