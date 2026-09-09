@@ -417,7 +417,10 @@
     const timeZone = String(applicant.timezone || '').toLowerCase() === 'other' && applicant.timezone_other_detail
       ? applicant.timezone_other_detail : applicant.timezone;
     const displayApplicant = { ...applicant, work_status: workStatus, timezone: timeZone };
-    const markup = profilePageWithScreening(displayApplicant);
+    let markup = profilePageWithScreening(displayApplicant);
+    if (!isOwnTalentProfileView() && currentAccessRole() === 'admin') {
+      markup = markup.replace('<p>Profile owner</p>', `<p>Profile owner</p><button type="button" class="text-button" data-staff-ownership="talent" data-owner-entity="${escapeHtml(applicant.id)}">Manage owners</button>`);
+    }
     const areaLabels = {
       healthcare: 'Healthcare & Medical Support',
       general_admin: 'General & Administrative VA',

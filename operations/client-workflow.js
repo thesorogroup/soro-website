@@ -1155,6 +1155,15 @@
     mountedRoot.querySelector?.('[data-client-workflow-find-talent]')?.addEventListener('click', () => dispatchWorkflowAction('find_talent'));
     mountedRoot.querySelectorAll?.('[data-client-workflow-next]')?.forEach(button => button.addEventListener('click', () => dispatchWorkflowAction(button.dataset.clientWorkflowNext, { requestId: button.dataset.requestId })));
     mountedRoot.querySelectorAll?.('[data-client-workflow-edit]')?.forEach(button => button.addEventListener('click', () => openEditor(button.dataset.clientWorkflowEdit)));
+    if (root.soroCurrentAccess?.role === 'admin') {
+      const heading = mountedRoot.querySelector?.('#client-workflow-company-card-title')?.closest('.client-workflow-section-heading');
+      if (heading) {
+        const ownerButton = root.document.createElement('button');
+        ownerButton.type = 'button'; ownerButton.className = 'text-button'; ownerButton.textContent = 'Reassign owner';
+        ownerButton.addEventListener('click', () => root.SoroStaffAccount?.openOwnership('client', selectedClientId, 'sales', load));
+        heading.append(ownerButton);
+      }
+    }
     mountedRoot.querySelectorAll?.('[data-client-workflow-edit-request]')?.forEach(button => button.addEventListener('click', () => openEditor('request-edit', button.dataset.clientWorkflowEditRequest)));
     mountedRoot.querySelector?.('[data-client-workflow-editor]')?.addEventListener('submit', submitEditor);
     mountedRoot.querySelectorAll?.('[data-client-workflow-editor-close]')?.forEach(button => button.addEventListener('click', closeEditor));

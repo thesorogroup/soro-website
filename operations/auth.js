@@ -133,6 +133,13 @@
       .every(key => Object.is(previous[key], next[key]));
   }
 
+  window.addEventListener('soro:staff-account-updated', event => {
+    const access = window.soroCurrentAccess;
+    if (!access || access.user_id !== event.detail?.userId || !access.is_founder || access.role !== 'admin') return;
+    window.soroCurrentAccess = { ...access, display_name: event.detail.displayName };
+    updateSignedInIdentity({ user: {} }, window.soroCurrentAccess);
+  });
+
   function revealAuthorizedApp() {
     checking.hidden = true;
     authGate.hidden = true;
@@ -166,6 +173,7 @@
 
   function showRequiredPasswordChange(session, access) {
     window.soroCurrentAccess = { ...access, user_id: session.user.id };
+    window.dispatchEvent(new CustomEvent('soro-auth-changed', { detail: { session: null, access: null } }));
     checking.hidden = true;
     authGate.hidden = true;
     if (passwordRecoveryGate) passwordRecoveryGate.hidden = true;
@@ -189,6 +197,7 @@
   function showPasswordRecovery(session) {
     recoverySession = session || recoverySession;
     window.soroCurrentAccess = null;
+    window.dispatchEvent(new CustomEvent('soro-auth-changed', { detail: { session: null, access: null } }));
     checking.hidden = true;
     authGate.hidden = true;
     if (firstPasswordGate) firstPasswordGate.hidden = true;

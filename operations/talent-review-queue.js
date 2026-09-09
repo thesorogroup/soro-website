@@ -813,7 +813,7 @@
       </header>
       <div class="talent-review-card-meta">
         <span><small>Application received</small><strong>${escapeHtml(formatDate(applicant.applicationReceivedAt))}</strong></span>
-        <span><small>Review owner</small><strong>${escapeHtml(applicant.owner.name)}</strong></span>
+        <span><small>Review owner</small><strong>${escapeHtml(applicant.owner.name)}</strong>${!notStarted && actualRole() === 'admin' ? `<button type="button" class="text-button" data-review-reassign="${escapeHtml(applicant.applicantId)}">Reassign</button>` : ''}</span>
         <span><small>Last updated</small><strong>${escapeHtml(formatDate(applicant.updatedAt))}</strong></span>
       </div>
       ${activeReview?.applicantId === applicant.applicantId && outsideFilter ? '<p class="talent-review-filter-exception">Current review · kept here outside the selected filters</p>' : ''}
@@ -1367,6 +1367,13 @@
         verificationContext = Object.freeze({ ...verificationContext, status: error.message || 'The reference could not be removed.', statusType: 'error' });
         render();
       }
+      return;
+    }
+    const reassignButton = event.target.closest?.('[data-review-reassign]');
+    if (reassignButton && actualRole() === 'admin') {
+      event.preventDefault();
+      holdReview(reassignButton.dataset.reviewReassign);
+      root.SoroStaffAccount?.openOwnership('talent', reassignButton.dataset.reviewReassign, 'review', () => refresh({ silent: true }));
       return;
     }
     const profileButton = event.target.closest?.('[data-review-profile]');

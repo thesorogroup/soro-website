@@ -3,13 +3,13 @@ const test=require('node:test'),assert=require('node:assert/strict'),vm=require(
 const source=fs.readFileSync(path.join(__dirname,'../operations/auth.js'),'utf8');
 const userId='10000000-0000-4000-8000-000000000010',orgId='10000000-0000-4000-8000-000000000001';
 function harness(){
- const elements=new Map(),timers=[],events=[];let callback,reads=0,renders=0,signouts=0,queryError=null,holdNext=null;
+ const elements=new Map(),timers=[],events=[],listeners=new Map();let callback,reads=0,renders=0,signouts=0,queryError=null,holdNext=null;
  let access={role:'admin',organization_id:orgId,active:true,must_change_password:false,display_name:'Example Admin',is_founder:true,initial_password_issued_at:null,password_changed_at:null};
  const session={user:{id:userId,email:'example@example.test',user_metadata:{}},access_token:'synthetic-only'};
  function element(id){return {id,hidden:id!=='auth-checking',textContent:'',className:'',dataset:{},classList:{toggle(){}},elements:{currentPassword:{focus(){}},newPassword:{focus(){}}},addEventListener(){},querySelector(){return null;},querySelectorAll(){return [];},closest(){return null;},setAttribute(){},reset(){},focus(){}};}
  const get=id=>{if(!elements.has(id))elements.set(id,element(id));return elements.get(id);};
  const document={getElementById:get,body:{className:''},createTextNode:text=>({textContent:text}),title:'Auth fixture'};
- const window={document,location:new URL('https://thesorogroup.com/operations/#talent/example'),history:{replaceState(){}},setTimeout:(fn,delay)=>timers.push({fn,delay}),SORO_SUPABASE_CONFIG:{url:'https://auth-test.supabase.co',publishableKey:'synthetic-only'},dispatchEvent:event=>events.push(event)};
+ const window={document,location:new URL('https://thesorogroup.com/operations/#talent/example'),history:{replaceState(){}},setTimeout:(fn,delay)=>timers.push({fn,delay}),SORO_SUPABASE_CONFIG:{url:'https://auth-test.supabase.co',publishableKey:'synthetic-only'},addEventListener:(name,fn)=>listeners.set(name,fn),dispatchEvent:event=>{events.push(event);listeners.get(event.type)?.(event);}};
  const client={from:()=>({select(){return this;},eq(){return this;},maybeSingle:async()=>{reads++;const result={data:access?{...access}:null,error:queryError};if(holdNext){const pending=holdNext;holdNext=null;await pending;}return result;}}),auth:{onAuthStateChange:fn=>{callback=fn;},getSession:async()=>({data:{session}}),signOut:async()=>{signouts++;callback('SIGNED_OUT',null);return {error:null};}}};
  window.supabase={createClient:()=>client};
  const context={window,document,URL,URLSearchParams,Date,Set,Object,setTimeout:window.setTimeout,CustomEvent:class{constructor(type,init){this.type=type;this.detail=init.detail;}},role:'admin',roleConfig:{admin:{className:'role-admin'},talent:{className:'role-talent'}},render:()=>{renders++;get('view-root').content={render:renders};},setActive(){}};

@@ -27,6 +27,8 @@
   let loading = false;
   let loadError = '';
   let employeeSearch = '';
+  let employeeLoadVersion = 0;
+  const employeeScope = () => JSON.stringify([window.soroCurrentAccess?.user_id, window.soroCurrentAccess?.organization_id, window.soroCurrentAccess?.role]);
 
   function payrollReadinessApi() {
     return window.soroEmployeePayrollReadiness || null;
@@ -144,6 +146,7 @@
       setActive();
       return originalRender();
     }
+    window.soroTalentReviewQueue?.unmount?.({ clear: false });
     root.innerHTML = employeesPage();
     bindEmployeePage();
   };
@@ -179,10 +182,13 @@
 
   async function loadEmployees() {
     if (!canManageEmployees() || !window.soroSupabase) return;
+    const version = ++employeeLoadVersion;
+    const scope = employeeScope();
     loading = true;
     loadError = '';
     if (current === 'employees') render();
     const { data: records, error } = await window.soroSupabase.rpc('admin_employee_directory');
+    if (version !== employeeLoadVersion || scope !== employeeScope() || !canManageEmployees()) return;
     loading = false;
     if (error) {
       employees = [];
@@ -399,6 +405,18 @@
       </div>`
     });
     dialog.querySelector('[data-employee-documents]')?.addEventListener('click',()=>{dialog.close('documents');window.soroOpenDocumentCenter?.({subjectKind:'employee',subjectId:employee.user_id});});
+    if (access.is_founder && employee.user_id === window.soroCurrentAccess?.user_id) {
+      const edit = document.createElement('button');
+      edit.type = 'button'; edit.className = 'admin-record-button'; edit.textContent = 'Edit my account';
+      edit.addEventListener('click', () => { dialog.close('account'); window.SoroStaffAccount?.openAccount(); });
+      dialog.querySelector('.record-manager-footer')?.prepend(edit);
+    }
+    if (!access.is_founder && window.soroCurrentAccess?.is_founder === true) {
+      const consolidate = document.createElement('button');
+      consolidate.type = 'button'; consolidate.className = 'admin-record-button'; consolidate.textContent = 'Consolidate duplicate';
+      consolidate.addEventListener('click', () => { dialog.close('consolidate'); window.SoroStaffAccount?.openDuplicate(employee.user_id); });
+      dialog.querySelector('.record-manager-footer')?.prepend(consolidate);
+    }
     dialog.querySelector('[data-close-profile]')?.addEventListener('click', () => dialog.close('done'));
     dialog.querySelector('[data-reissue-credentials]')?.addEventListener('click', event => reissueTemporaryPassword(employee, dialog, event.currentTarget));
     dialog.querySelector('[data-edit-payment-route]')?.addEventListener('click', () => openEmployeePaymentDialog(employee, dialog));
@@ -547,6 +565,10 @@
   }
 
   window.addEventListener('soro-auth-changed', event => {
+    employeeLoadVersion++;
+    employees = [];
+    loading = false;
+    document.querySelectorAll('dialog.employee-dialog').forEach(dialog => dialog.close());
     const access = event.detail?.access || null;
     syncEmployeeNavigation(access);
     if (access?.role !== 'admin') {
