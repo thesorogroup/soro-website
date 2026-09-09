@@ -226,7 +226,8 @@
       if(event.target.matches('[data-assignment-form] [name="team"]')){const select=node.querySelector('[data-assignee-select]');select.innerHTML='<option value="">Unassigned team queue</option>'+(selectedTicket?.assignees||[]).filter(a=>a.team===event.target.value||a.team==='admin').map(a=>`<option value="${escape(a.id)}">${escape(a.name)}</option>`).join('');}
       if(event.target.matches('[data-ticket-filter]')){filters={...filters,...Object.fromEntries([...node.querySelectorAll('[data-ticket-filter]')].map(el=>[el.dataset.ticketFilter,el.value])),offset:0};loadTickets(captured);}
     },listenerOptions);
-    loadTickets(captured);
+    if(typeof config.initialTicketId==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(config.initialTicketId))openTicket(config.initialTicketId.toLowerCase(),captured);
+    else loadTickets(captured);
   }
   let notificationVersion=0;
   async function refreshNotifications(){

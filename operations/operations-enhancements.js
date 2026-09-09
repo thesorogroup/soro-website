@@ -605,6 +605,7 @@
   window.soroRemoveOwnProfileManagementActions = removeOwnProfileManagementActions;
 
   render = function () {
+    window.SoroReports?.unmount?.();
     window.SoroFeedback?.unmount?.();
     window.SoroDocumentCenter?.unmount?.();
     window.SoroSupportTickets?.unmount?.();
@@ -623,7 +624,7 @@
       window.soroClientShortlistWorkflow?.unmount?.({ clear: false });
       window.SoroClientDashboard?.unmount?.({ clear: false });
       root.innerHTML = supportPage();
-      window.SoroSupportTickets?.mount?.(root,{role:currentAuthenticatedRole()});
+      window.SoroSupportTickets?.mount?.(root,{role:currentAuthenticatedRole(),initialTicketId:new URLSearchParams(location.hash.split('?')[1]||'').get('ticketId')});
       return;
     }
     if (current === 'talent-my-profile') {

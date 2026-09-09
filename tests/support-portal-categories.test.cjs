@@ -64,7 +64,7 @@ test('Unknown roles and historical categories do not expose internal names or un
 
 test('Help mount uses effective role; no raw categories are seeded in the form or live requests added to Admin previews',()=>{
  const source=fs.readFileSync(require.resolve('../operations/operations-enhancements.js'),'utf8');
- assert.match(source,/SoroSupportTickets\?\.mount\?\.\(root,\{role:currentAuthenticatedRole\(\)\}\)/);
+ assert.match(source,/SoroSupportTickets\?\.mount\?\.\(root,\{role:currentAuthenticatedRole\(\),initialTicketId:/);
  const preview=source.indexOf("if(typeof adminPreviewingNonAdminWorkspace==='function'&&adminPreviewingNonAdminWorkspace())return baseRender();");
  const mount=source.indexOf('window.SoroSupportTickets?.mount?.(root,');
  assert.ok(preview>=0&&preview<mount);
