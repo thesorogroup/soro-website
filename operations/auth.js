@@ -125,8 +125,33 @@
     }
   }
 
+  function sameAuthorizedAccess(session, access) {
+    const previous = window.soroCurrentAccess;
+    if (!previous || !session?.user?.id || previous.user_id !== session.user.id) return false;
+    const next = { ...access, user_id: session.user.id };
+    return [...new Set([...Object.keys(previous), ...Object.keys(next)])]
+      .every(key => Object.is(previous[key], next[key]));
+  }
+
+  function revealAuthorizedApp() {
+    checking.hidden = true;
+    authGate.hidden = true;
+    if (passwordRecoveryGate) passwordRecoveryGate.hidden = true;
+    if (firstPasswordGate) firstPasswordGate.hidden = true;
+    app.hidden = false;
+  }
+
   function showAuthorizedApp(session, access) {
+    // Supabase can confirm the same session again after tab focus or token
+    // refresh. verifySession has still re-read active access from the database.
+    // Do not destroy playing videos, upload state, or an Admin workspace preview
+    // when that freshly verified user and every access field are unchanged.
+    const preserveView = sameAuthorizedAccess(session, access);
     window.soroCurrentAccess = { ...access, user_id: session.user.id };
+    if (preserveView) {
+      revealAuthorizedApp();
+      return;
+    }
     if (typeof role !== 'undefined') {
       role = workspaceRole[access.role] || 'admin';
       if (typeof roleConfig !== 'undefined' && roleConfig[role]?.className) document.body.className = roleConfig[role].className;
@@ -135,11 +160,7 @@
     if (typeof window.soroSyncAuthorizedNavigation === 'function') window.soroSyncAuthorizedNavigation(access);
     if (typeof setActive === 'function') setActive();
     if (typeof render === 'function') render();
-    checking.hidden = true;
-    authGate.hidden = true;
-    if (passwordRecoveryGate) passwordRecoveryGate.hidden = true;
-    if (firstPasswordGate) firstPasswordGate.hidden = true;
-    app.hidden = false;
+    revealAuthorizedApp();
     window.dispatchEvent(new CustomEvent('soro-auth-changed', { detail: { session, access } }));
   }
 
@@ -233,7 +254,7 @@
       .select('organization_id,role,display_name,is_founder,active,must_change_password,initial_password_issued_at,password_changed_at')
       .eq('id', session.user.id)
       .maybeSingle();
-    if (check !== authCheck) return;
+    if (check !== authCheck || recoveryMode) return;
 
     if (error || !access?.active || !authorizedRoles.has(access.role)) {
       signedOutMessage = 'This account does not have access to Soro Ops. Contact a Soro Administrator if you believe this is an error.';
@@ -397,6 +418,7 @@
   });
   function handleAuthStateChange(event, session) {
     if (event === 'PASSWORD_RECOVERY') {
+      authCheck += 1; // Retire any normal access read already in flight.
       recoveryMode = true;
       recoveryEventReceived = true;
       recoverySession = session;

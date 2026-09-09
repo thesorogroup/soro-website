@@ -61,7 +61,7 @@ test('the page loads cache-busted profile assets before routing and authenticati
   assert.match(html, /client-profile\.css\?v=20260829-client-profile/);
   assert.match(html, /client-profile\.js\?v=20260908-document-center/);
   assert.ok(html.indexOf('client-profile.js?v=20260908-document-center') < html.indexOf('src="operations.js?'));
-  assert.match(html, /auth\.js\?v=20260907-client-account-setup/);
+  assert.match(html, /auth\.js\?v=20260908-media-continuity/);
 });
 
 test('the pure preview renderer is network-free and preserves field authority', () => {
