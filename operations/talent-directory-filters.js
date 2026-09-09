@@ -174,6 +174,14 @@
             SKILL_ID_BY_LABEL.set(normalize(record.label), record.id);
         });
     });
+    // Share the exact application/directory taxonomy with the profile editor.
+    window.soroTalentSkillCatalog = Object.freeze({
+        getGroups: function () {
+            return WORK_AREAS.map(function (area) {
+                return { id: area.id, label: area.label, skills: area.skills.map(function (skill) { return { id: skill[0], name: skill[1] }; }) };
+            });
+        }
+    });
     [
         ['medical coding', 'medical_coding'],
         ['medical coder', 'medical_coding'],

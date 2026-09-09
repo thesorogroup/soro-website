@@ -12,6 +12,17 @@ const ownerId = '33333333-3333-4333-8333-333333333333';
 const requestId = '44444444-4444-4444-8444-444444444444';
 const updatedAt = '2026-08-30T23:00:00.000Z';
 
+test('review action row shares a flexible height without changing dropdown actions', () => {
+  const css=read('operations/talent-review-queue.css');
+  assert.match(css,/--review-action-height: 3rem/);
+  assert.match(css,/\.talent-review-card-main-actions \{ align-items: stretch/);
+  assert.match(css,/\.talent-review-card-main-actions > \.button,\s*\.talent-review-secondary > summary \{[\s\S]*?min-height: var\(--review-action-height\);[\s\S]*?height: auto;/);
+  assert.match(css,/\.talent-review-action-divider \{ align-self: center/);
+  assert.match(css,/\.talent-review-secondary\[open\] > summary::after/);
+  assert.match(css,/@media \(max-width: 430px\)[\s\S]*\.talent-review-verification \{ flex: 1 1 100%; \}/);
+  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260909-action-height/);
+});
+
 const APPLICANT_KEYS = Object.freeze([
   'applicantId', 'fullName', 'preferredName', 'email', 'applicationReceivedAt',
   'updatedAt', 'stage', 'archived', 'owner', 'resume', 'checklist', 'allowedActions'
@@ -95,6 +106,22 @@ test('submitted action row contains only Start review and expands only after the
   await ui.changeApplicant({applicantId,expectedUpdatedAt:updatedAt,action:'begin_review'});
   assert.match(actions(),/data-review-verification/); assert.match(actions(),/data-review-interview/); assert.match(actions(),/Open résumé/);
 });
+
+for (const [role,stage,expected] of [['admin','in_review',true],['admin','submitted',false],['talent_management','in_review',false]]) {
+  test(`Review owner Edit button preserves access for ${role} / ${stage}`, async t => {
+    const row=applicant({stage,owner:{id:ownerId,name:'A very long Founder name & team <label>'}});
+    const {ui}=installUi(t,{role,responsePayload:queuePayload(role,[row])});
+    const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+    ui.mount(target); await new Promise(resolve=>setImmediate(resolve));
+    assert.match(target.innerHTML,/class="talent-review-owner-copy"/);
+    assert.match(target.innerHTML,/A very long Founder name &amp; team &lt;label&gt;/);
+    assert.equal(target.innerHTML.includes('data-review-reassign='),expected);
+    if(expected) {
+      assert.match(target.innerHTML,/class="button talent-review-owner-edit"[^>]+aria-label="Edit review owner for Santos, Mariel Anne">Edit<\/button>/);
+      assert.doesNotMatch(target.innerHTML,/>Reassign<\/button>/);
+    }
+  });
+}
 
 test('verification and interview drawers contain independent controls', async t => {
   const row=applicant({stage:'in_review'});

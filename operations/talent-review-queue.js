@@ -813,7 +813,7 @@
       </header>
       <div class="talent-review-card-meta">
         <span><small>Application received</small><strong>${escapeHtml(formatDate(applicant.applicationReceivedAt))}</strong></span>
-        <span><small>Review owner</small><strong>${escapeHtml(applicant.owner.name)}</strong>${!notStarted && actualRole() === 'admin' ? `<button type="button" class="text-button" data-review-reassign="${escapeHtml(applicant.applicantId)}">Reassign</button>` : ''}</span>
+        <span class="talent-review-owner"><span class="talent-review-owner-copy"><small>Review owner</small><strong title="${escapeHtml(applicant.owner.name)}">${escapeHtml(applicant.owner.name)}</strong></span>${!notStarted && actualRole() === 'admin' ? `<button type="button" class="button talent-review-owner-edit" data-review-reassign="${escapeHtml(applicant.applicantId)}" aria-label="Edit review owner for ${escapeHtml(applicant.fullName)}">Edit</button>` : ''}</span>
         <span><small>Last updated</small><strong>${escapeHtml(formatDate(applicant.updatedAt))}</strong></span>
       </div>
       ${activeReview?.applicantId === applicant.applicantId && outsideFilter ? '<p class="talent-review-filter-exception">Current review · kept here outside the selected filters</p>' : ''}

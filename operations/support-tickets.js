@@ -7,6 +7,8 @@
   let node=null,version=0,options={},mountedActor='',selectedTicket=null,workspace=null,detailVersion=0,bindings=null,filters=emptyFilters();
   const STATUSES={open:'New',in_progress:'In progress',waiting_on_client:'Waiting on client',resolved:'Resolved',closed:'Resolved'};
   const TEAMS={sales:'Sales',talent_management:'Talent Management',admin:'Admin'};
+  // Navigation only; the server still enforces organization and team access.
+  const canReviewRole=role=>['admin','sales','sales_management','talent_management'].includes(role);
   function pendingRequest(actor,hash,remove=false){
     const key=`soro-support-pending:${actor}`;let records=[];
     try{records=JSON.parse(root.sessionStorage?.getItem(key)||'[]');}catch{}
@@ -87,6 +89,7 @@
     try{
       const data=await request('GET',null,'?'+new URLSearchParams(filters));if(captured!==version||generation!==detailVersion||!node?.isConnected)return;if(!Array.isArray(data?.tickets))throw Error();workspace=data;
       const filtered=Boolean(filters.status||filters.team||filters.assignment||filters.reason),attentionView=data.internal&&filters.view==='attention',total=Number.isSafeInteger(data.total)?data.total:null;
+      const heading=node.querySelector('.support-page h1');if(heading)heading.textContent=data.internal?'Support Tickets':'Help & Support';
       if(total!==null&&filters.offset>0&&filters.offset>=total){filters.offset=total?Math.floor((total-1)/50)*50:0;return loadTickets(captured);}
       const restoreInboxFocus=root.document?.activeElement===previousFocus;
       list.classList.remove('is-ticket-detail');
@@ -202,5 +205,5 @@
   if(root.document){root.addEventListener?.('focus',refreshNotifications);root.setInterval?.(()=>{if(root.document.visibilityState!=='hidden')refreshNotifications();},30000);}
   // The owning enhancement renderer invalidates this module before each route
   // or auth render. A second auth listener here would clear its new Help view.
-  return Object.freeze({uploadMarkup,ticketMarkup,detailMarkup,summaryMarkup,attentionMarkup,viewMarkup,elapsed,readImage,pendingRequest,mount,unmount,refreshNotifications,MAX_BYTES,STATUSES,TEAMS});
+  return Object.freeze({canReviewRole,uploadMarkup,ticketMarkup,detailMarkup,summaryMarkup,attentionMarkup,viewMarkup,elapsed,readImage,pendingRequest,mount,unmount,refreshNotifications,MAX_BYTES,STATUSES,TEAMS});
 }));

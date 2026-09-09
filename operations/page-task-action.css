@@ -1,0 +1,8 @@
+.page-task-toolbar { max-width:1440px; margin:0 auto; padding:24px 42px 0; display:flex; justify-content:flex-end; }
+.page-task-toolbar[hidden] { display:none!important; }
+.page-task-toolbar .button { min-height:40px; white-space:nowrap; font-size:.875rem; }
+.has-page-task-action #view-root .page { padding-top:18px; }
+.has-page-task-action #view-root #add-task,
+.has-page-task-action #view-root #profile-add-task { display:none!important; }
+@media(max-width:950px) { .page-task-toolbar { padding:20px 20px 0; } }
+@media(max-width:520px) { .page-task-toolbar { padding:16px 14px 0; } .has-page-task-action #view-root .page { padding-top:16px; } }

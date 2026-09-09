@@ -8,6 +8,7 @@
   const fields = 'id,organization_id,updated_at,self_reported_skills,verified_skills,legacy_application_data';
   const uuid = value => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''));
   const escape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+  const catalogSnapshots = new WeakMap();
   function scope() {
     const access = root.soroCurrentAccess || {};
     return JSON.stringify([access.user_id, access.organization_id, access.role, access.active, access.must_change_password]);
@@ -27,17 +28,32 @@
   function skillNames(record) {
     return [...new Set([...(Array.isArray(record?.self_reported_skills) ? record.self_reported_skills : []), ...(Array.isArray(record?.verified_skills) ? record.verified_skills : [])].filter(x => typeof x === 'string' && x.trim()))].sort((a,b) => a.localeCompare(b));
   }
-  async function loadSkills(applicantId) {
+  async function loadSkills(applicantId, options = {}) {
     const context = session(applicantId);
     const result = await context.client.from('applicants').select(fields).eq('organization_id', context.organizationId).eq('id', applicantId).is('archived_at', null).maybeSingle();
     context.check();
     if (result.error || !result.data || result.data.id !== applicantId || result.data.organization_id !== context.organizationId) throw new Error('Skills could not be loaded. Try again.');
-    return { record: result.data, scope: scope() };
+    const snapshot = { record: result.data, scope: scope() };
+    if (options.includeCatalog) {
+      const groups = root.soroTalentSkillCatalog?.getGroups();
+      if (!Array.isArray(groups) || !groups.length) throw new Error('The skill catalog is unavailable. Refresh the page and try again.');
+      const library = [];
+      for (let offset = 0; ; offset += 500) {
+        const page = await context.client.from('skill_library').select('name,is_active').eq('is_active', true).order('name').range(offset, offset + 499);
+        context.check();
+        if (page.error || !Array.isArray(page.data)) throw new Error('The skill library could not be loaded. Try again.');
+        library.push(...page.data);
+        if (page.data.length < 500) break;
+      }
+      snapshot.catalog = groups.concat([{ id: 'library', label: 'Additional library skills', skills: library.filter(s => s.is_active !== false && typeof s.name === 'string' && s.name.trim()).map(s => ({ name: s.name.trim() })) }]);
+      catalogSnapshots.set(snapshot, snapshot.catalog.flatMap(g => g.skills.map(s => s.name)));
+    }
+    return snapshot;
   }
   async function saveSkills(applicantId, snapshot, selected) {
     const context = session(applicantId);
     if (snapshot?.scope !== scope() || snapshot?.record?.id !== applicantId || !snapshot.record.updated_at) throw new Error('Reopen verification before saving skills.');
-    const names = skillNames(snapshot.record), verified = [], experience = {};
+    const names = [...new Set([...skillNames(snapshot.record), ...(catalogSnapshots.get(snapshot) || [])])], verified = [], experience = {};
     if (!Array.isArray(selected) || selected.length > names.length) throw new Error('Choose only the skills listed for this applicant.');
     for (const item of selected) {
       if (!names.includes(item.name) || verified.includes(item.name)) throw new Error('Choose only the skills listed for this applicant.');
@@ -55,7 +71,12 @@
     }).eq('organization_id', context.organizationId).eq('id', applicantId).eq('updated_at', snapshot.record.updated_at).is('archived_at', null).select(fields).maybeSingle();
     context.check();
     if (result.error || !result.data) throw new Error('This profile may have changed. Reopen verification before saving again; your selection has not overwritten newer data.');
-    return { record: result.data, scope: scope() };
+    const updated = { record: result.data, scope: scope() };
+    if (catalogSnapshots.has(snapshot)) {
+      updated.catalog = snapshot.catalog;
+      catalogSnapshots.set(updated, catalogSnapshots.get(snapshot));
+    }
+    return updated;
   }
   async function loadResume(applicantId) {
     const context = session(applicantId);

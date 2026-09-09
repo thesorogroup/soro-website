@@ -14,10 +14,12 @@
   <link rel="stylesheet" href="inline-intro-video.css?v=20260908-loom-header" />
     <link rel="stylesheet" href="talent-profile-privacy.css?v=20260822-timezone-screening" />
     <link rel="stylesheet" href="talent-file-tabs.css?v=20260829-talent-self-profile-layout2" />
+    <link rel="stylesheet" href="talent-skill-editor.css?v=20260909-full-catalog" />
     <link rel="stylesheet" href="talent-self-uploads.css?v=20260908-self-video" />
     <link rel="stylesheet" href="talent-healthcare.css?v=20260908-healthcare" />
     <link rel="stylesheet" href="task-modal-polish.css?v=20260817-task-modal" />
     <link rel="stylesheet" href="task-center.css?v=20260831-live-tasks" />
+    <link rel="stylesheet" href="page-task-action.css?v=20260909-all-pages" />
     <link rel="stylesheet" href="document-center.css?v=20260908-document-center" />
     <link rel="stylesheet" href="support.css?v=20260908-support-attention" />
     <link rel="stylesheet" href="talent-directory-filters.css?v=20260828-skill-disclosure" />
@@ -33,7 +35,8 @@
     <link rel="stylesheet" href="admin-payroll.css?v=20260830-payroll-payouts" />
     <link rel="stylesheet" href="active-talent-today.css?v=20260829-active-talent-today" />
     <link rel="stylesheet" href="talent-time-off.css?v=20260829-talent-time-off" />
-    <link rel="stylesheet" href="talent-review-queue.css?v=20260909-private-pdf" />
+    <link rel="stylesheet" href="talent-review-queue.css?v=20260909-action-height" />
+    <link rel="stylesheet" href="staff-account.css?v=20260909-ownership-spacing" />
     <link rel="stylesheet" href="available-talent-bench.css?v=20260901-available-talent-bench" />
     <link rel="stylesheet" href="client-shortlist-workflow.css?v=20260908-shortlist-emails" />
     <link rel="stylesheet" href="client-workflow.css?v=20260901-client-workflow-approval" />
@@ -102,6 +105,7 @@
           <button class="nav-link" id="client-talent-profile-nav" data-view="client-talent-profile" hidden>Talent Profile</button>
           <button class="nav-link" id="client-account-settings-nav" data-view="my-profile" hidden>Account Settings</button>
           <button class="nav-link" id="my-tasks-nav" data-view="tasks">My Tasks <b id="my-tasks-count" hidden>0</b></button>
+          <button class="nav-link" id="support-tickets-nav" data-view="help" hidden>Support Tickets</button>
           <button class="nav-link" data-view="clients">Clients</button>
           <button class="nav-link" id="client-shortlists-nav" data-view="client-shortlists" hidden>Shortlists <b id="client-shortlists-count" hidden>0</b></button>
           <button class="nav-link" data-view="vas">Talent</button>
@@ -122,6 +126,7 @@
           <label class="global-search"><span aria-hidden="true">⌕</span><input id="global-search" type="search" autocomplete="off" placeholder="Search clients and Talent…" aria-label="Search clients and Talent" /></label>
           <div class="top-actions"><button class="icon-button client-mobile-profile" id="client-mobile-profile" type="button" aria-label="Open Account Settings" title="Account Settings" hidden><span class="avatar">CP</span></button><button class="text-button" id="sign-out" type="button">Sign out</button><button class="icon-button notification-button" id="notifications-button" aria-label="No notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" /></svg><em id="notifications-count" hidden>0</em></button><button class="help" id="help-button" type="button" aria-label="Help and support">?</button></div>
         </header>
+        <div class="page-task-toolbar" id="page-task-toolbar" hidden><button class="button primary" id="page-add-task" type="button" aria-haspopup="dialog" aria-controls="task-dialog">+ Add Task</button></div>
         <div id="view-root"></div>
       </section>
     </main>
@@ -141,9 +146,9 @@
     <script src="active-talent-today.js?v=20260829-active-talent-today"></script>
     <script src="talent-time-off.js?v=20260829-talent-time-off"></script>
     <script src="private-pdf-viewer.js?v=20260909-private-pdf"></script>
-    <script src="talent-review-evidence.js?v=20260909-private-pdf"></script>
-    <script src="talent-review-queue.js?v=20260909-staff-ownership"></script>
-    <script src="task-center.js?v=20260908-document-center"></script>
+    <script src="talent-review-evidence.js?v=20260909-full-catalog"></script>
+    <script src="talent-review-queue.js?v=20260909-ownership-spacing"></script>
+    <script src="task-center.js?v=20260909-all-pages"></script>
     <script src="global-search.js?v=20260901-global-search"></script>
     <script src="available-talent-bench.js?v=20260901-available-talent-bench"></script>
     <script src="client-shortlist-workflow.js?v=20260908-shortlist-emails"></script>
@@ -153,14 +158,16 @@
     <script src="sales-lifecycle-tracker.js?v=20260907-sales-tracker"></script>
     <script src="client-dashboard.js?v=20260907-client-care"></script>
     <script src="document-center.js?v=20260908-document-center"></script>
-    <script src="operations.js?v=20260909-queue-navigation"></script>
-    <script src="talent-directory-filters.js?v=20260828-skill-disclosure"></script>
+    <script src="operations.js?v=20260909-support-navigation"></script>
+    <script src="page-task-action.js?v=20260909-all-pages"></script>
+    <script src="talent-directory-filters.js?v=20260909-full-catalog"></script>
+    <script src="talent-skill-editor.js?v=20260909-full-catalog"></script>
     <script src="admin-skill-library.js?v=20260817-skill-library"></script>
     <script src="screening-presentation.js?v=20260829-speed-meter-fix"></script>
     <script src="profile-details.js?v=20260822-private-profile-details"></script>
-    <script src="support-tickets.js?v=20260908-support-attention"></script>
+    <script src="support-tickets.js?v=20260909-support-navigation"></script>
     <script src="talent-self-uploads.js?v=20260908-self-video-history"></script>
-    <script src="operations-enhancements.js?v=20260909-staff-ownership"></script>
+    <script src="operations-enhancements.js?v=20260909-support-navigation"></script>
     <script src="loom-introduction.js?v=20260908-loom-header"></script>
     <script src="inline-intro-video.js?v=20260908-loom-header"></script>
     <script src="talent-profile-privacy.js?v=20260908-profile-refresh"></script>
@@ -169,7 +176,7 @@
     <script src="task-modal-behavior.js?v=20260817-task-modal"></script>
     <script src="employee-payroll-readiness.js?v=20260831-founder-readiness"></script>
     <script src="admin-employee-management.js?v=20260909-founder-account"></script>
-    <script src="staff-account.js?v=20260909-founder-account"></script>
+    <script src="staff-account.js?v=20260909-ownership-spacing"></script>
     <script src="admin-payroll.js?v=20260908-document-navigation"></script>
     <script src="auth.js?v=20260909-founder-account"></script>
     <script src="admin-record-management.js?v=20260901-role-view-access"></script>

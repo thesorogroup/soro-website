@@ -63,3 +63,15 @@ test('navigation releases the queue root before Employees and other wrapper view
  assert.match(read('operations/talent-review-queue.js'),/!notStarted && actualRole\(\) === 'admin'/);
  assert.match(read('operations/talent-review-queue.js'),/holdReview\(reassignButton.dataset.reviewReassign\)/);
 });
+test('ownership form has scoped spacing and keeps the existing assignment workflow',()=>{
+ const ui=read('operations/staff-account.js'),css=read('operations/staff-account.css');
+ assert.match(ui,/shell\('Edit ownership'\)/);
+ assert.match(ui,/class="staff-ownership-form"/);
+ assert.match(ui,/class="staff-ownership-intro"/);
+ assert.match(css,/\.staff-ownership-form \{ display: grid; gap: 20px/);
+ assert.match(css,/\.staff-ownership-form \.record-manager-field > label \{ display: grid; gap: 8px/);
+ assert.match(css,/\[role="status"\]:empty \{ display: none/);
+ assert.match(ui,/action:'ownership_save',kind,entityId:id,field:form.elements.field.value/);
+ assert.match(ui,/expectedUpdatedAt:workspace.record.updatedAt/);
+ assert.match(read('operations/index.html'),/staff-account.css\?v=20260909-ownership-spacing/);
+});

@@ -118,8 +118,9 @@
     return data?.session?.access_token || '';
   }
 
-  async function request(method = 'GET', body) {
+  async function request(method = 'GET', body, assertCurrent = () => {}) {
     const accessToken = await token();
+    assertCurrent();
     if (!accessToken) throw new Error('Your secure session expired. Sign in again and retry.');
     const response = await root.fetch(ENDPOINT, {
       method,
@@ -127,6 +128,7 @@
       ...(body ? { body: JSON.stringify(body) } : {})
     });
     const payload = await response.json().catch(() => ({}));
+    assertCurrent();
     if (!response.ok) throw new Error(payload.message || 'Tasks could not be loaded.');
     return payload;
   }
@@ -336,6 +338,13 @@
   }
 
   async function createTask(form) {
+    if (root.soroPageTaskAction && !root.soroPageTaskAction.canCreate()) throw new Error('Task creation is unavailable in this workspace. Return to your authorized panel and try again.');
+    const client = root.soroSupabase;
+    const scope = () => JSON.stringify([root.soroCurrentAccess?.user_id, root.soroCurrentAccess?.organization_id, actualRole(), root.currentAuthenticatedRole?.()]);
+    const captured = scope();
+    const assertCurrent = () => {
+      if (client !== root.soroSupabase || captured !== scope() || (root.soroPageTaskAction && !root.soroPageTaskAction.canCreate())) throw new Error('Your task workspace changed. Reopen Add Task in your current panel.');
+    };
     const values = Object.fromEntries(new FormData(form).entries());
     const idempotencyKey = form.dataset.taskIdempotencyKey || createUuid();
     form.dataset.taskIdempotencyKey = idempotencyKey;
@@ -345,8 +354,8 @@
       priority: text(values.priority, 24) || 'normal', idempotencyKey
     };
     if (!body.title) throw new Error('Enter a task name.');
-    await request('POST', body);
-    delete form.dataset.taskIdempotencyKey;
+    await request('POST', body, assertCurrent);
+    if (form.dataset.taskIdempotencyKey === idempotencyKey) delete form.dataset.taskIdempotencyKey;
     return refresh();
   }
 
@@ -354,22 +363,29 @@
     const form = root?.document?.getElementById?.('task-form');
     if (!form || form.dataset.taskCenterBound === 'true') return;
     form.dataset.taskCenterBound = 'true';
+    let formGeneration = 0;
     form.addEventListener('submit', async event => {
       event.preventDefault();
       const submit = form.querySelector('[type="submit"]');
+      if (submit.disabled) return;
+      const generation = formGeneration;
       const message = root.document.getElementById('task-form-message');
       submit.disabled = true;
       if (message) { message.textContent = 'Saving task…'; message.className = 'task-form-message'; }
       try {
         await createTask(form);
+        if (generation !== formGeneration) return;
         root.document.getElementById('task-dialog')?.close('saved');
         form.reset();
         if (message) message.textContent = '';
       } catch (error) {
+        if (generation !== formGeneration) return;
         if (message) { message.textContent = error.message || 'The task could not be saved.'; message.className = 'task-form-message task-form-message--error'; }
-      } finally { submit.disabled = false; }
+      } finally { if (generation === formGeneration) submit.disabled = false; }
     });
     root.document.getElementById('task-dialog')?.addEventListener('close', () => {
+      formGeneration += 1;
+      form.querySelector('[type="submit"]').disabled = false;
       delete form.dataset.taskIdempotencyKey;
       if (root.document.getElementById('task-dialog')?.returnValue !== 'saved') form.reset();
       const message = root.document.getElementById('task-form-message');

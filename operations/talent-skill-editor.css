@@ -1,0 +1,31 @@
+.profile-skill-editor-dialog { width:min(850px,calc(100vw - 28px)); max-height:calc(100dvh - 32px); color:#173b65; }
+.profile-skill-editor-dialog::backdrop { background:rgba(9,31,56,.48); backdrop-filter:blur(3px); }
+.profile-skill-editor-dialog form { padding:24px; }
+.profile-skill-editor-dialog h2 { margin:0; font-size:1.5rem; }
+.profile-skill-editor-dialog .dialog-copy { font-size:.875rem; line-height:1.6; color:#526b85; margin:14px 0; }
+.profile-skill-editor-tools { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.profile-skill-editor-tools label { display:grid; gap:6px; font-size:.875rem; font-weight:700; }
+.profile-skill-editor-tools input,.profile-skill-editor-tools select { width:100%; min-width:0; min-height:42px; border:1px solid #c5d4e2; border-radius:9px; padding:9px 11px; background:white; color:#173b65; font:inherit; }
+.profile-skill-editor-summary { display:flex; justify-content:space-between; gap:12px; margin:15px 0 10px; font-size:.875rem; }
+.profile-skill-editor-summary strong { color:#176f62; }
+.profile-skill-editor-summary span { color:#657b91; }
+.profile-skill-editor-list { max-height:44vh; overflow:auto; padding-right:5px; overscroll-behavior:contain; }
+.profile-skill-editor-list fieldset { min-width:0; margin:0 0 18px; padding:0; border:0; }
+.profile-skill-editor-list legend { padding:0 0 9px; color:#173b65; font-size:.9375rem; font-weight:800; }
+.profile-skill-editor-row { display:grid; grid-template-columns:minmax(0,1fr) 92px; align-items:center; gap:14px; padding:11px 13px; margin:0 0 7px; border:1px solid #dce5ee; border-radius:10px; background:#fbfcfe; }
+.profile-skill-editor-row:has(input:checked) { background:#f0f8f6; border-color:#9fc8bc; }
+.profile-skill-editor-choice { display:flex; gap:11px; align-items:center; cursor:pointer; min-width:0; }
+.profile-skill-editor-choice input { flex:none; width:18px; height:18px; accent-color:#176f62; }
+.profile-skill-editor-choice strong { display:block; font-size:.875rem; line-height:1.4; }
+.profile-skill-editor-choice small { display:block; font-size:.75rem; color:#667e92; margin-top:3px; }
+.profile-skill-editor-years { position:relative; display:grid; gap:4px; font-size:.75rem; color:#526b85; }
+.profile-skill-editor-years input { width:100%; min-width:0; padding:7px; border:1px solid #c5d4e2; border-radius:7px; background:white; color:#173b65; font:inherit; font-size:.875rem; }
+.profile-skill-editor-years input:disabled { background:#edf1f5; opacity:.65; }
+.profile-skill-editor-dialog [hidden] { display:none!important; }
+.profile-skill-editor-dialog .sr-only { position:absolute; top:0; left:0; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
+.profile-skill-editor-dialog .skill-review-status { font-size:.875rem; margin:8px 0; }
+.profile-skill-editor-dialog .modal-actions { margin-top:12px; }
+.profile-skill-editor-loading { padding:24px; }
+.profile-skill-editor-loading button { margin:8px 8px 0 0; }
+.profile-skill-editor-dialog :focus-visible { outline:3px solid #94bedf; outline-offset:2px; }
+@media(max-width:600px) { .profile-skill-editor-dialog form { padding:16px; } .profile-skill-editor-tools { grid-template-columns:1fr; gap:10px; } .profile-skill-editor-list { max-height:36vh; } .profile-skill-editor-row { grid-template-columns:minmax(0,1fr) 76px; padding:10px; gap:8px; } }

@@ -201,11 +201,15 @@ function viewDataForAuthenticatedRole(view,viewData){
 }
 function syncAuthorizedNavigation(access=window.soroCurrentAccess){
   const accessRole=effectiveWorkspaceRole(access);
+  window.soroPageTaskAction?.sync();
   const allowed=authenticatedEmployeeViews[accessRole]||new Set();
   const clientPortal=authenticatedClientRoles.has(accessRole);
   document.querySelectorAll('#main-nav [data-view]').forEach(button=>{
     button.hidden=!allowed.has(button.dataset.view);
   });
+  const supportNav=document.getElementById('support-tickets-nav');
+  // Auth events carry the access row; the verified session identity lives on soroCurrentAccess.
+  if(supportNav)supportNav.hidden=!access||!(access.user_id||window.soroCurrentAccess?.user_id)||access.active===false||access.must_change_password===true||!window.SoroSupportTickets?.canReviewRole?.(accessRole);
   const actualRole=actualAuthenticatedRole(access);
   const payrollNav=document.getElementById('payroll-nav');
   const talentPayoutReviewNav=document.getElementById('talent-payout-review-nav');

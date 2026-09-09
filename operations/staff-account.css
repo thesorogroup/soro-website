@@ -1,0 +1,16 @@
+/* Keep ownership spacing local to this dialog; other account editors are unchanged. */
+.staff-ownership-dialog .record-manager-form { padding: 24px 30px 28px; }
+.staff-ownership-form { display: grid; gap: 20px; min-width: 0; }
+.staff-ownership-intro { display: grid; gap: 8px; }
+.staff-ownership-intro h3 { margin: 0; color: #102f54; font-size: 18px; line-height: 1.4; overflow-wrap: anywhere; }
+.staff-ownership-intro p { margin: 0; color: #536b85; font-size: 14px; line-height: 1.5; }
+.staff-ownership-form .record-manager-field > label { display: grid; gap: 8px; font-size: 14px; line-height: 1.4; letter-spacing: 0; }
+.staff-ownership-form .record-manager-field select { min-width: 0; min-height: 44px; }
+.staff-ownership-form .record-manager-note { margin: 0; padding: 14px 16px; border: 1px solid #e0e8f0; border-radius: 10px; background: #f4f8fc; }
+.staff-ownership-form > [role="status"] { margin: 0; font-size: 14px; line-height: 1.5; }
+.staff-ownership-form > [role="status"]:empty { display: none; }
+.staff-ownership-form .record-manager-footer { margin-top: 0; padding-top: 20px; flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .staff-ownership-dialog .record-manager-header { padding: 22px 20px 18px; }
+  .staff-ownership-dialog .record-manager-form { padding: 20px; }
+}

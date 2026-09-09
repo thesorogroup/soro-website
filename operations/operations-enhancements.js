@@ -437,7 +437,7 @@
         : `<p class="profile-skill-empty">${escapeHtml(empty)}</p>`;
     };
     const reportedAreas = (applicant.self_reported_experience_areas || []).map((area) => areaLabels[area] || titleCase(area));
-    const reviewButton = canVerifyTalentSkills() ? '<button class="text-button" id="review-talent-skills" type="button">Review skills</button>' : '';
+    const reviewButton = canVerifyTalentSkills() ? '<button class="text-button" id="review-talent-skills" type="button">Edit skills</button>' : '';
     const skillReview = `<section class="panel profile-section profile-skill-review" aria-label="Talent skill profile">
       <div class="panel-head"><div><p class="eyebrow">Matching profile</p><h2>Skills &amp; experience</h2></div>${reviewButton}</div>
       <div class="profile-skill-review__group profile-skill-review__group--verified">
@@ -541,56 +541,12 @@
   function openTalentSkillReview() {
     const applicant = selectedProfileApplicant();
     if (!applicant || !canVerifyTalentSkills() || !window.soroSupabase) return;
-    const reported = Array.isArray(applicant.self_reported_skills) ? applicant.self_reported_skills : [];
-    const verified = Array.isArray(applicant.verified_skills) ? applicant.verified_skills : [];
-    const skills = [...new Set([...reported, ...verified].filter(Boolean))].sort((a, b) => a.localeCompare(b));
-    const experience = skillExperienceMap(applicant);
-    let dialog = document.getElementById('talent-skill-review-dialog');
-    if (!dialog) {
-      dialog = document.createElement('dialog');
-      dialog.id = 'talent-skill-review-dialog';
-      dialog.className = 'soro-dialog talent-skill-review-dialog';
-      document.body.appendChild(dialog);
-    }
-    dialog.__skillNames = skills;
-    dialog.innerHTML = `<form id="talent-skill-review-form"><header class="dialog-heading"><div><p class="eyebrow">Talent Management</p><h2>Verify skills &amp; experience</h2></div><button class="modal-close" type="button" data-close-skill-review aria-label="Close">×</button></header><p class="dialog-copy">Only checked skills will appear as management verified. Record relevant experience for each approved skill.</p><div class="talent-skill-review-list">${skills.length ? skills.map((skill, index) => {
-      const checked = verified.includes(skill);
-      const years = Number(experience[skill]);
-      return `<label class="talent-skill-review-row"><input type="checkbox" name="verified_skill" value="${index}" ${checked ? 'checked' : ''}><span><strong>${escapeHtml(skill)}</strong><small>${reported.includes(skill) ? 'Applicant reported' : 'Previously verified'}</small></span><span class="skill-years"><input type="number" min="0" max="50" step="0.5" name="skill_years_${index}" value="${Number.isFinite(years) && years > 0 ? years : ''}" ${checked ? '' : 'disabled'}><small>years</small></span></label>`;
-    }).join('') : '<p class="profile-skill-empty">This applicant did not report any skills to review.</p>'}</div><p class="skill-review-status" aria-live="polite"></p><footer class="modal-actions"><button class="button secondary" type="button" data-close-skill-review>Cancel</button><button class="button primary" type="submit" ${skills.length ? '' : 'disabled'}>Save verified skills</button></footer></form>`;
-    dialog.querySelectorAll('[data-close-skill-review]').forEach(button => button.addEventListener('click', () => dialog.close()));
-    dialog.querySelectorAll('input[name="verified_skill"]').forEach(checkbox => checkbox.addEventListener('change', () => {
-      const years = dialog.querySelector(`[name="skill_years_${checkbox.value}"]`);
-      if (years) years.disabled = !checkbox.checked;
-    }));
-    dialog.querySelector('form').addEventListener('submit', async event => {
-      event.preventDefault();
-      const submit = event.currentTarget.querySelector('[type="submit"]');
-      const status = event.currentTarget.querySelector('.skill-review-status');
-      const selectedIndexes = [...event.currentTarget.querySelectorAll('input[name="verified_skill"]:checked')].map(input => Number(input.value));
-      const nextVerified = selectedIndexes.map(index => skills[index]).filter(Boolean);
-      const nextExperience = {};
-      selectedIndexes.forEach(index => {
-        const years = Number(event.currentTarget.elements[`skill_years_${index}`]?.value);
-        if (Number.isFinite(years) && years >= 0) nextExperience[skills[index]] = years;
-      });
-      submit.disabled = true;
-      submit.textContent = 'Saving…';
-      const nextLegacy = { ...(applicant.legacy_application_data || {}), verified_skill_experience: nextExperience };
-      const { error } = await window.soroSupabase.from('applicants').update({ verified_skills: nextVerified, legacy_application_data: nextLegacy, skill_profile_updated_at: new Date().toISOString() }).eq('id', applicant.id);
-      if (error) {
-        submit.disabled = false;
-        submit.textContent = 'Save verified skills';
-        status.textContent = 'Verified skills could not be saved. Refresh your secure session and try again.';
-        return;
-      }
-      applicant.verified_skills = nextVerified;
-      applicant.legacy_application_data = nextLegacy;
-      dialog.close();
+    if (!window.soroTalentSkillEditor) { toast('Refresh the page to load the skill editor.'); return; }
+    window.soroTalentSkillEditor.open(applicant, updated => {
+      Object.assign(applicant, updated);
       toast('Verified skills and experience updated.');
-      render();
+      if (selectedProfileApplicant()?.id === applicant.id) render();
     });
-    dialog.showModal();
   }
 
   function removeOwnProfileManagementActions(scope = root) {
@@ -650,8 +606,8 @@
 
   render = function () {
     window.SoroDocumentCenter?.unmount?.();
-    if(typeof adminPreviewingNonAdminWorkspace==='function'&&adminPreviewingNonAdminWorkspace())return baseRender();
     window.SoroSupportTickets?.unmount?.();
+    if(typeof adminPreviewingNonAdminWorkspace==='function'&&adminPreviewingNonAdminWorkspace())return baseRender();
     if (typeof viewAllowedForAuthenticatedRole === 'function' && !viewAllowedForAuthenticatedRole(current)) {
       // Auth has not established workspace access yet. Keep any invitation or
       // recovery callback intact until Supabase consumes it; baseRender keeps
