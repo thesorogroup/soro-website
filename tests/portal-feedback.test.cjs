@@ -3,6 +3,12 @@ const api=require('../netlify/functions/portal-feedback'),ui=require('../operati
 const id=n=>`10000000-0000-4000-8000-${String(n).padStart(12,'0')}`;
 const read=name=>fs.readFileSync(require.resolve('../'+name),'utf8');
 const post=body=>({httpMethod:'POST',body:JSON.stringify(body)});
+test('Feedback uses a professional usability label while preserving the existing category',()=>{
+ assert.equal(ui.TYPES.experience,'Usability improvement');
+ assert.match(ui.pageMarkup(),/<option value="experience">Usability improvement<\/option>/);
+ assert.match(ui.itemsMarkup({items:[{category:'experience',message:'A suggestion'}],canReview:false}),/<strong>Usability improvement<\/strong>/);
+ assert.equal(api.parseBody(post({requestId:id(1),category:'experience',message:'A suggestion'})).category,'experience');
+});
 test('Feedback validates text/category and rejects caller-selected ownership or status',()=>{
  const valid={requestId:id(1),category:'suggestion',message:' A helpful idea '};
  assert.equal(api.parseBody(post(valid)).message,'A helpful idea');
@@ -28,7 +34,7 @@ test('Every existing portal gets Feedback without changing any other role permis
  assert.deepEqual(Object.keys(context.views).sort(),[...ui.ROLES].sort());
  for(const [role,views] of Object.entries(context.views))assert.equal(views.has('feedback'),true,role);
  assert.equal(context.views.virtual_assistant.has('employees'),false);assert.equal(context.views.sales.has('payroll'),false);assert.equal(context.views.client_admin.has('talent-review'),false);
- assert.match(source,/\['help','feedback','my-profile'/);
+ assert.match(source,/\['help','feedback','activity','work-log','my-profile'/);
  for(const role of ui.ROLES)assert.equal(ui.eligible({user_id:id(1),organization_id:id(2),role,active:true}),true);
  for(const a of [null,{role:'admin'},{user_id:id(1),organization_id:id(2),role:'founder'},{user_id:id(1),organization_id:id(2),role:'admin',active:false},{user_id:id(1),organization_id:id(2),role:'admin',must_change_password:true}])assert.equal(ui.eligible(a),false);
 });

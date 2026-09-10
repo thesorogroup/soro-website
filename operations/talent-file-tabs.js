@@ -224,6 +224,11 @@
     fillPath?.setAttribute('d', geometry.fill);
     edgePath?.setAttribute('d', geometry.edge);
     if (requested === 'benefits') mountHealthcare(shell);
+    const activityHost=shell.querySelector('[data-talent-file-panel="activity"]');
+    if(requested==='activity' && activityHost && !activityHost.dataset.activityMounted){
+      activityHost.dataset.activityMounted='true';
+      window.SoroActivityHistory?.mount(activityHost,{kind:'talent',id:lastTalentId,compact:true,isCurrent:()=>shell.isConnected});
+    }
   }
 
   profilePage = function (applicant) {
@@ -261,13 +266,13 @@
 
     const shell = document.createElement('section');
     shell.className = 'talent-file-shell';
-    const initialTabCount = readOnlySales ? 1 : benefitsAvailable ? 4 : 3;
+    const initialTabCount = readOnlySales ? 1 : benefitsAvailable ? 5 : 4;
     const tabMarkup = readOnlySales
       ? tabButton('profile', 'Profile')
-      : `${tabButton('profile', 'Profile')}${benefitsAvailable ? tabButton('benefits', 'Benefits', '<span class="tab-lock" aria-hidden="true"></span>') : ''}${tabButton('attendance', 'Attendance')}${tabButton('documents', 'Documents')}`;
+      : `${tabButton('profile', 'Profile')}${benefitsAvailable ? tabButton('benefits', 'Benefits', '<span class="tab-lock" aria-hidden="true"></span>') : ''}${tabButton('attendance', 'Attendance')}${tabButton('activity', 'Activity')}${tabButton('documents', 'Documents')}`;
     const panelMarkup = readOnlySales
       ? panel('profile', '', 'talent-file-profile-panel')
-      : `${panel('profile', '', 'talent-file-profile-panel')}${benefitsAvailable ? panel('benefits', benefitsPanel(applicant)) : ''}${panel('attendance', attendancePanel())}${panel('documents', '', 'talent-file-documents-panel')}`;
+      : `${panel('profile', '', 'talent-file-profile-panel')}${benefitsAvailable ? panel('benefits', benefitsPanel(applicant)) : ''}${panel('attendance', attendancePanel())}${panel('activity', '', 'talent-file-activity-panel')}${panel('documents', '', 'talent-file-documents-panel')}`;
     shell.innerHTML = `${folderArtwork(initialTabCount)}<div class="talent-file-tabs" role="tablist" aria-label="Talent file sections">${tabMarkup}</div><div class="talent-file-body"></div><div class="talent-file-panels">${panelMarkup}</div>`;
     syncFolderArt(shell);
 

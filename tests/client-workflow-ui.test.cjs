@@ -98,7 +98,8 @@ test('the Client Hub keeps account, access, requests, placement progress, and ac
   ['Hiring request', 'Shortlist', 'Client review', 'Interview', 'Selection', 'Placement', 'Onboarding'].forEach(label => {
     assert.match(target.innerHTML, new RegExp(`>${label}<`), `${label} must be visible in the placement journey.`);
   });
-  assert.match(target.innerHTML, />Activity</);
+  assert.match(target.innerHTML, />Activity History</);
+  assert.match(target.innerHTML, /data-activity-kind="client"/);
   assert.match(target.innerHTML, /data-client-workflow-find-talent/);
 });
 

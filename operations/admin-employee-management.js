@@ -404,6 +404,7 @@
         <p class="employee-profile-action-message" aria-live="polite"></p><footer class="record-manager-footer"><button type="button" class="admin-record-button" data-employee-documents>Documents & requests</button>${profileComplete && status.setupRequired ? '<button type="button" class="admin-record-button" data-reissue-credentials>Generate new temporary password</button>' : ''}${profileComplete ? '<button type="button" class="admin-record-button" data-edit-payment-route>Edit payment setup</button>' : ''}<button type="button" class="admin-record-button admin-record-button--primary" data-close-profile>Close profile</button></footer>
       </div>`
     });
+    dialog.querySelector('[data-employee-documents]')?.insertAdjacentHTML('afterend',`<button type="button" class="admin-record-button" data-activity-kind="employee" data-activity-id="${escapeHtml(employee.user_id)}">Activity History</button>`);
     dialog.querySelector('[data-employee-documents]')?.addEventListener('click',()=>{dialog.close('documents');window.soroOpenDocumentCenter?.({subjectKind:'employee',subjectId:employee.user_id});});
     if (access.is_founder && employee.user_id === window.soroCurrentAccess?.user_id) {
       const edit = document.createElement('button');

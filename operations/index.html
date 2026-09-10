@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="sidebar-theme.css?v=20260909-grouped-feedback" />
     <link rel="stylesheet" href="feedback.css?v=20260909-feedback" />
     <link rel="stylesheet" href="reports.css?v=20260909-real-reports" />
+    <link rel="stylesheet" href="activity-history.css?v=20260909-activity" />
     <link rel="stylesheet" href="auth.css?v=20260828-password-recovery" />
   <link rel="stylesheet" href="profile-dialog.css?v=20260817-profile-layout" />
   <link rel="stylesheet" href="inline-intro-video.css?v=20260908-loom-header" />
@@ -29,6 +30,7 @@
     <link rel="stylesheet" href="admin-record-management.css?v=20260822-identity-preferences" />
     <link rel="stylesheet" href="talent-portal-access.css?v=20260828-va-portal-access" />
     <link rel="stylesheet" href="client-profile.css?v=20260829-client-profile" />
+    <link rel="stylesheet" href="work-log.css?v=20260909-work-log" />
     <link rel="stylesheet" href="internal-client-profile.css?v=20260901-global-search" />
     <link rel="stylesheet" href="global-search.css?v=20260901-global-search" />
     <link rel="stylesheet" href="client-talent-profile.css?v=20260829-production-visuals" />
@@ -106,6 +108,7 @@
           <button class="nav-link" id="talent-my-profile-nav" data-view="talent-my-profile" hidden>My Profile</button>
           <button class="nav-link" id="client-talent-profile-nav" data-view="client-talent-profile" hidden>Talent Profile</button>
           <button class="nav-link" id="client-account-settings-nav" data-view="my-profile" hidden>Account Settings</button>
+          <button class="nav-link" id="work-log-nav" data-view="work-log" hidden>Work Log</button>
           <button class="nav-link" id="my-tasks-nav" data-view="tasks">My Tasks <b id="my-tasks-count" hidden>0</b></button>
           <button class="nav-link" id="support-tickets-nav" data-view="help" hidden>Support Tickets</button>
           <button class="nav-link" data-view="clients">Clients</button>
@@ -142,30 +145,32 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="supabase-config.js?v=20260817-loom"></script>
     <script src="talent-profile-visuals.js?v=20260829-production-visuals"></script>
-    <script src="client-profile.js?v=20260908-document-center"></script>
+    <script src="activity-history.js?v=20260909-activity"></script>
+    <script src="client-profile.js?v=20260909-activity"></script>
     <script src="internal-client-profile.js?v=20260908-document-center"></script>
     <script src="client-talent-profile.js?v=20260907-client-home"></script>
     <script src="talent-workday.js?v=20260829-manual-workday"></script>
+    <script src="work-log.js?v=20260909-work-log"></script>
     <script src="active-talent-today.js?v=20260829-active-talent-today"></script>
     <script src="talent-time-off.js?v=20260829-talent-time-off"></script>
     <script src="private-pdf-viewer.js?v=20260909-private-pdf"></script>
     <script src="talent-review-evidence.js?v=20260909-full-catalog"></script>
     <script src="talent-review-queue.js?v=20260909-quiet-position"></script>
-    <script src="task-center.js?v=20260909-all-pages"></script>
+    <script src="task-center.js?v=20260909-activity"></script>
     <script src="global-search.js?v=20260901-global-search"></script>
     <script src="available-talent-bench.js?v=20260901-available-talent-bench"></script>
     <script src="client-shortlist-workflow.js?v=20260908-shortlist-emails"></script>
-    <script src="client-workflow.js?v=20260909-staff-ownership"></script>
+    <script src="client-workflow.js?v=20260909-activity"></script>
     <script src="talent-healthcare.js?v=20260908-healthcare"></script>
-    <script src="client-placement-workflow.js?v=20260908-healthcare"></script>
+    <script src="client-placement-workflow.js?v=20260909-activity"></script>
     <script src="sales-lifecycle-tracker.js?v=20260907-sales-tracker"></script>
-    <script src="client-dashboard.js?v=20260907-client-care"></script>
+    <script src="client-dashboard.js?v=20260909-work-log"></script>
     <script src="document-center.js?v=20260908-document-center"></script>
-    <script src="sidebar-navigation.js?v=20260909-grouped-feedback"></script>
-    <script src="feedback.js?v=20260909-feedback"></script>
+    <script src="sidebar-navigation.js?v=20260909-work-log"></script>
+    <script src="feedback.js?v=20260909-usability-label"></script>
     <script src="report-definitions.js?v=20260909-real-reports"></script>
-    <script src="reports.js?v=20260909-real-reports"></script>
-    <script src="operations.js?v=20260909-real-reports"></script>
+    <script src="reports.js?v=20260909-activity"></script>
+    <script src="operations.js?v=20260909-work-log"></script>
     <script src="page-task-action.js?v=20260909-all-pages"></script>
     <script src="talent-directory-filters.js?v=20260909-full-catalog"></script>
     <script src="talent-skill-editor.js?v=20260909-full-catalog"></script>
@@ -174,16 +179,16 @@
     <script src="profile-details.js?v=20260822-private-profile-details"></script>
     <script src="support-tickets.js?v=20260909-report-links"></script>
     <script src="talent-self-uploads.js?v=20260908-self-video-history"></script>
-    <script src="operations-enhancements.js?v=20260909-real-reports"></script>
+    <script src="operations-enhancements.js?v=20260909-work-log"></script>
     <script src="loom-introduction.js?v=20260908-loom-header"></script>
     <script src="inline-intro-video.js?v=20260908-loom-header"></script>
     <script src="talent-profile-privacy.js?v=20260908-profile-refresh"></script>
-    <script src="talent-file-tabs.js?v=20260908-healthcare"></script>
+    <script src="talent-file-tabs.js?v=20260909-activity"></script>
     <script src="read-only-talent-profile.js?v=20260901-role-view-access"></script>
     <script src="task-modal-behavior.js?v=20260817-task-modal"></script>
     <script src="employee-payroll-readiness.js?v=20260831-founder-readiness"></script>
-    <script src="admin-employee-management.js?v=20260909-founder-account"></script>
-    <script src="staff-account.js?v=20260909-sidebar-footer"></script>
+    <script src="admin-employee-management.js?v=20260909-activity"></script>
+    <script src="staff-account.js?v=20260909-activity"></script>
     <script src="admin-payroll.js?v=20260908-document-navigation"></script>
     <script src="auth.js?v=20260909-founder-account"></script>
     <script src="admin-record-management.js?v=20260901-role-view-access"></script>

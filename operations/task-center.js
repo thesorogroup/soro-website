@@ -277,7 +277,7 @@
     return state.tasks.map(task => {
       const status = taskStatus(task);
       const priority = taskPriority(task);
-      return `<tr data-task-id="${escapeHtml(taskId(task))}"><td><span class="task-title"><strong>${escapeHtml(text(task.title, 180) || 'Untitled task')}</strong><small class="task-priority task-priority--${escapeHtml(priority)}">${escapeHtml(PRIORITY_LABELS[priority])}</small></span></td><td>${escapeHtml(relatedLabel(task))}</td><td><span class="${isOverdue(task) ? 'task-due--overdue' : ''}">${escapeHtml(formatDue(task))}</span></td><td>${escapeHtml(assignedName(task))}</td><td><button type="button" class="button task-status-action" data-task-status="${status === 'completed' ? 'open' : 'completed'}">${status === 'completed' ? 'Reopen' : 'Complete'}</button></td></tr>`;
+      return `<tr data-task-id="${escapeHtml(taskId(task))}"><td><span class="task-title"><strong>${escapeHtml(text(task.title, 180) || 'Untitled task')}</strong><small class="task-priority task-priority--${escapeHtml(priority)}">${escapeHtml(PRIORITY_LABELS[priority])}</small></span></td><td>${escapeHtml(relatedLabel(task))}</td><td><span class="${isOverdue(task) ? 'task-due--overdue' : ''}">${escapeHtml(formatDue(task))}</span></td><td>${escapeHtml(assignedName(task))}</td><td><button type="button" class="button task-status-action" data-task-status="${status === 'completed' ? 'open' : 'completed'}">${status === 'completed' ? 'Reopen' : 'Complete'}</button> <button type="button" class="button" data-activity-kind="task" data-activity-id="${escapeHtml(taskId(task))}" aria-label="Activity for ${escapeHtml(text(task.title,180))}">History</button></td></tr>`;
     }).join('');
   }
 

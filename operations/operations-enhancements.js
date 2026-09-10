@@ -605,6 +605,8 @@
   window.soroRemoveOwnProfileManagementActions = removeOwnProfileManagementActions;
 
   render = function () {
+    window.SoroWorkLog?.unmount?.();
+    window.SoroActivityHistory?.unmount?.();
     window.SoroReports?.unmount?.();
     window.SoroFeedback?.unmount?.();
     window.SoroDocumentCenter?.unmount?.();

@@ -1,6 +1,6 @@
 (function(root,factory){const api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.SoroFeedback=api;}(typeof globalThis!=='undefined'?globalThis:this,function(root){
   'use strict';
-  const TYPES={suggestion:'Suggestion',experience:'Something could be easier',general:'General feedback'};
+  const TYPES={suggestion:'Suggestion',experience:'Usability improvement',general:'General feedback'};
   const ROLES=['admin','sales','sales_management','talent_management','billing','client_admin','client_reviewer','client_billing','virtual_assistant'];
   const ROLE_LABELS={admin:'Admin',sales:'Sales',sales_management:'Sales Management',talent_management:'Talent Management',billing:'Billing',client_admin:'Client',client_reviewer:'Client',client_billing:'Client',virtual_assistant:'Talent'};
   const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));

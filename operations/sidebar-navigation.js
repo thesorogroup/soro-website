@@ -3,7 +3,7 @@
   const GROUPS=[
     {id:'clients',label:'Clients & matching',views:['clients','client-shortlists']},
     {id:'talent',label:'Talent',views:['vas','available-talent','talent-review']},
-    {id:'operations',label:'Operations',views:['placements','documents','reports']},
+    {id:'operations',label:'Operations',views:['placements','work-log','documents','reports']},
     {id:'administration',label:'Administration',views:['employees','payroll','talent-payout-review']}
   ];
   let nav,scroll,footer,observer,lastScope='',lastView='',scheduled=false;

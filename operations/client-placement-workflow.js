@@ -719,6 +719,7 @@
       <header><div><p class="cpw-eyebrow">${clientSafe ? 'Placement' : 'Onboarding'}</p><h3>${escapeHtml(candidate ? candidateName(candidate) : 'Selected talent')}</h3></div>${statusPill(placement.status)}</header>
       <div class="cpw-placement__facts"><span><strong>Start date</strong>${escapeHtml(formatDate(placement.startDate))}</span><span><strong>Schedule</strong>${escapeHtml(placement.scheduleSummary || 'To be confirmed')}</span></div>
       ${checklist}
+      ${!mountedOptions.adapter ? `<p><button type="button" class="button ah-record-action" data-activity-kind="placement" data-activity-id="${escapeHtml(placement.placementId)}">Activity History</button></p>` : ''}
       ${!clientSafe && workspace.permissions.manageOnboarding && !mountedOptions.adapter && root.SoroTalentHealthcare?.liveAllowed() && ['admin','talent_management'].includes(root.soroCurrentAccess?.role) ? `<div data-cpw-healthcare="${escapeHtml(placement.placementId)}" data-healthcare-applicant="${escapeHtml(placement.applicantId)}"></div>` : ''}
       ${workspace.permissions.manageOnboarding && placement.status === 'onboarding' ? `<div class="cpw-activation"><button type="button" class="cpw-button cpw-button--primary" data-cpw-direct="activate_placement" data-placement-id="${escapeHtml(placement.placementId)}" ${canActivate ? '' : 'disabled'}>Activate placement</button>${requiredPending ? '<small>Complete every required onboarding item first.</small>' : beforeStart ? '<small>Activation becomes available on the start date.</small>' : ''}</div>` : ''}
     </article>`;
