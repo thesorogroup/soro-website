@@ -1,9 +1,9 @@
 (function(root,factory){const api=factory(root);if(typeof module==='object'&&module.exports)module.exports=api;if(root)root.SoroSidebarNavigation=api;}(typeof globalThis!=='undefined'?globalThis:this,function(root){
   'use strict';
   const GROUPS=[
-    {id:'clients',label:'Clients & matching',views:['clients','client-shortlists']},
-    {id:'talent',label:'Talent',views:['vas','available-talent','talent-review']},
-    {id:'operations',label:'Operations',views:['placements','work-log','documents','reports']},
+    {id:'clients',label:'Client Management',views:['clients','client-shortlists','placements']},
+    {id:'talent',label:'Talent',views:['vas','available-talent','talent-review','work-log']},
+    {id:'operations',label:'Operations',views:['documents','reports']},
     {id:'administration',label:'Administration',views:['employees','payroll','talent-payout-review']}
   ];
   let nav,scroll,footer,observer,lastScope='',lastView='',scheduled=false;
@@ -25,7 +25,7 @@
     footer=root.document.createElement('div');footer.className='sidebar-nav-footer';footer.id='sidebar-nav-footer';
     const buttons=[...nav.querySelectorAll('.nav-link')];
     const grouped=new Set(GROUPS.flatMap(g=>g.views));
-    buttons.filter(b=>!grouped.has(b.dataset.view)&&!['my-profile','feedback'].includes(b.dataset.view)&&b.id!=='founder-account-nav').forEach(b=>primary.append(b));
+    buttons.filter(b=>!grouped.has(b.dataset.view)&&!['my-profile','feedback','help'].includes(b.dataset.view)&&b.id!=='founder-account-nav').forEach(b=>primary.append(b));
     scroll.append(primary);
     GROUPS.forEach(config=>{
       const section=root.document.createElement('details');section.className='sidebar-nav-group';section.dataset.navGroup=config.id;
@@ -34,6 +34,7 @@
       section.addEventListener('toggle',()=>{refreshBadges();if(lastScope)try{root.localStorage.setItem(`soro-nav:${lastScope}:${config.id}`,String(section.open));}catch{}});
       scroll.append(section);
     });
+    const support=buttons.find(b=>b.dataset.view==='help');if(support)scroll.append(support);
     buttons.filter(b=>b.dataset.view==='my-profile'||b.id==='founder-account-nav').forEach(b=>footer.append(b));
     const feedback=buttons.find(b=>b.dataset.view==='feedback');if(feedback)footer.append(feedback);
     nav.append(scroll,footer);nav.classList.add('is-organized');

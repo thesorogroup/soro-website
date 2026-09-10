@@ -4,6 +4,9 @@
 [functions."portal-confirmations"]
   schedule = "* * * * *"
 
+[functions."interview-follow-through"]
+  schedule = "* * * * *"
+
 [[redirects]]
   from = "/about-us/"
   to = "/about-us.html"

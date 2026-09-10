@@ -20,7 +20,7 @@ test('review action row shares a flexible height without changing dropdown actio
   assert.match(css,/\.talent-review-action-divider \{ align-self: center/);
   assert.match(css,/\.talent-review-secondary\[open\] > summary::after/);
   assert.match(css,/@media \(max-width: 430px\)[\s\S]*\.talent-review-verification \{ flex: 1 1 100%; \}/);
-  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260910-interview-attendees/);
+  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260910-interview-follow-through/);
 });
 
 const APPLICANT_KEYS = Object.freeze([

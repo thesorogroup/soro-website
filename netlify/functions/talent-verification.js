@@ -27,6 +27,7 @@ const ATTEMPT_RESULTS = new Set(['reached', 'no_answer', 'voicemail', 'wrong_num
 const ACTIONS = new Set([
   'schedule_interview',
   'reschedule_interview',
+  'schedule_follow_up_interview',
   'cancel_interview',
   'record_interview_outcome',
   'retry_calendar_sync',
@@ -38,6 +39,7 @@ const ACTIONS = new Set([
 const ACTION_KEYS = Object.freeze({
   schedule_interview: ['action', 'requestId', 'applicantId', 'expectedUpdatedAt', 'startsAt', 'durationMinutes', 'timezone', 'interviewerUserId'],
   reschedule_interview: ['action', 'requestId', 'applicantId', 'expectedUpdatedAt', 'interviewId', 'startsAt', 'durationMinutes', 'timezone', 'interviewerUserId'],
+  schedule_follow_up_interview: ['action', 'requestId', 'applicantId', 'expectedUpdatedAt', 'interviewId', 'startsAt', 'durationMinutes', 'timezone', 'interviewerUserId'],
   cancel_interview: ['action', 'requestId', 'applicantId', 'expectedUpdatedAt', 'interviewId', 'note'],
   record_interview_outcome: [
     'action', 'requestId', 'applicantId', 'expectedUpdatedAt', 'interviewId', 'status', 'outcome',
@@ -307,8 +309,8 @@ function inputEmail(value) {
 
 function actionPayload(body, action) {
   const payload = {};
-  if (action === 'schedule_interview' || action === 'reschedule_interview') {
-    payload.interviewId = action === 'reschedule_interview' ? inputUuid(body.interviewId, 'interview') : null;
+  if (['schedule_interview', 'reschedule_interview', 'schedule_follow_up_interview'].includes(action)) {
+    payload.interviewId = action !== 'schedule_interview' ? inputUuid(body.interviewId, 'interview') : null;
     payload.startsAt = inputTimestamp(body.startsAt, 'interview start time');
     if (Date.parse(payload.startsAt) <= Date.now() + 60 * 1000) {
       throw httpError(400, 'invalid_request', 'Choose an interview time in the future.');
@@ -624,6 +626,7 @@ function publicInterview(value) {
   };
   return {
     interviewId: requiredUuid(value.interviewId),
+    roundNumber: Math.max(1, Number(value.roundNumber) || 1),
     status,
     startsAt: nullableTimestamp(value.startsAt),
     endsAt: nullableTimestamp(value.endsAt),
@@ -668,6 +671,7 @@ function publicPayload(value) {
       blockers: value.gate.blockers.map(item => requiredText(item, 100))
     },
     interview: publicInterview(value.interview),
+    interviewHistory: (Array.isArray(value.interviewHistory) ? value.interviewHistory : []).map(item => ({...publicInterview(item), calendar: {status: 'not_applicable', joinUrl: null}})),
     availableAttendees: (value.availableAttendees || []).map(person => ({ id: requiredUuid(person.id), name: requiredText(person.name, 180), role: requiredText(person.role, 40) })),
     interviewers: value.interviewers.map(interviewer => ({
       id: requiredUuid(interviewer.id),
@@ -727,7 +731,7 @@ async function mutateVerification(event) {
   const body = parseBody(event);
   const action = String(body.action || '').trim().toLowerCase();
   if (!ACTIONS.has(action)) throw httpError(400, 'unsupported_action', 'Choose a supported verification action.');
-  const withAttendees = ['schedule_interview', 'reschedule_interview'].includes(action) && Object.hasOwn(body, 'additionalAttendeeUserIds');
+  const withAttendees = ['schedule_interview', 'reschedule_interview', 'schedule_follow_up_interview'].includes(action) && Object.hasOwn(body, 'additionalAttendeeUserIds');
   if (!hasExactKeys(body, withAttendees ? [...ACTION_KEYS[action], 'additionalAttendeeUserIds'] : ACTION_KEYS[action])) {
     throw httpError(400, 'unsupported_scope', 'Only the fields required for this verification action are accepted.');
   }
@@ -735,7 +739,7 @@ async function mutateVerification(event) {
   const applicantId = inputUuid(body.applicantId, 'Talent application');
   const expectedUpdatedAt = inputTimestamp(body.expectedUpdatedAt, 'last update time', action === 'schedule_interview' || (action === 'save_reference' && body.referenceId === null));
   const payloadInput = actionPayload(body, action);
-  if (['schedule_interview', 'reschedule_interview', 'cancel_interview', 'record_interview_outcome', 'retry_calendar_sync'].includes(action)) {
+  if (['schedule_interview', 'reschedule_interview', 'schedule_follow_up_interview', 'cancel_interview', 'record_interview_outcome', 'retry_calendar_sync'].includes(action)) {
     payloadInput.calendarOrganizer = graphConfigured() ? GRAPH_ORGANIZER : null;
   }
   const user = await authenticatedUser(event);

@@ -147,7 +147,7 @@ test('public response is allowlisted, exposes eligible interviewer names but no 
   const payload = bodyOf(result);
   assert.equal(result.statusCode, 200);
   assert.deepEqual(Object.keys(payload).sort(), [
-    'applicant', 'availableAttendees', 'calendarIntegration', 'gate', 'generatedAt', 'interview', 'interviewers', 'references', 'viewerRole'
+    'applicant', 'availableAttendees', 'calendarIntegration', 'gate', 'generatedAt', 'interview', 'interviewHistory', 'interviewers', 'references', 'viewerRole'
   ].sort());
   assert.deepEqual(payload.interviewers, [{ id: interviewerId, name: 'Jordan Reed' }]);
   assert.deepEqual(payload.calendarIntegration, { configured: true, organizerLabel: 'Soro Talent Interviews' });

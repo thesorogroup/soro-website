@@ -353,6 +353,7 @@
     if (source.calendar?.joinUrl && !joinUrl) return null;
     return Object.freeze({
       interviewId, status, startsAt, endsAt, timezone, updatedAt,
+      roundNumber: Math.max(1, Number(source.roundNumber) || 1),
       interviewer: Object.freeze({ id: interviewerId, name: interviewerName }),
       additionalAttendees,
       outcome: outcome || '', scorecard, notes: text(source.notes, 4000),
@@ -408,7 +409,9 @@
     if (!Array.isArray(payload.references) || payload.references.length > 20) throw new Error('The verification response contained an invalid reference list.');
     const references = payload.references.map(normalizeReference);
     if (references.some(item => !item) || new Set(references.map(item => item.referenceId)).size !== references.length) throw new Error('The verification response contained an invalid reference record.');
-    return Object.freeze({ generatedAt, viewerRole, applicant, gate, interview, references: Object.freeze(references), interviewers, availableAttendees, calendarIntegration });
+    const interviewHistory = (Array.isArray(payload.interviewHistory) ? payload.interviewHistory : []).map(normalizeInterview);
+    if (interviewHistory.some(item => !item)) throw new Error('Interview history could not be verified.');
+    return Object.freeze({ generatedAt, viewerRole, applicant, gate, interview, interviewHistory: Object.freeze(interviewHistory), references: Object.freeze(references), interviewers, availableAttendees, calendarIntegration });
   }
 
   function currentQueue() {
@@ -566,7 +569,7 @@
       if (!startsAt || !Number.isInteger(durationMinutes) || durationMinutes < 15 || durationMinutes > 240 || !interviewerUserId) throw new Error('Add a valid interview date, duration, time zone, and interviewer.');
       return Object.freeze({ ...base, startsAt, durationMinutes, timezone, interviewerUserId, ...attendeeSelection(values) });
     }
-    if (normalizedAction === 'reschedule_interview') {
+    if (['reschedule_interview', 'schedule_follow_up_interview'].includes(normalizedAction)) {
       const base = verificationRequestBase(normalizedAction, applicantId, values.expectedUpdatedAt);
       const interviewId = validUuid(values.interviewId);
       const startsAt = validTimestamp(values.startsAt);
@@ -907,9 +910,9 @@
     </fieldset>`;
   }
 
-  function scheduleFormMarkup(data, interview = null) {
-    const action = interview ? 'reschedule_interview' : 'schedule_interview';
-    const title = interview ? 'Reschedule appointment' : 'Schedule interview';
+  function scheduleFormMarkup(data, interview = null, followUp = false) {
+    const action = followUp ? 'schedule_follow_up_interview' : interview ? 'reschedule_interview' : 'schedule_interview';
+    const title = followUp ? 'Schedule follow-up interview' : interview ? 'Reschedule appointment' : 'Schedule interview';
     const interviewerUserId = actualUserId();
     const selectedInterviewerId = interview?.interviewer?.id || (data.interviewers.some(item => item.id === interviewerUserId) ? interviewerUserId : data.interviewers[0]?.id || interviewerUserId);
     const interviewerControl = data.interviewers.length
@@ -922,7 +925,7 @@
       <h4>${title}</h4>
       <div class="talent-verification-integration-note ${data.calendarIntegration.configured ? 'is-connected' : 'is-unconfigured'}">${calendarCopy}</div>
       <div class="talent-verification-form-grid">
-        <label><span>Date and time</span><input type="datetime-local" name="startsAt" value="${escapeHtml(dateTimeLocalValue(interview?.startsAt, interview?.timezone))}" required></label>
+        <label><span>Date and time</span><input type="datetime-local" name="startsAt" value="${followUp ? '' : escapeHtml(dateTimeLocalValue(interview?.startsAt, interview?.timezone))}" required></label>
         <label><span>Duration</span><select name="durationMinutes" required><option value="30"${interviewDuration(interview) === 30 ? ' selected' : ''}>30 minutes</option><option value="45"${interviewDuration(interview) === 45 ? ' selected' : ''}>45 minutes</option><option value="60"${interviewDuration(interview) === 60 ? ' selected' : ''}>60 minutes</option><option value="90"${interviewDuration(interview) === 90 ? ' selected' : ''}>90 minutes</option></select></label>
         <label class="talent-verification-field-wide"><span>Time zone</span><input type="text" name="timezone" maxlength="80" value="${escapeHtml(interview?.timezone || defaultTimezone())}" required></label>
         ${interviewerControl}
@@ -956,6 +959,7 @@
     const interview = data.interview;
     if (!interview) return `<section class="talent-verification-section"><div class="talent-verification-section-heading"><div><p class="eyebrow">Internal interview</p><h3>No interview scheduled</h3></div><span class="talent-verification-state is-open">Action needed</span></div>${scheduleFormMarkup(data)}</section>`;
     const terminal = ['completed', 'no_show', 'waived'].includes(interview.status);
+    const followUp = interview.status === 'no_show' || (interview.status === 'completed' && interview.outcome === 'follow_up');
     return `<section class="talent-verification-section">
       <div class="talent-verification-section-heading"><div><p class="eyebrow">Internal interview</p><h3>${escapeHtml(humanLabel(interview.status))}</h3></div><span class="talent-verification-state is-${escapeHtml(interview.status)}">${escapeHtml(humanLabel(interview.status))}</span></div>
       <div class="talent-verification-interview-summary"><div><small>Appointment</small><strong>${escapeHtml(formatDateTime(interview.startsAt, interview.timezone))}</strong></div><div><small>Interviewer</small><strong>${escapeHtml(interview.interviewer.name)}</strong></div>${interview.outcome ? `<div><small>Recommendation</small><strong>${escapeHtml(humanLabel(interview.outcome))}</strong></div>` : ''}</div>
@@ -965,8 +969,15 @@
       ${interview.notes ? `<div class="talent-verification-private-note"><strong>Internal note</strong><p>${escapeHtml(interview.notes)}</p></div>` : ''}
       ${interview.status === 'scheduled' ? `<div class="talent-verification-control-grid"><details><summary>Reschedule</summary>${scheduleFormMarkup(data, interview)}</details><details><summary>Complete or waive</summary>${outcomeFormMarkup(interview)}</details><details><summary>Cancel appointment</summary><form class="talent-verification-form" data-verification-form="cancel_interview"><label><span>Internal cancellation note</span><textarea name="note" maxlength="1000" required placeholder="Why is this appointment being cancelled?"></textarea></label><p class="talent-verification-form-note">This internal note is not sent in the calendar cancellation.</p><button type="submit" class="button talent-review-confirm-guarded">Cancel interview</button></form></details></div>` : ''}
       ${interview.status === 'cancelled' ? (interview.calendar.status === 'not_applicable' ? scheduleFormMarkup(data, interview) : '<p class="talent-verification-inline-error">Finish the Microsoft 365 cancellation above before rebooking this interview.</p>') : ''}
-      ${terminal ? '<p class="talent-verification-complete-copy">This interview requirement is addressed. Continue with reference verification below.</p>' : ''}
+      ${followUp ? (['synced', 'not_applicable'].includes(interview.calendar.status) && data.applicant.stage === 'in_review' ? `<details class="talent-interview-follow-up"><summary>Schedule follow-up interview</summary><p>The previous appointment and its result will stay in Interview history. This creates a new invitation.</p>${scheduleFormMarkup(data, interview, true)}</details>` : '<p class="talent-verification-form-note">Complete calendar sync and keep the application in review before scheduling another round.</p>') : terminal ? '<p class="talent-verification-complete-copy">This interview requirement is addressed. Continue with reference verification.</p>' : ''}
+      ${interview.status === 'scheduled' && Date.parse(interview.endsAt) <= Date.now() ? '<p class="talent-interview-result-due" role="status"><strong>Interview result due</strong><br>Record the outcome to complete the interviewer’s follow-up task.</p>' : ''}
+      ${interviewHistoryMarkup(data.interviewHistory)}
     </section>`;
+  }
+
+  function interviewHistoryMarkup(history = []) {
+    if (!history.length) return '';
+    return `<section class="talent-interview-history" aria-label="Interview history"><h4>Interview history</h4><p>Previous rounds are saved for your team. Notes and scores stay private.</p>${[...history].reverse().map(item => `<details><summary><span>Round ${escapeHtml(item.roundNumber)} · ${escapeHtml(humanLabel(item.status))}</span><small>${escapeHtml(formatDateTime(item.startsAt, item.timezone))}</small></summary><div class="talent-interview-history-body"><p><strong>Interviewer:</strong> ${escapeHtml(item.interviewer.name)}</p>${item.additionalAttendees.length ? `<p><strong>Also invited:</strong> ${item.additionalAttendees.map(person => escapeHtml(person.name)).join(', ')}</p>` : ''}${item.outcome ? `<p><strong>Recommendation:</strong> ${escapeHtml(humanLabel(item.outcome))}</p>` : ''}${scorecardMarkup(item.scorecard)}${item.notes ? `<p>${escapeHtml(item.notes)}</p>` : ''}</div></details>`).join('')}</section>`;
   }
 
   function referenceOutcomeLabel(reference) {
@@ -1140,7 +1151,7 @@
   async function loadVerification(applicantId, { preserveStatus = false, mode = verificationContext?.mode || 'verification' } = {}) {
     if (pendingVerificationAction) return false;
     if (!canOpenForRole()) return false;
-    const applicant = findApplicant(applicantId);
+    const applicant = findApplicant(applicantId) || (mode === 'interview' && validUuid(applicantId) ? {applicantId: validUuid(applicantId)} : null);
     if (!applicant) return false;
     const version = ++verificationRequestVersion;
     verificationContext = Object.freeze({ applicantId: applicant.applicantId, mode, phase: 'loading', data: preserveStatus ? verificationContext?.data || null : null, error: '', status: '', statusType: '' });
@@ -1218,6 +1229,14 @@
     return true;
   }
 
+  async function openInterviewFromTask(applicantId) {
+    if (!mountedRoot || !validUuid(applicantId) || !canOpenForRole() || pendingVerificationAction) return false;
+    const loaded = await loadVerification(applicantId, {mode:'interview'});
+    const result = mountedRoot?.querySelector?.('[data-verification-form="record_interview_outcome"]')?.closest('details');
+    if (loaded && result) result.open=true;
+    return loaded;
+  }
+
   function closeVerification() {
     if (pendingVerificationAction) return false;
     stopResumeViewer();
@@ -1266,7 +1285,7 @@
     if (!verificationContext?.data || !canOpenForRole()) throw new Error('Refresh this verification record and try again.');
     const context = verificationContext, version = verificationRequestVersion;
     const body = buildVerificationAction(action, { applicantId: context.applicantId, ...values });
-    if (['schedule_interview', 'reschedule_interview'].includes(body.action) && !verificationContext.data.interviewers.some(item => item.id === body.interviewerUserId)) {
+    if (['schedule_interview', 'reschedule_interview', 'schedule_follow_up_interview'].includes(body.action) && !verificationContext.data.interviewers.some(item => item.id === body.interviewerUserId)) {
       throw new Error('Choose an eligible interviewer from the current staff list.');
     }
     if (body.additionalAttendeeUserIds?.some(id => !context.data.availableAttendees.some(person => person.id === id))) {
@@ -1300,7 +1319,7 @@
   }
 
   function verificationProgressLabel(action) {
-    return ({schedule_interview:'Scheduling interview…',reschedule_interview:'Rescheduling interview…',cancel_interview:'Cancelling interview…',retry_calendar_sync:'Updating interview calendar…',record_interview_outcome:'Saving interview outcome…'})[action] || 'Saving reference verification…';
+    return ({schedule_interview:'Scheduling interview…',reschedule_interview:'Rescheduling interview…',schedule_follow_up_interview:'Scheduling follow-up interview…',cancel_interview:'Cancelling interview…',retry_calendar_sync:'Updating interview calendar…',record_interview_outcome:'Saving interview outcome…'})[action] || 'Saving reference verification…';
   }
 
   function findApplicant(applicantId) {
@@ -1515,9 +1534,9 @@
     const referenceId = form.closest?.('[data-verification-reference]')?.dataset.verificationReference || '';
     const reference = referenceId ? verificationContext.data.references.find(item => item.referenceId === referenceId) : null;
     let bodyValues = {};
-    if (action === 'schedule_interview' || action === 'reschedule_interview') {
+    if (['schedule_interview', 'reschedule_interview', 'schedule_follow_up_interview'].includes(action)) {
       bodyValues = {
-        ...(action === 'reschedule_interview' ? { interviewId: interview?.interviewId, expectedUpdatedAt: interview?.updatedAt } : {}),
+        ...(action !== 'schedule_interview' ? { interviewId: interview?.interviewId, expectedUpdatedAt: interview?.updatedAt } : {}),
         startsAt: zonedLocalToIso(values.startsAt, values.timezone), durationMinutes: values.durationMinutes,
         timezone: values.timezone, interviewerUserId: values.interviewerUserId,
         additionalAttendeeUserIds: [...form.querySelectorAll('[name="additionalAttendeeUserId"]:checked')].map(input => input.value)
@@ -1736,6 +1755,7 @@
     setSort,
     openResume,
     openVerification,
+    openInterviewFromTask,
     changeApplicant,
     refresh,
     mount,

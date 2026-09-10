@@ -40,13 +40,30 @@ test('Every existing portal gets Feedback without changing any other role permis
 });
 test('Menus preserve route identities and keep utilities separate from scrolling groups',()=>{
  const all=nav.GROUPS.flatMap(g=>g.views);assert.equal(new Set(all).size,all.length);
- assert.deepEqual(nav.GROUPS.find(g=>g.id==='talent').views,['vas','available-talent','talent-review']);
+ assert.deepEqual(nav.GROUPS.find(g=>g.id==='talent').views,['vas','available-talent','talent-review','work-log']);
  assert.doesNotMatch(JSON.stringify(nav.GROUPS),/feedback|my-profile|tasks|overview/);
  const source=read('operations/sidebar-navigation.js');assert.match(source,/badge\.hidden=!count\|\|group\.open/);assert.match(source,/links\.some\(b=>!b\.hidden\)/);
  assert.match(source,/links\.some\(b=>!b\.hidden&&b\.classList\.contains\('active'\)\)/);
  assert.match(read('operations/sidebar-theme.css'),/sidebar-nav-scroll \{flex:1 1 auto;min-height:0;overflow-y:auto/);
  assert.match(read('operations/sidebar-theme.css'),/sidebar-nav-footer \{flex:0 0 auto/);
  assert.match(read('operations/staff-account.js'),/footer\.insertBefore\(item,document\.getElementById\('feedback-nav'\)\)/);
+});
+
+test('Sidebar places client and talent work in their groups, with support after Administration',()=>{
+ assert.deepEqual(nav.GROUPS.find(g=>g.id==='clients'),{id:'clients',label:'Client Management',views:['clients','client-shortlists','placements']});
+ assert.deepEqual(nav.GROUPS.find(g=>g.id==='operations').views,['documents','reports']);
+ assert.equal(nav.GROUPS.at(-1).id,'administration');
+ const source=read('operations/sidebar-navigation.js'),html=read('operations/index.html');
+ assert.match(source,/!\['my-profile','feedback','help'\]\.includes\(b\.dataset\.view\)/);
+ assert(source.indexOf('scroll.append(support)')>source.indexOf('scroll.append(section)'));
+ assert(source.indexOf('scroll.append(support)')<source.indexOf('nav.append(scroll,footer)'));
+ assert.doesNotMatch(source,/support\.hidden\s*=/,'Moving support must not change its role visibility');
+ const menu=html.match(/<nav id="main-nav">([\s\S]*?)<\/nav>/)[1];
+ assert(menu.indexOf('data-view="placements"')<menu.indexOf('data-view="vas"'));
+ assert(menu.indexOf('data-view="work-log"')>menu.indexOf('data-view="talent-review"'));
+ assert(menu.indexOf('data-view="help"')>menu.indexOf('data-view="talent-payout-review"'));
+ const labels=[...nav.GROUPS.map(g=>g.label),...Array.from(menu.matchAll(/<button[^>]*>([\s\S]*?)<\/button>/g),m=>m[1].replace(/<b\b[^>]*>[\s\S]*?<\/b>/g,'').replace(/<[^>]+>/g,'').replace(/&amp;/g,'&').trim())];
+ for(const label of labels)for(const word of label.split(/\s+/).filter(w=>/[A-Za-z]/.test(w)))assert.match(word,/^[A-Z]/,label+' must use Title Case');
 });
 test('Feedback navigation cleans up before outer views and blocks workspace-preview writes',()=>{
  const source=read('operations/operations.js'),uiSource=read('operations/feedback.js');

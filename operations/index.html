@@ -41,7 +41,7 @@
     <link rel="stylesheet" href="admin-payroll.css?v=20260830-payroll-payouts" />
     <link rel="stylesheet" href="active-talent-today.css?v=20260829-active-talent-today" />
     <link rel="stylesheet" href="talent-time-off.css?v=20260829-talent-time-off" />
-    <link rel="stylesheet" href="talent-review-queue.css?v=20260910-interview-attendees" />
+    <link rel="stylesheet" href="talent-review-queue.css?v=20260910-interview-follow-through" />
     <link rel="stylesheet" href="staff-account.css?v=20260909-ownership-spacing" />
     <link rel="stylesheet" href="available-talent-bench.css?v=20260901-available-talent-bench" />
     <link rel="stylesheet" href="client-shortlist-workflow.css?v=20260908-shortlist-emails" />
@@ -110,20 +110,20 @@
           <button class="nav-link" id="talent-my-profile-nav" data-view="talent-my-profile" hidden>My Profile</button>
           <button class="nav-link" id="client-talent-profile-nav" data-view="client-talent-profile" hidden>Talent Profile</button>
           <button class="nav-link" id="client-account-settings-nav" data-view="my-profile" hidden>Account Settings</button>
-          <button class="nav-link" id="work-log-nav" data-view="work-log" hidden>Work Log</button>
           <button class="nav-link" id="my-tasks-nav" data-view="tasks">My Tasks <b id="my-tasks-count" hidden>0</b></button>
-          <button class="nav-link" id="support-tickets-nav" data-view="help" hidden>Support Tickets</button>
           <button class="nav-link" data-view="clients">Clients</button>
           <button class="nav-link" id="client-shortlists-nav" data-view="client-shortlists" hidden>Shortlists <b id="client-shortlists-count" hidden>0</b></button>
+          <button class="nav-link" data-view="placements">Placements</button>
           <button class="nav-link" data-view="vas">Talent</button>
           <button class="nav-link" id="available-talent-nav" data-view="available-talent" hidden>Available Talent</button>
           <button class="nav-link" id="talent-review-nav" data-view="talent-review" hidden><span>Talent Review Queue</span><b id="talent-review-count" hidden>0</b></button>
-          <button class="nav-link" data-view="placements">Placements</button>
+          <button class="nav-link" id="work-log-nav" data-view="work-log" hidden>Work Log</button>
           <button class="nav-link" data-view="documents">Documents</button>
           <button class="nav-link" data-view="reports">Reports</button>
           <button class="nav-link" id="employees-nav" data-view="employees" hidden>Employees</button>
           <button class="nav-link" id="payroll-nav" data-view="payroll" hidden>Payroll &amp; Payouts</button>
           <button class="nav-link" id="talent-payout-review-nav" data-view="talent-payout-review" hidden>Talent Payout Review</button>
+          <button class="nav-link" id="support-tickets-nav" data-view="help" hidden>Support Tickets</button>
           <button class="nav-link" id="feedback-nav" data-view="feedback" hidden>Feedback</button>
         </nav>
         <button class="profile" id="role-switcher" aria-label="Change sample workspace"><span class="avatar">MJ</span><span><strong>Matt Johnson</strong><small id="role-label">Administrator</small></span><i>⌄</i></button>
@@ -158,8 +158,8 @@
     <script src="talent-time-off.js?v=20260829-talent-time-off"></script>
     <script src="private-pdf-viewer.js?v=20260909-private-pdf"></script>
     <script src="talent-review-evidence.js?v=20260909-full-catalog"></script>
-    <script src="talent-review-queue.js?v=20260910-interview-attendees"></script>
-    <script src="task-center.js?v=20260909-activity"></script>
+    <script src="talent-review-queue.js?v=20260910-interview-follow-through"></script>
+    <script src="task-center.js?v=20260910-interview-follow-through"></script>
     <script src="global-search.js?v=20260901-global-search"></script>
     <script src="available-talent-bench.js?v=20260901-available-talent-bench"></script>
     <script src="client-shortlist-workflow.js?v=20260908-shortlist-emails"></script>
@@ -170,11 +170,11 @@
     <script src="sales-lifecycle-tracker.js?v=20260907-sales-tracker"></script>
     <script src="client-dashboard.js?v=20260909-work-log"></script>
     <script src="document-center.js?v=20260908-document-center"></script>
-    <script src="sidebar-navigation.js?v=20260909-work-log"></script>
+    <script src="sidebar-navigation.js?v=20260910-menu-groups"></script>
     <script src="feedback.js?v=20260909-usability-label"></script>
     <script src="report-definitions.js?v=20260909-real-reports"></script>
     <script src="reports.js?v=20260909-activity"></script>
-    <script src="operations.js?v=20260910-offboarding"></script>
+    <script src="operations.js?v=20260910-interview-follow-through"></script>
     <script src="page-task-action.js?v=20260909-all-pages"></script>
     <script src="talent-directory-filters.js?v=20260909-full-catalog"></script>
     <script src="talent-skill-editor.js?v=20260909-full-catalog"></script>

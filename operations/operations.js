@@ -755,7 +755,7 @@ window.addEventListener('soro:active-talent-open-profile',event=>{
   if(!window.soroActiveTalentToday?.canLoadForRole(actualAuthenticatedRole())||!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(applicantId))return;
   openTalentProfile(applicantId);
 });
-window.addEventListener('soro:talent-review-open-queue',()=>{
+window.addEventListener('soro:talent-review-open-queue',event=>{
   if(!viewAllowedForAuthenticatedRole('talent-review'))return;
   current='talent-review';
   selectedTalentId=null;
@@ -763,6 +763,7 @@ window.addEventListener('soro:talent-review-open-queue',()=>{
   setActive();
   render();
   document.querySelector('.sidebar')?.classList.remove('open');
+  if(event.detail?.interviewApplicantId)window.soroTalentReviewQueue?.openInterviewFromTask?.(event.detail.interviewApplicantId);
 });
 window.addEventListener('soro:talent-review-open-profile',event=>{
   const applicantId=String(event.detail?.applicantId||'');

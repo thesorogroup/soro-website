@@ -548,7 +548,7 @@
   .talent-review-action-divider { display: none; }
   .talent-review-action { flex: 1; }
   .talent-review-secondary { align-self: flex-end; }
-  .talent-verification-dialog { width: 100vw; border-radius: 0; }
+  .talent-verification-dialog, .talent-verification-dialog.has-resume { left: 0; right: 0; width: auto; max-width: none; border-radius: 0; }
   .talent-verification-header { padding: 20px 18px 16px; }
   .talent-verification-body { padding: 16px 14px 28px; }
   .talent-verification-gate { grid-template-columns: 1fr; }
@@ -594,3 +594,12 @@
 .talent-interview-attendee-list span { overflow-wrap: anywhere; font-size: 14px; }
 .talent-interview-attendee-list small { display: block; color: #9a4e24; margin-top: 3px; }
 .talent-interview-attendees [data-attendee-count] { display: block; margin-top: 10px; color: #59718a; }
+/* Interview follow-through uses the existing private interview workspace. */
+.talent-interview-follow-up,.talent-interview-history { margin-top:24px; border-top:1px solid #d8e3ef; padding-top:20px; }
+.talent-interview-follow-up>summary { display:list-item; width:fit-content; color:#123b65; font-weight:600; cursor:pointer; padding:12px 16px; border:1px solid #b7cce2; border-radius:8px; background:#f4f8fc; font-size:14px; }
+.talent-interview-follow-up>p,.talent-interview-history>p { color:#526b85; line-height:1.6; font-size:14px; }
+.talent-interview-history>details { margin-top:10px; border:1px solid #d8e3ef; border-radius:10px; overflow:hidden; }
+.talent-interview-history summary { padding:14px 16px; cursor:pointer; color:#123b65; font-size:14px; }
+.talent-interview-history summary small { display:block; padding-top:6px; color:#526b85; font-size:13px; }
+.talent-interview-history-body { padding:0 16px 16px; font-size:16px; line-height:1.6; }
+.talent-interview-result-due { padding:14px 16px; border-left:3px solid #e87924; background:#fff6ec; color:#68411b; border-radius:6px; font-size:14px; line-height:1.6; }

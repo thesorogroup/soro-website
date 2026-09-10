@@ -256,6 +256,7 @@ function publicTask(value) {
   if ((task.status === 'completed') !== Boolean(task.completedAt)) {
     throw httpError(502, 'task_service_error', 'My Tasks returned an invalid response.');
   }
+  if(value.source?.kind === 'interview_result') task.source={kind:'interview_result',applicantId:requiredUuid(value.source.applicantId),interviewId:requiredUuid(value.source.interviewId)};
   return task;
 }
 

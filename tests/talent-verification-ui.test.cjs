@@ -226,7 +226,7 @@ test('verification drawer remains scrollable and responsive without widening the
   const css = cssSource();
   assert.match(css, /\.talent-verification-dialog\s*\{[^}]*width:\s*min\(920px,\s*100vw\)/s);
   assert.match(css, /\.talent-verification-body\s*\{[^}]*overflow-y:\s*auto/s);
-  assert.match(css, /@media \(max-width: 720px\)[\s\S]*\.talent-verification-dialog\s*\{[^}]*width:\s*100vw/s);
+  assert.match(css, /@media \(max-width: 720px\)[\s\S]*\.talent-verification-dialog,\s*\.talent-verification-dialog\.has-resume\s*\{[^}]*left:\s*0;\s*right:\s*0;\s*width:\s*auto/s);
   assert.match(css, /\.talent-review-verification\s*\{/);
   assert.doesNotMatch(css, /\.talent-review-card\s*\{[^}]*min-width:\s*[6-9]\d\dpx/s);
 });
