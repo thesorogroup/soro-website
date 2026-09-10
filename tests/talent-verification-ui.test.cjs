@@ -157,6 +157,20 @@ test('local appointment times are converted using the selected IANA time zone', 
   assert.equal(ui.zonedLocalToIso('2026-09-01T10:00', 'Not/A_Timezone'), '');
 });
 
+test('company guest selections are optional, bounded, unique and exclude the primary interviewer', t => {
+  const ui = install(t);
+  const base = { applicantId, expectedUpdatedAt, interviewId, startsAt: '2099-09-02T15:00:00Z', durationMinutes: 30, timezone: 'Asia/Manila', interviewerUserId: interviewerId };
+  for (const action of ['schedule_interview', 'reschedule_interview']) {
+    assert.deepEqual(ui.buildVerificationAction(action, { ...base, additionalAttendeeUserIds: [interviewerId, referenceId, referenceId] }).additionalAttendeeUserIds, [referenceId]);
+    assert.deepEqual(ui.buildVerificationAction(action, { ...base, additionalAttendeeUserIds: [] }).additionalAttendeeUserIds, []);
+    assert.equal(Object.hasOwn(ui.buildVerificationAction(action, base), 'additionalAttendeeUserIds'), false);
+    assert.throws(() => ui.buildVerificationAction(action, { ...base, additionalAttendeeUserIds: ['outside@example.com'] }), /company list/);
+    assert.throws(() => ui.buildVerificationAction(action, { ...base, additionalAttendeeUserIds: Array(51).fill(referenceId) }), /50/);
+  }
+  const result = ui.normalizeVerificationPayload(payload({ availableAttendees: [{id: referenceId, name: 'Sales colleague', email: 'private@example.com'}] }), applicantId, 'admin');
+  assert.deepEqual(result.availableAttendees, [{id: referenceId, name: 'Sales colleague'}]);
+});
+
 test('interview result always requires an internal summary and sends nullable score keys', t => {
   const ui = install(t);
   assert.throws(() => ui.buildVerificationAction('record_interview_outcome', {

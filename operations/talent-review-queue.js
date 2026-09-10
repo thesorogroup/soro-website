@@ -64,6 +64,7 @@
   const evidenceRequests = {skills:0,resume:0};
   let pendingStageAction = false;
   let skillsSaving = false;
+  let pendingVerificationAction = null;
   const verificationGateCache = new Map();
   let feedback = Object.freeze({ type: '', message: '' });
 
@@ -294,9 +295,9 @@
     });
   }
 
-  function normalizeInterviewers(source) {
+  function normalizeInterviewers(source, maximum = 200) {
     if (typeof source === 'undefined' || source === null) return Object.freeze([]);
-    if (!Array.isArray(source) || source.length > 200) return null;
+    if (!Array.isArray(source) || source.length > maximum) return null;
     const interviewers = source.map(item => {
       const id = validUuid(item?.id);
       const name = text(item?.name, 120);
@@ -341,6 +342,8 @@
     const calendarStatus = text(source.calendar?.status, 40).toLowerCase();
     const joinUrl = safeHttpsUrl(source.calendar?.joinUrl);
     const scorecard = normalizeScorecard(source.scorecard);
+    const additionalAttendees = normalizeInterviewers(source.additionalAttendees);
+    if (!additionalAttendees || additionalAttendees.length > 50) return null;
     if (!interviewId || !INTERVIEW_STATUSES.has(status) || !updatedAt || !interviewerName || !CALENDAR_STATUSES.has(calendarStatus)) return null;
     if (interviewerSource?.id && !interviewerId) return null;
     if (source.startsAt && !startsAt) return null;
@@ -351,6 +354,7 @@
     return Object.freeze({
       interviewId, status, startsAt, endsAt, timezone, updatedAt,
       interviewer: Object.freeze({ id: interviewerId, name: interviewerName }),
+      additionalAttendees,
       outcome: outcome || '', scorecard, notes: text(source.notes, 4000),
       calendar: Object.freeze({ status: calendarStatus, joinUrl })
     });
@@ -395,6 +399,8 @@
     const gate = normalizeVerificationGate(payload.gate);
     const interview = normalizeInterview(payload.interview);
     const interviewers = normalizeInterviewers(payload.interviewers);
+    const availableAttendees = normalizeInterviewers(payload.availableAttendees, 10000);
+    if (!availableAttendees) throw new Error('The company attendee list could not be verified.');
     const calendarIntegration = normalizeCalendarIntegration(payload.calendarIntegration);
     if (!generatedAt || !canOpenForRole(viewerRole) || viewerRole !== role || !applicant || !gate || !interviewers || !calendarIntegration || (payload.interview !== null && typeof payload.interview !== 'undefined' && !interview)) throw new Error('Talent verification access could not be verified.');
     const expectedId = validUuid(expectedApplicantId);
@@ -402,7 +408,7 @@
     if (!Array.isArray(payload.references) || payload.references.length > 20) throw new Error('The verification response contained an invalid reference list.');
     const references = payload.references.map(normalizeReference);
     if (references.some(item => !item) || new Set(references.map(item => item.referenceId)).size !== references.length) throw new Error('The verification response contained an invalid reference record.');
-    return Object.freeze({ generatedAt, viewerRole, applicant, gate, interview, references: Object.freeze(references), interviewers, calendarIntegration });
+    return Object.freeze({ generatedAt, viewerRole, applicant, gate, interview, references: Object.freeze(references), interviewers, availableAttendees, calendarIntegration });
   }
 
   function currentQueue() {
@@ -481,9 +487,10 @@
     if (!canOpenForRole()) throw new Error('Only Admin and Talent Management can access Talent verification.');
     const id = validUuid(applicantId);
     if (!id) throw new Error('Choose a valid Talent application and try again.');
-    const scope = accessFingerprint();
+    const scope = accessFingerprint(), ownerVersion = verificationRequestVersion;
     const token = await sessionToken();
     checkRequestScope(scope);
+    if (body && ownerVersion !== verificationRequestVersion) throw new Error('This review changed before the request was sent. Reopen it and try again.');
     const controller = typeof root?.AbortController === 'function' ? new root.AbortController() : null;
     abortVerificationRequest();
     activeVerificationController = controller;
@@ -539,6 +546,14 @@
     return score;
   }
 
+  function attendeeSelection(values) {
+    if (!Object.hasOwn(values, 'additionalAttendeeUserIds')) return {};
+    if (!Array.isArray(values.additionalAttendeeUserIds) || values.additionalAttendeeUserIds.length > 50) throw new Error('Choose up to 50 additional company attendees.');
+    const ids = values.additionalAttendeeUserIds.map(id => validUuid(id));
+    if (ids.some(id => !id)) throw new Error('Choose additional attendees from the company list.');
+    return { additionalAttendeeUserIds: Object.freeze([...new Set(ids)].filter(id => id !== validUuid(values.interviewerUserId)).sort()) };
+  }
+
   function buildVerificationAction(action, values = {}) {
     const normalizedAction = text(action, 50).toLowerCase();
     const applicantId = values.applicantId;
@@ -549,7 +564,7 @@
       const timezone = requiredText(values.timezone, 'Time zone', 80);
       const interviewerUserId = validUuid(values.interviewerUserId);
       if (!startsAt || !Number.isInteger(durationMinutes) || durationMinutes < 15 || durationMinutes > 240 || !interviewerUserId) throw new Error('Add a valid interview date, duration, time zone, and interviewer.');
-      return Object.freeze({ ...base, startsAt, durationMinutes, timezone, interviewerUserId });
+      return Object.freeze({ ...base, startsAt, durationMinutes, timezone, interviewerUserId, ...attendeeSelection(values) });
     }
     if (normalizedAction === 'reschedule_interview') {
       const base = verificationRequestBase(normalizedAction, applicantId, values.expectedUpdatedAt);
@@ -559,7 +574,7 @@
       const timezone = requiredText(values.timezone, 'Time zone', 80);
       const interviewerUserId = validUuid(values.interviewerUserId);
       if (!interviewId || !startsAt || !Number.isInteger(durationMinutes) || durationMinutes < 15 || durationMinutes > 240 || !interviewerUserId) throw new Error('Add a valid interview date, duration, time zone, and interviewer.');
-      return Object.freeze({ ...base, interviewId, startsAt, durationMinutes, timezone, interviewerUserId });
+      return Object.freeze({ ...base, interviewId, startsAt, durationMinutes, timezone, interviewerUserId, ...attendeeSelection(values) });
     }
     if (normalizedAction === 'cancel_interview') {
       const base = verificationRequestBase(normalizedAction, applicantId, values.expectedUpdatedAt);
@@ -877,6 +892,21 @@
     return `<div class="talent-verification-calendar is-${escapeHtml(status)}"><span class="talent-verification-calendar-dot" aria-hidden="true"></span><div><strong>${escapeHtml(copy[0])}</strong><p>${escapeHtml(copy[1])}</p></div><div class="talent-verification-calendar-actions">${interview.calendar.joinUrl ? `<a class="button primary" href="${escapeHtml(interview.calendar.joinUrl)}" target="_blank" rel="noopener noreferrer">Join Teams meeting</a>` : ''}${['pending', 'sync_failed', 'connection_required'].includes(status) ? `<button type="button" class="button" data-verification-quick-action="retry_calendar_sync">${status === 'pending' ? 'Check sync' : 'Retry sync'}</button>` : ''}</div></div>`;
   }
 
+  function attendeePickerMarkup(data, interview, primaryId) {
+    const selected = new Set((interview?.additionalAttendees || []).map(person => person.id));
+    const available = data.availableAttendees || [];
+    const people = [...available, ...(interview?.additionalAttendees || []).filter(person => !available.some(item => item.id === person.id))];
+    return `<fieldset class="talent-interview-attendees talent-verification-field-wide">
+      <legend>Additional attendees <span>(optional)</span></legend>
+      <p>Invite company teammates to join. The applicant and assigned interviewer are already included.</p>
+      ${people.length ? `<label class="talent-interview-attendee-search"><span class="sr-only">Search company attendees</span><input type="search" data-attendee-search placeholder="Search teammates by name" autocomplete="off"></label>
+      <div class="talent-interview-attendee-list">${people.map(person => {
+        const unavailable = !available.some(item => item.id === person.id);
+        return `<label data-attendee-row data-attendee-name="${escapeHtml(person.name.toLowerCase())}"${person.id === primaryId ? ' hidden' : ''}><input type="checkbox" name="additionalAttendeeUserId" value="${escapeHtml(person.id)}"${selected.has(person.id) && person.id !== primaryId ? ' checked' : ''}><span>${escapeHtml(person.name)}${unavailable ? '<small>No longer available — uncheck to remove</small>' : ''}</span></label>`;
+      }).join('')}</div><p data-attendee-empty hidden>No teammates match your search.</p><small data-attendee-count>${[...selected].filter(id => id !== primaryId).length} selected</small>` : '<p>No additional company employees are available yet.</p>'}
+    </fieldset>`;
+  }
+
   function scheduleFormMarkup(data, interview = null) {
     const action = interview ? 'reschedule_interview' : 'schedule_interview';
     const title = interview ? 'Reschedule appointment' : 'Schedule interview';
@@ -896,8 +926,9 @@
         <label><span>Duration</span><select name="durationMinutes" required><option value="30"${interviewDuration(interview) === 30 ? ' selected' : ''}>30 minutes</option><option value="45"${interviewDuration(interview) === 45 ? ' selected' : ''}>45 minutes</option><option value="60"${interviewDuration(interview) === 60 ? ' selected' : ''}>60 minutes</option><option value="90"${interviewDuration(interview) === 90 ? ' selected' : ''}>90 minutes</option></select></label>
         <label class="talent-verification-field-wide"><span>Time zone</span><input type="text" name="timezone" maxlength="80" value="${escapeHtml(interview?.timezone || defaultTimezone())}" required></label>
         ${interviewerControl}
+        ${attendeePickerMarkup(data, interview, selectedInterviewerId)}
       </div>
-      <p class="talent-verification-form-note">The applicant and assigned interviewer receive the calendar invitation. Private review notes are never included.</p>
+      <p class="talent-verification-form-note">The applicant, assigned interviewer, and selected teammates receive the same calendar invitation and Teams link. Private review notes are never included.</p>
       ${data.interviewers.length ? `<button type="submit" class="button primary">${title}</button>` : ''}
     </form>`;
   }
@@ -929,6 +960,7 @@
       <div class="talent-verification-section-heading"><div><p class="eyebrow">Internal interview</p><h3>${escapeHtml(humanLabel(interview.status))}</h3></div><span class="talent-verification-state is-${escapeHtml(interview.status)}">${escapeHtml(humanLabel(interview.status))}</span></div>
       <div class="talent-verification-interview-summary"><div><small>Appointment</small><strong>${escapeHtml(formatDateTime(interview.startsAt, interview.timezone))}</strong></div><div><small>Interviewer</small><strong>${escapeHtml(interview.interviewer.name)}</strong></div>${interview.outcome ? `<div><small>Recommendation</small><strong>${escapeHtml(humanLabel(interview.outcome))}</strong></div>` : ''}</div>
       ${calendarMarkup(interview)}
+      ${interview.additionalAttendees?.length ? `<p class="talent-verification-form-note"><strong>Additional attendees:</strong> ${interview.additionalAttendees.map(person => escapeHtml(person.name)).join(', ')}</p>` : ''}
       ${scorecardMarkup(interview.scorecard)}
       ${interview.notes ? `<div class="talent-verification-private-note"><strong>Internal note</strong><p>${escapeHtml(interview.notes)}</p></div>` : ''}
       ${interview.status === 'scheduled' ? `<div class="talent-verification-control-grid"><details><summary>Reschedule</summary>${scheduleFormMarkup(data, interview)}</details><details><summary>Complete or waive</summary>${outcomeFormMarkup(interview)}</details><details><summary>Cancel appointment</summary><form class="talent-verification-form" data-verification-form="cancel_interview"><label><span>Internal cancellation note</span><textarea name="note" maxlength="1000" required placeholder="Why is this appointment being cancelled?"></textarea></label><p class="talent-verification-form-note">This internal note is not sent in the calendar cancellation.</p><button type="submit" class="button talent-review-confirm-guarded">Cancel interview</button></form></details></div>` : ''}
@@ -1064,7 +1096,7 @@
         event.preventDefault();
         if (dialog.matches?.('[data-verification-dialog]')) closeVerification();
         else closeActionDialog();
-      }, { once: true });
+      });
       if (typeof dialog.showModal === 'function' && !dialog.open) dialog.showModal();
     }
     mountResumeViewer();
@@ -1106,6 +1138,7 @@
   }
 
   async function loadVerification(applicantId, { preserveStatus = false, mode = verificationContext?.mode || 'verification' } = {}) {
+    if (pendingVerificationAction) return false;
     if (!canOpenForRole()) return false;
     const applicant = findApplicant(applicantId);
     if (!applicant) return false;
@@ -1172,6 +1205,7 @@
   }
 
   function openVerification(applicantId, mode = 'verification') {
+    if (pendingVerificationAction) return false;
     if (!canOpenForRole()) return false;
     const applicant = findApplicant(applicantId);
     if (!applicant || (applicant.stage === 'submitted' && !applicant.archived)) return false;
@@ -1185,6 +1219,7 @@
   }
 
   function closeVerification() {
+    if (pendingVerificationAction) return false;
     stopResumeViewer();
     evidenceVersion += 1;
     evidence = {skills:null,resume:null};
@@ -1227,13 +1262,26 @@
   }
 
   async function postVerificationAction(action, values) {
+    if (pendingVerificationAction) return null;
     if (!verificationContext?.data || !canOpenForRole()) throw new Error('Refresh this verification record and try again.');
     const context = verificationContext, version = verificationRequestVersion;
     const body = buildVerificationAction(action, { applicantId: context.applicantId, ...values });
     if (['schedule_interview', 'reschedule_interview'].includes(body.action) && !verificationContext.data.interviewers.some(item => item.id === body.interviewerUserId)) {
       throw new Error('Choose an eligible interviewer from the current staff list.');
     }
-    const data = await requestVerification(verificationContext.applicantId, { body });
+    if (body.additionalAttendeeUserIds?.some(id => !context.data.availableAttendees.some(person => person.id === id))) {
+      throw new Error('An additional attendee is no longer available. Uncheck them or refresh the company list.');
+    }
+    const label = verificationProgressLabel(body.action);
+    const operation = {};
+    pendingVerificationAction = operation;
+    const dialog = mountedRoot?.querySelector?.('[data-verification-dialog]');
+    const controls = [...(dialog?.querySelectorAll?.('button, input, select, textarea') || [])].map(control => ({control,disabled:control.disabled}));
+    controls.forEach(({control}) => { control.disabled = true; });
+    const finish = root.SoroActionProgress?.begin(label);
+    operation.finish = finish;
+    try {
+    const data = await requestVerification(context.applicantId, { body });
     if (version !== verificationRequestVersion || verificationContext?.applicantId !== context.applicantId || !canOpenForRole()) return data;
     verificationGateCache.set(verificationContext.applicantId, data.gate);
     verificationContext = Object.freeze({
@@ -1242,6 +1290,17 @@
     });
     render();
     return data;
+    } finally {
+      finish?.();
+      if (pendingVerificationAction === operation) {
+        pendingVerificationAction = null;
+        controls.forEach(({control,disabled}) => { if (control.isConnected) control.disabled = disabled; });
+      }
+    }
+  }
+
+  function verificationProgressLabel(action) {
+    return ({schedule_interview:'Scheduling interview…',reschedule_interview:'Rescheduling interview…',cancel_interview:'Cancelling interview…',retry_calendar_sync:'Updating interview calendar…',record_interview_outcome:'Saving interview outcome…'})[action] || 'Saving reference verification…';
   }
 
   function findApplicant(applicantId) {
@@ -1316,6 +1375,7 @@
   }
 
   async function handleClick(event) {
+    if (pendingVerificationAction && event.target.closest?.('[data-verification-dialog]')) { event.preventDefault(); return; }
     const evidenceRetry = event.target.closest?.('[data-evidence-retry]');
     if (evidenceRetry) { event.preventDefault(); loadEvidence(evidenceRetry.dataset.evidenceRetry === 'resume' ? 'resume' : 'skills'); return; }
     const refreshButton = event.target.closest?.('[data-review-refresh]');
@@ -1394,17 +1454,38 @@
     }
   }
 
+  function updateAttendeePicker(form) {
+    const picker = form?.querySelector('.talent-interview-attendees');
+    if (!picker) return;
+    const query = (picker.querySelector('[data-attendee-search]')?.value || '').trim().toLowerCase();
+    const primary = form.querySelector('[name="interviewerUserId"]')?.value;
+    let visible = 0, selected = 0;
+    picker.querySelectorAll('[data-attendee-row]').forEach(row => {
+      const input = row.querySelector('input');
+      if (input.value === primary) input.checked = false;
+      row.hidden = input.value === primary || !row.dataset.attendeeName.includes(query);
+      if (!row.hidden) visible += 1;
+      if (input.checked) selected += 1;
+    });
+    const count = picker.querySelector('[data-attendee-count]'), empty = picker.querySelector('[data-attendee-empty]');
+    if (count) count.textContent = `${selected} selected`;
+    if (empty) empty.hidden = visible > 0;
+  }
+
   function handleInput(event) {
+    if (event.target.matches?.('[data-attendee-search]')) updateAttendeePicker(event.target.closest('form'));
     const search = event.target.closest?.('[data-review-search]');
     if (search) setSearch(search.value);
   }
 
   function handleChange(event) {
+    if (event.target.matches?.('[name="interviewerUserId"], [name="additionalAttendeeUserId"]')) updateAttendeePicker(event.target.closest('form'));
     const sort = event.target.closest?.('[data-review-sort]');
     if (sort) setSort(sort.value);
   }
 
   async function saveReviewSkills(form) {
+    if (pendingVerificationAction) return;
     const service = root.soroTalentReviewEvidence, context = verificationContext, snapshot = evidence.skills, version = evidenceVersion;
     if (skillsSaving || !service || context?.mode === 'interview' || !snapshot?.record) return;
     skillsSaving = true;
@@ -1426,7 +1507,7 @@
   }
 
   async function handleVerificationSubmit(form) {
-    if (!verificationContext?.data) return false;
+    if (pendingVerificationAction || !verificationContext?.data) return false;
     const context = verificationContext, version = verificationRequestVersion;
     const action = text(form.dataset.verificationForm, 50).toLowerCase();
     const values = formValues(form);
@@ -1438,7 +1519,8 @@
       bodyValues = {
         ...(action === 'reschedule_interview' ? { interviewId: interview?.interviewId, expectedUpdatedAt: interview?.updatedAt } : {}),
         startsAt: zonedLocalToIso(values.startsAt, values.timezone), durationMinutes: values.durationMinutes,
-        timezone: values.timezone, interviewerUserId: values.interviewerUserId
+        timezone: values.timezone, interviewerUserId: values.interviewerUserId,
+        additionalAttendeeUserIds: [...form.querySelectorAll('[name="additionalAttendeeUserId"]:checked')].map(input => input.value)
       };
     } else if (action === 'cancel_interview') {
       bodyValues = { interviewId: interview?.interviewId, expectedUpdatedAt: interview?.updatedAt, note: values.note };
@@ -1463,7 +1545,8 @@
       bodyValues = { referenceId: reference?.referenceId, expectedUpdatedAt: reference?.updatedAt, outcome: values.outcome, note: values.note };
     } else return false;
     const submit = form.querySelector?.('[type="submit"]');
-    if (submit) submit.disabled = true;
+    const submitLabel = submit?.textContent;
+    if (submit) { submit.disabled = true; submit.textContent = verificationProgressLabel(action); submit.setAttribute?.('aria-busy', 'true'); }
     try { await postVerificationAction(action, bodyValues); }
     catch (error) {
       if (version !== verificationRequestVersion || verificationContext?.applicantId !== context.applicantId) return false;
@@ -1471,6 +1554,7 @@
       verificationContext = Object.freeze({ ...verificationContext, status: error.message || 'The verification update could not be saved.', statusType: 'error' });
       render();
     }
+    finally { if (submit?.isConnected) { submit.disabled = false; submit.textContent = submitLabel; submit.removeAttribute?.('aria-busy'); } }
     return true;
   }
 
@@ -1506,6 +1590,8 @@
   }
 
   function unmount({ clear = true, reset = false } = {}) {
+    pendingVerificationAction?.finish?.();
+    pendingVerificationAction = null;
     // The sidebar owns a background queue load even when the queue view is absent.
     // Other portal renders must not cancel that load or strand it in loading state.
     if (!mountedRoot && !reset) return false;

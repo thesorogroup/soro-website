@@ -316,6 +316,14 @@ function actionPayload(body, action) {
     payload.durationMinutes = inputDuration(body.durationMinutes);
     payload.timezone = inputTimezone(body.timezone);
     payload.interviewerUserId = inputUuid(body.interviewerUserId, 'interviewer');
+    // Omission preserves older reschedule forms; an explicit [] removes guests.
+    if (Object.hasOwn(body, 'additionalAttendeeUserIds')) {
+      if (!Array.isArray(body.additionalAttendeeUserIds) || body.additionalAttendeeUserIds.length > 50) {
+        throw httpError(400, 'invalid_request', 'Choose up to 50 additional company attendees.');
+      }
+      payload.additionalAttendeeUserIds = [...new Set(body.additionalAttendeeUserIds.map(id => inputUuid(id, 'additional attendee')))]
+        .filter(id => id !== payload.interviewerUserId).sort();
+    }
   } else if (action === 'cancel_interview') {
     payload.interviewId = inputUuid(body.interviewId, 'interview');
     payload.note = inputText(body.note, 'Cancellation note', 1000, { required: true });
@@ -416,8 +424,9 @@ function graphEventBody(command) {
     location: { displayName: 'Microsoft Teams' },
     attendees: [
       { emailAddress: { address: command.applicantEmail, name: command.applicantName }, type: 'required' },
-      { emailAddress: { address: command.interviewerEmail, name: command.interviewerName }, type: 'required' }
-    ]
+      { emailAddress: { address: command.interviewerEmail, name: command.interviewerName }, type: 'required' },
+      ...(command.additionalAttendees || []).map(person => ({ emailAddress: { address: person.email, name: person.name }, type: 'optional' }))
+    ].filter((attendee, index, all) => all.findIndex(item => item.emailAddress.address.trim().toLowerCase() === attendee.emailAddress.address.trim().toLowerCase()) === index)
   };
   if (command.action === 'create') {
     event.body = {
@@ -593,6 +602,11 @@ function publicReference(value) {
   };
 }
 
+function publicAttendees(value = []) {
+  if (!Array.isArray(value) || value.length > 50) throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid attendee list.');
+  return value.map(item => ({ id: requiredUuid(item.id), name: requiredText(item.name, 180) }));
+}
+
 function publicInterview(value) {
   if (value === null || value === undefined) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid response.');
@@ -615,6 +629,7 @@ function publicInterview(value) {
     endsAt: nullableTimestamp(value.endsAt),
     timezone: nullableText(value.timezone, 100),
     interviewer: { id: nullableUuid(value.interviewer?.id), name: requiredText(value.interviewer?.name, 180) },
+    additionalAttendees: publicAttendees(value.additionalAttendees),
     outcome,
     scorecard,
     notes: nullableText(value.notes, 4000),
@@ -653,6 +668,7 @@ function publicPayload(value) {
       blockers: value.gate.blockers.map(item => requiredText(item, 100))
     },
     interview: publicInterview(value.interview),
+    availableAttendees: (value.availableAttendees || []).map(person => ({ id: requiredUuid(person.id), name: requiredText(person.name, 180), role: requiredText(person.role, 40) })),
     interviewers: value.interviewers.map(interviewer => ({
       id: requiredUuid(interviewer.id),
       name: requiredText(interviewer.name, 180)
@@ -686,6 +702,11 @@ function calendarCommand(value, requestId, state) {
     applicantEmail: requiredText(value.applicantEmail, 254),
     interviewerName: requiredText(value.interviewerName, 180),
     interviewerEmail: requiredText(value.interviewerEmail, 254),
+    additionalAttendees: publicAttendees(value.additionalAttendees).map((person, index) => {
+      const email = requiredText(value.additionalAttendees[index].email, 254);
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid attendee email.');
+      return { ...person, email };
+    }),
     startsAt: requiredTimestamp(value.startsAt),
     endsAt: requiredTimestamp(value.endsAt),
     timezone: interviewTimezone(state?.interview?.interviewId === command.interviewId
@@ -706,7 +727,8 @@ async function mutateVerification(event) {
   const body = parseBody(event);
   const action = String(body.action || '').trim().toLowerCase();
   if (!ACTIONS.has(action)) throw httpError(400, 'unsupported_action', 'Choose a supported verification action.');
-  if (!hasExactKeys(body, ACTION_KEYS[action])) {
+  const withAttendees = ['schedule_interview', 'reschedule_interview'].includes(action) && Object.hasOwn(body, 'additionalAttendeeUserIds');
+  if (!hasExactKeys(body, withAttendees ? [...ACTION_KEYS[action], 'additionalAttendeeUserIds'] : ACTION_KEYS[action])) {
     throw httpError(400, 'unsupported_scope', 'Only the fields required for this verification action are accepted.');
   }
   const requestId = inputUuid(body.requestId, 'request id');

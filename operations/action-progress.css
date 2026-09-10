@@ -1,0 +1,12 @@
+.soro-action-progress{position:fixed;inset:auto 24px 24px auto;margin:0;box-sizing:border-box;width:min(360px,calc(100vw - 32px));padding:18px 20px;display:flex;align-items:center;gap:16px;border:1px solid #26466d;border-radius:18px;background:#0b254b;color:#fff;box-shadow:0 14px 44px #071b3c33;z-index:2147483647;pointer-events:none;font-family:inherit;text-align:left;}
+.soro-action-progress[hidden]{display:none!important;}
+.soro-action-progress::backdrop{background:transparent;pointer-events:none;}
+.soro-action-progress__mark{position:relative;display:grid;place-items:center;flex:0 0 58px;width:58px;height:58px;}
+.soro-action-progress__mark img{display:block;width:44px;height:44px;object-fit:contain;border-radius:12px;}
+.soro-action-progress__mark::before{content:"";position:absolute;inset:0;border:2px solid #ffffff26;border-top-color:#ff5a14;border-right-color:#ff5a14;border-radius:50%;animation:soro-action-orbit 1.4s linear infinite;}
+.soro-action-progress__copy{display:grid;gap:5px;min-width:0;}
+.soro-action-progress__copy strong{font-size:1rem;line-height:1.4;font-weight:650;color:#fff;}
+.soro-action-progress__copy>span{font-size:.875rem;line-height:1.45;color:#cfdbec;}
+@keyframes soro-action-orbit{to{transform:rotate(360deg);}}
+@media(max-width:600px){.soro-action-progress{inset:auto 16px max(16px,env(safe-area-inset-bottom)) 16px;width:auto;padding:16px;gap:14px;}}
+@media(prefers-reduced-motion:reduce){.soro-action-progress__mark::before{animation:none;border-right-color:#ffffff26;}}

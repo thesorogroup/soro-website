@@ -33,6 +33,7 @@
   let workspace = null;
   let phase = 'idle';
   let busy = false;
+  let pendingMutation = null;
   let feedback = Object.freeze({ tone: '', message: '' });
   let editor = null;
   let loadVersion = 0;
@@ -810,6 +811,7 @@
   }
 
   function openEditor(kind, button) {
+    if (busy) return;
     const interviewId = text(button?.dataset?.interviewId, 100);
     const interview = workspace?.candidates?.flatMap(candidate => candidate.interviews)
       .find(item => item.interviewId === interviewId);
@@ -836,15 +838,21 @@
 
   async function performMutation(action, values, successMessage) {
     if (busy || !activeAdapter || !workspace) return;
+    const operation = { adapter:activeAdapter, host:mountedRoot, version:loadVersion, role:requestedRole };
+    pendingMutation = operation;
+    const current = () => pendingMutation === operation && mountedRoot === operation.host && loadVersion === operation.version && activeAdapter === operation.adapter;
     busy = true;
     feedback = Object.freeze({ tone: '', message: '' });
     render();
+    const progressLabel = ({schedule_interview:'Scheduling interview…',reschedule_interview:'Rescheduling interview…',cancel_interview:'Cancelling interview…',retry_calendar_sync:'Updating interview calendar…'})[action] || 'Saving placement update…';
+    const finish = root.SoroActionProgress?.begin(progressLabel);
     try {
-      const result = await activeAdapter.mutate(action, { hiringRequestId: workspace.request.hiringRequestId, ...values }, candidate => {
-        const verified = normalizeWorkspace(candidate, requestedRole);
+      const result = await operation.adapter.mutate(action, { hiringRequestId: workspace.request.hiringRequestId, ...values }, candidate => {
+        const verified = normalizeWorkspace(candidate, operation.role);
         if (!verified) throw new Error('The updated placement workflow could not be verified.');
         return verified;
       });
+      if (!current()) return;
       const normalized = normalizeWorkspace(result, requestedRole);
       if (!normalized) throw new Error('The updated placement workflow could not be verified.');
       workspace = normalized;
@@ -855,10 +863,11 @@
       editor = null;
       if (typeof mountedOptions.onChange === 'function') mountedOptions.onChange(workspace, action);
     } catch (error) {
+      if (!current()) return;
       feedback = Object.freeze({ tone: 'error', message: text(error?.message, 300) || 'This placement action could not be completed.' });
     } finally {
-      busy = false;
-      render();
+      finish?.();
+      if (current()) { pendingMutation = null; busy = false; render(); }
     }
   }
 
@@ -951,7 +960,7 @@
   }
 
   async function load() {
-    if (!activeAdapter || !hiringRequestId) return;
+    if (busy || !activeAdapter || !hiringRequestId) return;
     const version = ++loadVersion;
     phase = 'loading';
     feedback = Object.freeze({ tone: '', message: '' });
@@ -973,6 +982,8 @@
   }
 
   async function mount(target, options = {}) {
+    pendingMutation = null;
+    busy = false;
     mountedRoot = target || null;
     mountedOptions = options || {};
     requestedRole = normalizedRole(options.role || root?.soroCurrentAccess?.role);
@@ -990,6 +1001,7 @@
   }
 
   function unmount(options = {}) {
+    pendingMutation = null;
     loadVersion += 1;
     if (options.clear !== false) mountedRoot?.replaceChildren?.();
     mountedRoot = null;

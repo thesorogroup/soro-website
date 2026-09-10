@@ -147,13 +147,92 @@ test('public response is allowlisted, exposes eligible interviewer names but no 
   const payload = bodyOf(result);
   assert.equal(result.statusCode, 200);
   assert.deepEqual(Object.keys(payload).sort(), [
-    'applicant', 'calendarIntegration', 'gate', 'generatedAt', 'interview', 'interviewers', 'references', 'viewerRole'
+    'applicant', 'availableAttendees', 'calendarIntegration', 'gate', 'generatedAt', 'interview', 'interviewers', 'references', 'viewerRole'
   ].sort());
   assert.deepEqual(payload.interviewers, [{ id: interviewerId, name: 'Jordan Reed' }]);
   assert.deepEqual(payload.calendarIntegration, { configured: true, organizerLabel: 'Soro Talent Interviews' });
   assert.equal(result.body.includes('private-interviewer@example.com'), false);
   assert.equal(result.body.includes('private-graph-id'), false);
   assert.equal(result.body.includes('77777777-7777-4777-8777-777777777777'), false);
+});
+
+test('additional attendees accept only bounded employee IDs and preserve omission versus removal', () => {
+  const base = { startsAt: '2099-09-05T16:00:00.000Z', durationMinutes: 30, timezone: 'Asia/Manila', interviewerUserId: interviewerId, interviewId };
+  for (const action of ['schedule_interview', 'reschedule_interview']) {
+    assert.equal(Object.hasOwn(backend.actionPayload(base, action), 'additionalAttendeeUserIds'), false);
+    assert.deepEqual(backend.actionPayload({ ...base, additionalAttendeeUserIds: [] }, action).additionalAttendeeUserIds, []);
+    assert.deepEqual(backend.actionPayload({ ...base, additionalAttendeeUserIds: [userId, interviewerId, userId] }, action).additionalAttendeeUserIds, [userId]);
+    for (const invalid of [null, 'anyone@example.com', [null], ['external@example.com'], Array(51).fill(userId)]) {
+      assert.throws(() => backend.actionPayload({ ...base, additionalAttendeeUserIds: invalid }, action));
+    }
+  }
+});
+
+test('Graph sends company guests as optional and deduplicates required recipients by email', () => {
+  const base = { applicantName: 'Alex', applicantEmail: 'alex@example.com', interviewerName: 'Jordan', interviewerEmail: 'jordan@example.com', startsAt: '2099-09-05T16:00:00Z', endsAt: '2099-09-05T16:30:00Z', transactionId: requestId };
+  const additionalAttendees = [{ name: 'Sales teammate', email: 'sales@example.com' }, { name: 'Primary duplicate', email: 'JORDAN@example.com' }, { name: 'Applicant duplicate', email: 'Alex@example.com' }, { name: 'Guest duplicate', email: 'Sales@example.com' }];
+  for (const action of ['create', 'update']) {
+    const body = backend.graphEventBody({ ...base, action, additionalAttendees });
+    assert.equal(body.attendees.length, 3);
+    assert.deepEqual(body.attendees.map(person => person.type), ['required', 'required', 'optional']);
+    assert.equal(body.attendees[2].emailAddress.address, 'sales@example.com');
+    assert.equal(backend.graphEventBody({ ...base, action, additionalAttendees: [] }).attendees.length, 2);
+  }
+});
+
+test('safe attendee projection strips staff emails and unrelated employee fields', () => {
+  const person = { id: userId, name: 'Company teammate', role: 'sales', email: 'private@example.com', phone: 'private-phone' };
+  const safe = backend.publicPayload(state({ availableAttendees: [person], interview: {
+    interviewId, status: 'scheduled', startsAt: '2099-09-05T16:00:00Z', endsAt: '2099-09-05T16:30:00Z',
+    timezone: 'Asia/Manila', interviewer: {id: interviewerId, name: 'Jordan'}, additionalAttendees: [person],
+    outcome: null, notes: null, scorecard: null, calendar: { status: 'synced', joinUrl: null }, updatedAt
+  }}));
+  assert.deepEqual(safe.availableAttendees, [{ id: userId, name: person.name, role: 'sales' }]);
+  assert.deepEqual(safe.interview.additionalAttendees, [{ id: userId, name: person.name }]);
+  assert.doesNotMatch(JSON.stringify(safe), /private@example|private-phone/);
+});
+
+test('new attendee contract forwards only IDs through the authorized mutation RPC', async t => {
+  const calls = installFetch(t, call => {
+    if (call.url.endsWith('/auth/v1/user')) return response({ id: userId });
+    if (call.url.endsWith('/rest/v1/rpc/mutate_talent_verification')) return response({ state: state(), calendarCommand: null });
+    throw new Error('Unexpected request');
+  });
+  const body = { action: 'schedule_interview', requestId, applicantId, expectedUpdatedAt: null, startsAt: '2099-09-05T16:00:00Z', durationMinutes: 30, timezone: 'Asia/Manila', interviewerUserId: interviewerId, additionalAttendeeUserIds: [userId] };
+  const post = data => backend.handler(event({ httpMethod: 'POST', queryStringParameters: {}, rawQueryString: '', body: JSON.stringify(data) }));
+  assert.equal((await post(body)).statusCode, 200);
+  assert.deepEqual(JSON.parse(calls[1].options.body).p_payload.additionalAttendeeUserIds, [userId]);
+  assert.equal((await post({ ...body, additionalAttendeeEmails: ['outside@example.com'] })).statusCode, 400);
+});
+
+test('calendar synchronization uses saved attendee snapshots, not incoming selections or current directory emails', async t => {
+  const guest = {id: referenceId, name: 'Saved guest', email: 'original-guest@example.com'};
+  const pending = state({interview: {
+    interviewId, status: 'scheduled', startsAt: '2099-09-05T16:00:00Z', endsAt: '2099-09-05T16:30:00Z',
+    timezone: 'Asia/Manila', interviewer: {id: interviewerId, name: 'Jordan'}, additionalAttendees: [guest],
+    outcome: null, scorecard: null, notes: null, calendar: {status: 'pending', joinUrl: null}, updatedAt
+  }});
+  const calls = installFetch(t, call => {
+    if (call.url.endsWith('/auth/v1/user')) return response({id:userId});
+    if (call.url.endsWith('/rest/v1/rpc/mutate_talent_verification')) return response({state:pending, calendarCommand: {
+      action:'create', transactionId:requestId, interviewId, expectedUpdatedAt:updatedAt,
+      applicantName:'Alex', applicantEmail:'alex@example.com', interviewerName:'Jordan', interviewerEmail:'jordan@example.com',
+      additionalAttendees:[guest], startsAt:pending.interview.startsAt, endsAt:pending.interview.endsAt, eventId:null, joinUrl:null
+    }});
+    if (call.url.includes('/oauth2/v2.0/token')) return response({access_token:'test-token'});
+    if (call.url.includes('graph.microsoft.com')) return response({id:'test-event', onlineMeeting:{joinUrl:'https://teams.microsoft.com/sample'}});
+    if (call.url.endsWith('/rest/v1/rpc/record_talent_interview_calendar_sync')) return response({...pending,interview:{...pending.interview,calendar:{status:'synced',joinUrl:null}}});
+    throw new Error('Unexpected call');
+  });
+  const result = await backend.handler(event({httpMethod:'POST',queryStringParameters:{},rawQueryString:'',body:JSON.stringify({
+    action:'schedule_interview',requestId,applicantId,expectedUpdatedAt:null,startsAt:pending.interview.startsAt,
+    durationMinutes:30,timezone:'Asia/Manila',interviewerUserId:interviewerId,additionalAttendeeUserIds:[userId]
+  })}));
+  assert.equal(result.statusCode,200);
+  const graph = JSON.parse(calls.find(call=>call.url.includes('graph.microsoft.com')).options.body);
+  assert.deepEqual(graph.attendees[2],{emailAddress:{address:guest.email,name:guest.name},type:'optional'});
+  assert.doesNotMatch(result.body,/original-guest@example.com/);
+  assert.deepEqual(bodyOf(result).interview.additionalAttendees,[{id:referenceId,name:guest.name}]);
 });
 
 test('POST action bodies are exact and pending is rejected as a final reference outcome before authentication', async t => {
