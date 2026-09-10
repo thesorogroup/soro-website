@@ -1,4 +1,4 @@
-const {interviewEmail} = require('./lib/branded-email');
+const {interviewEmail, interviewTimezone, updateInterviewBody} = require('./lib/branded-email');
 const configuredUrl = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_URL = /^https:\/\/[^/]+\.supabase\.co\/?$/.test(configuredUrl)
   ? configuredUrl.replace(/\/$/, '')
@@ -407,7 +407,7 @@ function graphEventBody(command) {
   if (command.action === 'create') {
     event.body = {
       contentType: 'HTML',
-      content: interviewEmail('Client').html
+      content: interviewEmail('Client', command).html
     };
     event.isOnlineMeeting = true;
     event.onlineMeetingProvider = 'teamsForBusiness';
@@ -440,9 +440,17 @@ async function syncGraphCalendar(command) {
       return { status: 'synced', eventId: event.id, joinUrl, errorCode: null };
     }
     if (command.action === 'update') {
+      const currentResponse = await fetch(`${base}/${safeGraphId(command.eventId)}?$select=body`, {
+        method: 'GET', headers, redirect: 'error', signal: AbortSignal.timeout(GRAPH_REQUEST_TIMEOUT_MS)
+      });
+      const current = await responseJson(currentResponse);
+      if (!currentResponse.ok) throw new Error('graph_body_unavailable');
+      const patch = graphEventBody(command);
+      patch.body = updateInterviewBody(current?.body, 'Client', command);
+      const etag = current?.['@odata.etag'];
       const response = await fetch(`${base}/${safeGraphId(command.eventId)}`, {
-        method: 'PATCH', headers, redirect: 'error', signal: AbortSignal.timeout(GRAPH_REQUEST_TIMEOUT_MS),
-        body: JSON.stringify(graphEventBody(command))
+        method: 'PATCH', headers: {...headers, ...(typeof etag === 'string' && etag.length < 1024 && !/[\r\n]/.test(etag) ? {'If-Match':etag} : {})}, redirect: 'error', signal: AbortSignal.timeout(GRAPH_REQUEST_TIMEOUT_MS),
+        body: JSON.stringify(patch)
       });
       const event = await responseJson(response);
       if (!response.ok) throw new Error(`graph_update_${response.status}`);
@@ -643,6 +651,7 @@ function publicPlacement(value, canManageOnboarding) {
     applicantId: requiredUuid(value.applicantId),
     status: requiredText(value.status, 40),
     startDate: nullableText(value.startDate, 10),
+    endDate: nullableText(value.endDate, 10),
     scheduleSummary: nullableText(value.scheduleSummary, 1000),
     updatedAt: requiredTimestamp(value.updatedAt),
     onboardingItems: canManageOnboarding ? value.onboardingItems.map(publicOnboardingItem) : []
@@ -692,7 +701,7 @@ function publicPayload(value) {
   return result;
 }
 
-function calendarCommand(value, requestId) {
+function calendarCommand(value, requestId, state) {
   if (value === null || value === undefined) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || !['create', 'update', 'cancel'].includes(value.action)) {
@@ -715,11 +724,17 @@ function calendarCommand(value, requestId) {
   if (!Array.isArray(value.attendees) || value.attendees.length !== 3) {
     throw httpError(502, 'placement_service_error', 'The placement workflow returned an invalid calendar command.');
   }
+  const recorded = (Array.isArray(state?.candidates) ? state.candidates : [])
+    .flatMap(candidate => Array.isArray(candidate?.interviews) ? candidate.interviews : [])
+    .find(interview => interview?.interviewId === command.interviewId
+      && Date.parse(interview.startsAt) === Date.parse(value.startsAt)
+      && Date.parse(interview.endsAt) === Date.parse(value.endsAt));
   return {
     ...command,
     applicantName: requiredText(value.applicantName, 180),
     startsAt: requiredTimestamp(value.startsAt),
     endsAt: requiredTimestamp(value.endsAt),
+    timezone: interviewTimezone(recorded?.timezone),
     attendees: value.attendees.map(attendee => {
       if (!attendee || typeof attendee !== 'object' || Array.isArray(attendee)) {
         throw httpError(502, 'placement_service_error', 'The placement workflow returned an invalid calendar attendee.');
@@ -776,7 +791,7 @@ async function mutateWorkflow(event) {
   if (!mutation.state || typeof mutation.state !== 'object' || Array.isArray(mutation.state)) {
     throw httpError(502, 'placement_service_error', 'The Client placement workflow returned an invalid response.');
   }
-  const command = calendarCommand(mutation.calendarCommand, requestId);
+  const command = calendarCommand(mutation.calendarCommand, requestId, mutation.state);
   if (!command) return json(200, publicPayload(mutation.state));
 
   const sync = await syncGraphCalendar(command);

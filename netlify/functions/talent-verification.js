@@ -1,4 +1,4 @@
-const {interviewEmail} = require('./lib/branded-email');
+const {interviewEmail, interviewTimezone, updateInterviewBody} = require('./lib/branded-email');
 const configuredUrl = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_URL = /^https:\/\/[^/]+\.supabase\.co\/?$/.test(configuredUrl)
   ? configuredUrl.replace(/\/$/, '')
@@ -422,7 +422,7 @@ function graphEventBody(command) {
   if (command.action === 'create') {
     event.body = {
       contentType: 'HTML',
-      content: interviewEmail('Talent').html
+      content: interviewEmail('Talent', command).html
     };
     event.isOnlineMeeting = true;
     event.onlineMeetingProvider = 'teamsForBusiness';
@@ -470,9 +470,17 @@ async function syncGraphCalendar(command) {
       };
     }
     if (command.action === 'update') {
+      const currentResponse = await fetch(`${base}/${safeGraphId(command.eventId)}?$select=body`, {
+        method: 'GET', headers, redirect: 'error', signal: AbortSignal.timeout(GRAPH_REQUEST_TIMEOUT_MS)
+      });
+      const current = await responseJson(currentResponse);
+      if (!currentResponse.ok) throw new Error('graph_body_unavailable');
+      const patch = graphEventBody(command);
+      patch.body = updateInterviewBody(current?.body, 'Talent', command);
+      const etag = current?.['@odata.etag'];
       const response = await fetch(`${base}/${safeGraphId(command.eventId)}`, {
-        method: 'PATCH', headers, redirect: 'error', signal: AbortSignal.timeout(GRAPH_REQUEST_TIMEOUT_MS),
-        body: JSON.stringify(graphEventBody(command))
+        method: 'PATCH', headers: {...headers, ...(typeof etag === 'string' && etag.length < 1024 && !/[\r\n]/.test(etag) ? {'If-Match':etag} : {})}, redirect: 'error', signal: AbortSignal.timeout(GRAPH_REQUEST_TIMEOUT_MS),
+        body: JSON.stringify(patch)
       });
       const event = await responseJson(response);
       if (!response.ok) throw new Error(`graph_update_${response.status}`);
@@ -653,7 +661,7 @@ function publicPayload(value) {
   };
 }
 
-function calendarCommand(value, requestId) {
+function calendarCommand(value, requestId, state) {
   if (value === null || value === undefined) return null;
   if (!value || typeof value !== 'object' || Array.isArray(value) || !['create', 'update', 'cancel'].includes(value.action)) {
     throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid calendar command.');
@@ -679,7 +687,10 @@ function calendarCommand(value, requestId) {
     interviewerName: requiredText(value.interviewerName, 180),
     interviewerEmail: requiredText(value.interviewerEmail, 254),
     startsAt: requiredTimestamp(value.startsAt),
-    endsAt: requiredTimestamp(value.endsAt)
+    endsAt: requiredTimestamp(value.endsAt),
+    timezone: interviewTimezone(state?.interview?.interviewId === command.interviewId
+      && Date.parse(state.interview.startsAt) === Date.parse(value.startsAt)
+      && Date.parse(state.interview.endsAt) === Date.parse(value.endsAt) ? state.interview.timezone : 'UTC')
   };
 }
 
@@ -714,7 +725,7 @@ async function mutateVerification(event) {
     p_expected_updated_at: expectedUpdatedAt,
     p_payload: payloadInput
   });
-  const command = calendarCommand(mutation.calendarCommand, requestId);
+  const command = calendarCommand(mutation.calendarCommand, requestId, mutation.state);
   if (!command) return json(200, publicPayload(mutation.state));
 
   const sync = await syncGraphCalendar(command);

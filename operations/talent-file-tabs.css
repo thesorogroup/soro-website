@@ -1005,3 +1005,72 @@
 
 .screening-editor-group label:first-of-type { margin-top: 3px; }
 .screening-editor-group label:last-of-type { margin-bottom: 0; }
+
+/* Keep responsive rules after the approved folder styles so fixed desktop
+   columns cannot collapse identity details on phones or beside the sidebar. */
+@media (max-width: 1399px) {
+  .talent-file-body .talent-profile-hero,
+  .talent-self-profile-page .talent-file-body .talent-profile-hero {
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 24px;
+    min-height: 0;
+  }
+  .talent-file-body .talent-profile-hero > * { min-width: 0; }
+  .talent-file-body .profile-identity { padding-top: 28px; }
+  .talent-file-body .profile-hero-media,
+  .talent-self-profile-page .talent-file-body .profile-hero-media {
+    grid-column: 1 / -1;
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: stretch;
+    width: 100%;
+    max-width: none;
+    padding-top: 0;
+  }
+  .talent-file-body .talent-headshot { width: 180px; height: 218px; padding: 9px 9px 34px; }
+  .talent-file-body .profile-actions,
+  .talent-file-body .admin-profile-controls { flex-wrap: wrap; justify-content: flex-start; margin-left: 0; }
+  .talent-file-body .profile-identity .profile-private-address { width: 100%; }
+  .talent-file-body .profile-contact,
+  .talent-file-body .profile-private-address,
+  .talent-file-body .profile-communication-preferences { overflow-wrap: anywhere; word-break: normal; }
+}
+
+@media (max-width: 1100px) {
+  .talent-file-body .talent-profile-hero { padding: 28px 24px 24px; }
+  .talent-file-body .headshot-wrap { justify-items: center; }
+  .talent-file-body .talent-headshot { transform: none; justify-self: center; }
+  .talent-file-body .talent-headshot::before,
+  .talent-file-body .talent-headshot::after { content: none; display: none; }
+  .talent-file-body .talent-paperclip { display: none; }
+  .talent-file-profile-panel .profile-layout { grid-template-columns: minmax(0, 1fr); }
+  .talent-file-profile-panel .profile-stat-grid,
+  .talent-self-profile-page .talent-file-profile-panel .profile-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .talent-file-profile-panel .profile-stat-grid strong,
+  .talent-file-profile-panel .profile-details dd { overflow-wrap: anywhere; }
+  .talent-file-profile-panel .panel-head { flex-wrap: wrap; gap: 12px; }
+}
+
+@media (max-width: 760px) {
+  .talent-file-body .talent-profile-hero,
+  .talent-self-profile-page .talent-file-body .talent-profile-hero {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+    padding: 28px 20px 24px;
+  }
+  .talent-file-body .headshot-wrap { width: 100%; justify-self: center; gap: 10px; }
+  .talent-file-body .talent-headshot { width: 160px; height: 196px; padding: 8px 8px 32px; margin-top: 10px; }
+  .talent-file-body .headshot-upload { margin-top: 10px; min-height: 44px; padding: 11px 14px; font-size: 14px; }
+  .talent-file-body .headshot-wrap small { margin-top: 0; font-size: 12px; }
+  .talent-file-body .profile-identity { width: 100%; padding-top: 0; }
+  .talent-file-body .profile-identity h1 { max-width: none; font-size: 28px; line-height: 1.15; overflow-wrap: anywhere; }
+  .talent-file-body .profile-identity > p:not(.eyebrow) { font-size: 16px; line-height: 1.5; }
+  .talent-file-body .profile-identity .profile-private-address { padding: 14px; }
+  .talent-file-body .profile-identity .profile-tags { margin: 14px 0 0; }
+  .talent-file-body .profile-actions > .button,
+  .talent-file-body .profile-actions .admin-record-button { min-height: 44px; font-size: 14px; white-space: normal; }
+}
+
+@media (max-width: 520px) {
+  .talent-file-profile-panel .profile-stat-grid,
+  .talent-self-profile-page .talent-file-profile-panel .profile-stat-grid { grid-template-columns: minmax(0, 1fr); }
+}

@@ -73,18 +73,90 @@ function accessEmail({person, actionLink, kind, audience = 'Talent'}) {
   });
 }
 
-function interviewEmail(audience) {
-  if (!['Talent', 'Client'].includes(audience)) throw new Error('Invalid interview audience.');
-  // The same calendar body goes to all attendees: never greet the entire group
-  // with one person's name or include internal feedback/private profile data.
-  return renderEmail({
-    subject: `Your Soro ${audience} interview`, eyebrow: 'YOUR SORO INTERVIEW',
-    title: 'Let’s meet your next teammate.',
-    paragraphs: ['Your interview is scheduled. The date and time in this calendar invitation will display in your local time zone.', 'Use the Microsoft Teams meeting details in this invitation to join.'],
-    steps: [['Before the interview', 'Check your microphone, camera, and internet connection.'], ['Need to make a change?', 'Contact your Soro coordinator to arrange a new time.']],
-    note: 'Private review notes and decisions stay in Soro Ops.',
-    footer: 'Questions about this interview? Contact your Soro coordinator.'
+const INTERVIEW_CONFIDENTIALITY = 'This is a confidential interview invitation from The Soro Group. This invitation and meeting link are intended only for the invited participants. Please do not forward them without permission.';
+const INTERVIEW_CONTACT_FOOTER = 'Questions about this interview? Contact talents@thesorogroup.com.';
+const INTERVIEW_CONTACT_FOOTER_HTML = 'Questions about this interview? Contact <a href="mailto:talents@thesorogroup.com" style="color:#ffffff;text-decoration:underline;text-underline-offset:3px">talents@thesorogroup.com</a>.';
+
+function interviewTimezone(value) {
+  try {
+    if (typeof value !== 'string' || value.length > 100 || /^[+-]/.test(value)) return 'UTC';
+    return new Intl.DateTimeFormat('en-US', {timeZone: value}).resolvedOptions().timeZone;
+  } catch { return 'UTC'; }
+}
+
+function interviewSchedule(schedule = {}) {
+  if (!schedule.startsAt && !schedule.endsAt) return [];
+  const start = new Date(schedule.startsAt), end = new Date(schedule.endsAt);
+  if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime()) || end <= start) throw new Error('Invalid interview schedule.');
+  const zone = interviewTimezone(schedule.timezone);
+  const zones = [...new Set(['Asia/Manila', zone])];
+  return zones.map(timeZone => {
+    const fmt = opts => new Intl.DateTimeFormat('en-US', {timeZone, ...opts});
+    const day = fmt({weekday:'long',year:'numeric',month:'long',day:'numeric'});
+    const time = fmt({hour:'numeric',minute:'2-digit',hour12:true});
+    const offset = instant => fmt({timeZoneName:'longOffset'}).formatToParts(instant).find(p=>p.type==='timeZoneName').value.replace('GMT','UTC').replace(/^UTC$/, 'UTC+00:00');
+    const firstOffset = offset(start), lastOffset = offset(end);
+    const endLabel = day.format(start) === day.format(end) ? time.format(end) : `${day.format(end)} · ${time.format(end)}`;
+    const label = timeZone === 'Asia/Manila' ? 'Philippine Time' : timeZone === 'UTC' ? 'Coordinated Universal Time' : 'Scheduling time zone';
+    return [label, `${day.format(start)} · ${time.format(start)} – ${endLabel} · ${timeZone} (${firstOffset}${firstOffset===lastOffset?'':` → ${lastOffset}`})`];
   });
 }
 
-module.exports = {PORTAL, LOGO, FOOTER, escapeHtml, firstName, greeting, renderEmail, accessEmail, interviewEmail};
+function interviewScheduleBlock(schedule) {
+  const rows = interviewSchedule(schedule);
+  if (!rows.length) return '';
+  return `<table id="soro-interview-schedule" role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f4f7fb" style="margin:22px 0;border:1px solid #dce5ef;border-radius:12px"><tr><td style="padding:18px 20px 4px;color:#082d5c;font:700 14px 'Segoe UI',Arial,sans-serif">INTERVIEW DATE &amp; TIME</td></tr>${rows.map(([label,value])=>`<tr><td style="padding:12px 20px 18px"><p style="margin:0 0 6px;color:#ba4419;font:700 14px 'Segoe UI',Arial,sans-serif">${escapeHtml(label)}</p><p style="margin:0;color:#082d5c;font:16px/1.6 'Segoe UI',Arial,sans-serif">${escapeHtml(value).replaceAll(' · ', '<br>')}</p></td></tr>`).join('')}</table>`;
+}
+
+function interviewEmail(audience, schedule = {}) {
+  if (!['Talent', 'Client'].includes(audience)) throw new Error('Invalid interview audience.');
+  // The same calendar body goes to all attendees: never greet the entire group
+  // with one person's name or include internal feedback/private profile data.
+  const email = renderEmail({
+    subject: `Your Soro ${audience} interview`, eyebrow: 'YOUR SORO INTERVIEW',
+    title: audience === 'Talent' ? 'Your interview with The Soro Group.' : 'Let’s meet your next teammate.',
+    paragraphs: ['Your interview is scheduled. Open this calendar invitation to see the date and time in your calendar’s configured time zone.', 'Use the Microsoft Teams meeting details in this invitation to join.'],
+    steps: [['Before the interview', 'Check your microphone, camera, and internet connection.'], ['Need to make a change?', 'Contact your Soro coordinator to arrange a new time.']],
+    note: INTERVIEW_CONFIDENTIALITY,
+    footer: INTERVIEW_CONTACT_FOOTER
+  });
+  // Only this fixed, trusted contact link becomes HTML; caller text stays escaped.
+  email.html = email.html.replace(escapeHtml(INTERVIEW_CONTACT_FOOTER), INTERVIEW_CONTACT_FOOTER_HTML);
+  const block = interviewScheduleBlock(schedule);
+  if (block) {
+    email.html = email.html.replace(/(<p\b[^>]*>Use the Microsoft Teams meeting details in this invitation to join\.<\/p>)/, `$1${block}`);
+    email.text = email.text.replace('Use the Microsoft Teams meeting details in this invitation to join.', `Use the Microsoft Teams meeting details in this invitation to join.\n\nINTERVIEW DATE & TIME\n${interviewSchedule(schedule).map(([label,value])=>`${label}: ${value}`).join('\n\n')}`);
+  }
+  return email;
+}
+
+// Change only our bounded schedule/copy. The surrounding Microsoft Teams meeting
+// block must be retained when rescheduling an existing online meeting.
+function updateInterviewBody(existing, audience, schedule) {
+  if (existing?.contentType?.toLowerCase() !== 'html' || typeof existing.content !== 'string' || existing.content.length > 1000000) throw new Error('Calendar body is unavailable.');
+  const block = interviewScheduleBlock(schedule);
+  if (!block) throw new Error('Interview schedule is required.');
+  let html = existing.content;
+  const visible = paragraph => paragraph.replace(/<[^>]*>/g, '').replace(/&nbsp;|&#160;|&#x0*a0;/gi,' ').replace(/&rsquo;|&#8217;|&#x2019;/gi,'’').replace(/\s+/g,' ').trim();
+  const schedulePattern = /<table\b[^>]*\bid\s*=\s*["']soro-interview-schedule["'][^>]*>[\s\S]*?<\/table\s*>/gi;
+  const matches = [...html.matchAll(schedulePattern)];
+  if (matches.length === 1 && !/<table\b/i.test(matches[0][0].slice(6))) html = html.replace(schedulePattern, () => block);
+  else if (matches.length === 0 && !/soro-interview-schedule|INTERVIEW DATE (?:&amp;|&) TIME/i.test(html)) {
+    // Legacy invitation has no fixed date block. Insert beside the original
+    // appointment paragraph; do not reconstruct or discard the Teams details.
+    const anchors = [...html.matchAll(/<p\b[^>]*>[\s\S]*?<\/p\s*>/gi)].filter(match => visible(match[0]).startsWith('Your interview is scheduled.'));
+    if (anchors.length !== 1) throw new Error('Calendar body needs review before rescheduling.');
+    const anchor = anchors[0];
+    html = html.slice(0,anchor.index) + anchor[0] + block + html.slice(anchor.index+anchor[0].length);
+  } else throw new Error('Calendar schedule block needs review.');
+  html = html.replaceAll('Private review notes and decisions stay in Soro Ops.', escapeHtml(INTERVIEW_CONFIDENTIALITY));
+  html = html.replace(/<p\b[^>]*>[\s\S]*?<\/p\s*>/gi, paragraph => visible(paragraph) === 'Private review notes and decisions stay in Soro Ops.'
+    ? paragraph.replace(/(>)[\s\S]*(<\/p\s*>)/i, `$1${escapeHtml(INTERVIEW_CONFIDENTIALITY)}$2`) : paragraph);
+  html = html.replaceAll('Your interview is scheduled. The date and time in this calendar invitation will display in your local time zone.', 'Your interview is scheduled. Open this calendar invitation to see the date and time in your calendar’s configured time zone.');
+  html = html.replace(/<p\b[^>]*>[\s\S]*?<\/p\s*>/gi, paragraph => visible(paragraph) === 'Questions about this interview? Contact your Soro coordinator.'
+    ? paragraph.replace(/(>)[\s\S]*(<\/p\s*>)/i, `$1${INTERVIEW_CONTACT_FOOTER_HTML}$2`) : paragraph);
+  if (audience === 'Talent') html = html.replaceAll('Let’s meet your next teammate.', 'Your interview with The Soro Group.');
+  return {contentType:'HTML', content:html};
+}
+
+module.exports = {PORTAL, LOGO, FOOTER, escapeHtml, firstName, greeting, renderEmail, accessEmail, interviewEmail, interviewTimezone, interviewSchedule, updateInterviewBody};

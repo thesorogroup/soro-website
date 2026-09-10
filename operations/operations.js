@@ -298,6 +298,7 @@ function profilePage(a){if(!a)return `<main class="page"><button class="text-but
 function render(){
   window.SoroActivityHistory?.unmount?.();
   window.SoroWorkLog?.unmount?.();
+  window.SoroPlacementEnding?.unmount?.();
   window.SoroReports?.unmount?.();
   window.SoroFeedback?.unmount?.();
   window.SoroDocumentCenter?.unmount?.();
@@ -318,6 +319,9 @@ function render(){
   if(!['client-shortlists','client-candidate-review'].includes(current))window.soroClientShortlistWorkflow?.unmount?.({clear:false});
   if(current!=='clients')window.SoroClientWorkflow?.unmount?.({clear:false});
   if(current!=='client-placement')window.SoroClientPlacementWorkflow?.unmount?.({clear:false});
+  if(current==='placements'&&window.SoroPlacementEnding?.canManage(currentAuthenticatedRole())){
+    window.SoroPlacementEnding.mount(root,{role:currentAuthenticatedRole(),preview:adminPreviewingNonAdminWorkspace(),placementId:history.state?.endingPlacementId,onOpenTalent:openTalentProfile});setActive();return;
+  }
   if(current==='feedback'){
     window.SoroFeedback?.mount(root,{preview:adminPreviewingNonAdminWorkspace(),onSupport:()=>{current='help';history.pushState({},'',`${location.pathname}#help`);setActive();render();}});setActive();return;
   }
@@ -832,6 +836,15 @@ function openClientPlacementWorkflow(requestId){
   return true;
 }
 window.addEventListener('soro:client-placement-open',event=>openClientPlacementWorkflow(event.detail?.requestId));
+window.addEventListener('click',event=>{
+  const button=event.target.closest?.('[data-placement-ending-open]');
+  if(!button||!window.SoroPlacementEnding?.canManage(currentAuthenticatedRole())||adminPreviewingNonAdminWorkspace())return;
+  current='placements';history.pushState({endingPlacementId:button.dataset.placementEndingOpen},'',`${location.pathname}#placements`);setActive();render();
+});
+window.addEventListener('soro:placement-work-log-open',event=>{
+  if(!['admin','talent_management'].includes(currentAuthenticatedRole())||adminPreviewingNonAdminWorkspace())return;
+  current='work-log';history.pushState({workLogPlacement:event.detail?.placementId},'',`${location.pathname}#work-log`);setActive();render();
+});
 window.addEventListener('soro:task-center-updated',()=>{
   if(current==='tasks'||(current==='overview'&&['admin','sales','talent'].includes(role)))render();
 });
