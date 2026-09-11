@@ -62,5 +62,16 @@ test('profile loads fresh full catalog through protected evidence and keeps hidd
  const html=fs.readFileSync(require.resolve('../operations/index.html'),'utf8');
  assert.ok(html.indexOf('talent-directory-filters.js')<html.indexOf('talent-skill-editor.js'));
  assert.ok(html.indexOf('talent-skill-editor.js')<html.indexOf('operations-enhancements.js'));
- assert.match(html,/talent-skill-editor.css\?v=20260909-full-catalog/);
+ assert.match(html,/talent-skill-editor.css\?v=20260910-legacy-library/);
+});
+
+test('optional-library notice does not hide catalog or recorded legacy skills and is escaped',()=>{
+ const state=snapshot();state.catalogNotice='Additional custom skills are temporarily unavailable. <script>';
+ state.record.verified_skills=['Legacy expertise'];
+ const html=api.markup(state,'Sample');
+ assert.match(html,/class="profile-skill-editor-notice"/);
+ assert.match(html,/temporarily unavailable/);assert.match(html,/&lt;script&gt;/);assert.doesNotMatch(html,/<script>/);
+ assert.equal((html.match(/name="verified_skill"/g)||[]).length,51);
+ assert.match(html,/Legacy expertise/);
+ assert.match(html,/<button type="submit" class="button primary">Save verified skills/);
 });

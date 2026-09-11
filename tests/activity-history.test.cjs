@@ -52,7 +52,8 @@ test('Integration uses Reports entry and existing profile surfaces without new s
  const read=n=>fs.readFileSync(path.join(__dirname,'../operations',n),'utf8');
  assert.match(read('reports.js'),/role==='admin'.*Open Activity Log/);assert.match(read('operations.js'),/current==='activity'/);assert.ok(!read('index.html').includes('data-view="activity"'));
  assert.match(read('talent-file-tabs.js'),/tabButton\('activity', 'Activity'\).*tabButton\('documents', 'Documents'\)/);
- for(const file of ['client-workflow.js','client-profile.js','admin-employee-management.js','staff-account.js','client-placement-workflow.js','task-center.js'])assert.match(read(file),/data-activity-kind/);
+ for(const file of ['client-workflow.js','client-profile.js','admin-employee-management.js','staff-account.js','client-placement-workflow.js'])assert.match(read(file),/data-activity-kind/);
+ assert.match(read('task-detail.js'),/Task History/);assert.match(read('task-center.js'),/data-open-task/);
 });
 test('Migration uses service-only projection, exact existing source strings and no backfill',()=>{
  const sql=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20260909_061_activity_history.sql'),'utf8'),capture=fs.readFileSync(path.join(__dirname,'../supabase/migrations/20260909_062_profile_activity_capture.sql'),'utf8');

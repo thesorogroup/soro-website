@@ -18,11 +18,12 @@
   <link rel="stylesheet" href="inline-intro-video.css?v=20260908-loom-header" />
     <link rel="stylesheet" href="talent-profile-privacy.css?v=20260822-timezone-screening" />
     <link rel="stylesheet" href="talent-file-tabs.css?v=20260910-mobile-profile" />
-    <link rel="stylesheet" href="talent-skill-editor.css?v=20260909-full-catalog" />
+    <link rel="stylesheet" href="talent-skill-editor.css?v=20260910-legacy-library" />
     <link rel="stylesheet" href="talent-self-uploads.css?v=20260908-self-video" />
     <link rel="stylesheet" href="talent-healthcare.css?v=20260908-healthcare" />
     <link rel="stylesheet" href="task-modal-polish.css?v=20260817-task-modal" />
     <link rel="stylesheet" href="task-center.css?v=20260831-live-tasks" />
+    <link rel="stylesheet" href="task-detail.css?v=20260910-task-collaboration" />
     <link rel="stylesheet" href="page-task-action.css?v=20260909-all-pages" />
     <link rel="stylesheet" href="document-center.css?v=20260908-document-center" />
     <link rel="stylesheet" href="support.css?v=20260908-support-attention" />
@@ -41,7 +42,7 @@
     <link rel="stylesheet" href="admin-payroll.css?v=20260830-payroll-payouts" />
     <link rel="stylesheet" href="active-talent-today.css?v=20260829-active-talent-today" />
     <link rel="stylesheet" href="talent-time-off.css?v=20260829-talent-time-off" />
-    <link rel="stylesheet" href="talent-review-queue.css?v=20260910-interview-follow-through" />
+    <link rel="stylesheet" href="talent-review-queue.css?v=20260910-checklist-results" />
     <link rel="stylesheet" href="staff-account.css?v=20260909-ownership-spacing" />
     <link rel="stylesheet" href="available-talent-bench.css?v=20260901-available-talent-bench" />
     <link rel="stylesheet" href="client-shortlist-workflow.css?v=20260908-shortlist-emails" />
@@ -138,7 +139,7 @@
         <div id="view-root"></div>
       </section>
     </main>
-    <dialog id="task-dialog"><form class="modal" id="task-form"><div class="modal-title"><h2>Add task</h2><button type="button" class="modal-close" aria-label="Close dialog">×</button></div><label>Task name<input id="task-name" name="title" required maxlength="160" placeholder="What needs attention?" /></label><label>Related to <span class="task-field-optional">Optional</span><input id="task-related" name="relatedLabel" maxlength="200" placeholder="Client, Talent, or project" /></label><label>Due date <span class="task-field-optional">Optional</span><input id="task-due-date" name="dueDate" type="date" /></label><label>Priority<select id="task-priority" name="priority"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option><option value="low">Low</option></select></label><label>Assign to<select id="task-assignee" name="assignedTo"><option value="">Loading available employees…</option></select></label><p class="task-form-message" id="task-form-message" aria-live="polite"></p><div class="modal-actions"><button type="button" class="button modal-cancel">Cancel</button><button type="submit" class="primary">Add task</button></div></form></dialog>
+    <dialog id="task-dialog"><form class="modal" id="task-form"><div class="modal-title"><h2>Add task</h2><button type="button" class="modal-close" aria-label="Close dialog">×</button></div><label>Task name<input id="task-name" name="title" required maxlength="160" placeholder="What needs attention?" /></label><label>Instructions <span class="optional-field">Optional</span><textarea name="details" maxlength="4000" rows="4" placeholder="What needs to be done?"></textarea></label><label>Related to <span class="task-field-optional">Optional</span><input id="task-related" name="relatedLabel" maxlength="200" placeholder="Client, Talent, or project" /></label><label>Due date <span class="task-field-optional">Optional</span><input id="task-due-date" name="dueDate" type="date" /></label><label>Priority<select id="task-priority" name="priority"><option value="normal">Normal</option><option value="high">High</option><option value="urgent">Urgent</option><option value="low">Low</option></select></label><label>Assign To <span class="optional-field">Select one or more people (Ctrl/Cmd-click)</span><select id="task-assignee" name="assignedTo" multiple size="4" required><option value="">Loading available employees…</option></select></label><p class="task-form-message" id="task-form-message" aria-live="polite"></p><div class="modal-actions"><button type="button" class="button modal-cancel">Cancel</button><button type="submit" class="primary">Add task</button></div></form></dialog>
     <dialog id="role-dialog"><form method="dialog" class="modal"><div class="modal-title"><h2>Preview a workspace</h2><button type="button" class="modal-close" aria-label="Close dialog">×</button></div><div class="role-options"><button value="admin" class="role-option"><strong>Admin Panel</strong><small>Company-wide operations and oversight</small></button><button value="sales" class="role-option"><strong>Sales Panel</strong><small>Clients, follow-ups, and shortlists</small></button><button value="talent" class="role-option"><strong>Talent Management Panel</strong><small>Virtual Assistant readiness, support, and reviews</small></button><button value="client" class="role-option"><strong>Client Portal</strong><small>Active Virtual Assistants, documents, invoices, and hiring</small></button><button value="va" class="role-option"><strong>Talent Portal</strong><small>Daily work, Dream Pathway, and support</small></button></div></form></dialog>
     <dialog id="notifications-dialog"><section class="modal notifications-modal" aria-labelledby="notifications-title"><div class="modal-title"><div><p class="eyebrow">Soro Ops</p><h2 id="notifications-title">Notifications</h2></div><button type="button" class="modal-close" aria-label="Close notifications">×</button></div><div class="notification-list" id="notification-list"><p class="notifications-empty">You have no notifications requiring attention.</p></div></section></dialog>
     <dialog id="active-talent-today-dialog" class="active-talent-dialog"><section aria-labelledby="active-talent-today-title"><div class="modal-title"><div><p class="eyebrow">Live attendance</p><h2 id="active-talent-today-title">Active Talent Today</h2></div><button type="button" class="modal-close" aria-label="Close Active Talent Today">×</button></div><div id="active-talent-today-content" aria-live="polite"></div></section></dialog>
@@ -157,9 +158,10 @@
     <script src="active-talent-today.js?v=20260829-active-talent-today"></script>
     <script src="talent-time-off.js?v=20260829-talent-time-off"></script>
     <script src="private-pdf-viewer.js?v=20260909-private-pdf"></script>
-    <script src="talent-review-evidence.js?v=20260909-full-catalog"></script>
-    <script src="talent-review-queue.js?v=20260910-interview-follow-through"></script>
-    <script src="task-center.js?v=20260910-interview-follow-through"></script>
+    <script src="talent-review-evidence.js?v=20260910-legacy-library"></script>
+    <script src="talent-review-queue.js?v=20260910-checklist-results"></script>
+    <script src="task-detail.js?v=20260910-task-collaboration"></script>
+    <script src="task-center.js?v=20260910-task-collaboration"></script>
     <script src="global-search.js?v=20260901-global-search"></script>
     <script src="available-talent-bench.js?v=20260901-available-talent-bench"></script>
     <script src="client-shortlist-workflow.js?v=20260908-shortlist-emails"></script>
@@ -174,16 +176,16 @@
     <script src="feedback.js?v=20260909-usability-label"></script>
     <script src="report-definitions.js?v=20260909-real-reports"></script>
     <script src="reports.js?v=20260909-activity"></script>
-    <script src="operations.js?v=20260910-interview-follow-through"></script>
-    <script src="page-task-action.js?v=20260909-all-pages"></script>
+    <script src="operations.js?v=20260910-task-collaboration"></script>
+    <script src="page-task-action.js?v=20260910-task-collaboration"></script>
     <script src="talent-directory-filters.js?v=20260909-full-catalog"></script>
-    <script src="talent-skill-editor.js?v=20260909-full-catalog"></script>
+    <script src="talent-skill-editor.js?v=20260910-legacy-library"></script>
     <script src="admin-skill-library.js?v=20260817-skill-library"></script>
-    <script src="screening-presentation.js?v=20260829-speed-meter-fix"></script>
+    <script src="screening-presentation.js?v=20260910-speed-fields"></script>
     <script src="profile-details.js?v=20260822-private-profile-details"></script>
     <script src="support-tickets.js?v=20260909-report-links"></script>
     <script src="talent-self-uploads.js?v=20260908-self-video-history"></script>
-    <script src="operations-enhancements.js?v=20260909-work-log"></script>
+    <script src="operations-enhancements.js?v=20260910-checklist-results"></script>
     <script src="loom-introduction.js?v=20260908-loom-header"></script>
     <script src="inline-intro-video.js?v=20260908-loom-header"></script>
     <script src="talent-profile-privacy.js?v=20260908-profile-refresh"></script>
@@ -194,7 +196,7 @@
     <script src="admin-employee-management.js?v=20260909-activity"></script>
     <script src="staff-account.js?v=20260909-activity"></script>
     <script src="admin-payroll.js?v=20260908-document-navigation"></script>
-    <script src="auth.js?v=20260909-founder-account"></script>
+    <script src="auth.js?v=20260910-task-collaboration"></script>
     <script src="admin-record-management.js?v=20260901-role-view-access"></script>
     <script src="talent-portal-access.js?v=20260901-role-view-access"></script>
     <script src="admin-permanent-deletion.js?v=20260901-role-view-access"></script>

@@ -208,6 +208,8 @@
 .talent-review-checklist li.is-complete > span { background: #d8f0e7; }
 .talent-review-checklist li.is-needs_review { border-color: #f1d5ae; background: #fff9ef; color: #8a5715; }
 .talent-review-checklist li.is-needs_review > span { background: #ffebc9; }
+.talent-review-checklist-note { margin: 10px 0 0; color: #61748a; font-size: 12px; line-height: 1.5; }
+.talent-review-checklist li.is-needs_review small { color: #8a5715; }
 
 .talent-review-card-actions {
   --review-action-height: 3rem;

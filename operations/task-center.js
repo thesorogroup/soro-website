@@ -39,8 +39,9 @@
   }
 
   function canLoad(role = actualRole()) {
-    return ENABLED_ROLES.has(text(role, 60).toLowerCase());
+    return canCreate(role) || role === 'virtual_assistant';
   }
+  function canCreate(role = actualRole()) { return ENABLED_ROLES.has(text(role,60).toLowerCase()); }
 
   function taskDate(task) {
     return task?.dueDate || task?.due_date || '';
@@ -60,6 +61,7 @@
   }
 
   function assignedName(task) {
+    if(task.assignees?.length)return task.assignees.slice(0,2).map(p=>p.name).join(', ')+(task.assignees.length>2?` +${task.assignees.length-2}`:'');
     return text(task?.assignedTo?.name || task?.assigneeName || task?.assignee_name || task?.assignedToName || task?.assigned_to_name, 160) || 'Assigned to me';
   }
 
@@ -114,13 +116,18 @@
   }
 
   async function token() {
+    const userId=root?.soroCurrentAccess?.user_id;
     const { data } = await root?.soroSupabase?.auth?.getSession?.() || {};
+    if(data?.session?.user?.id!==userId)return '';
     return data?.session?.access_token || '';
   }
 
   async function request(method = 'GET', body, assertCurrent = () => {}) {
+    if(actualRole()==='virtual_assistant')return root.soroTaskDetail.request({action:'workspace'});
+    const client=root.soroSupabase,captured=JSON.stringify(root.soroCurrentAccess);
+    const current=()=>{assertCurrent();if(client!==root.soroSupabase||captured!==JSON.stringify(root.soroCurrentAccess))throw new Error('Your task workspace changed.');};
     const accessToken = await token();
-    assertCurrent();
+    current();
     if (!accessToken) throw new Error('Your secure session expired. Sign in again and retry.');
     const response = await root.fetch(ENDPOINT, {
       method,
@@ -128,7 +135,7 @@
       ...(body ? { body: JSON.stringify(body) } : {})
     });
     const payload = await response.json().catch(() => ({}));
-    assertCurrent();
+    current();
     if (!response.ok) throw new Error(payload.message || 'Tasks could not be loaded.');
     return payload;
   }
@@ -202,6 +209,7 @@
   function notificationText(notification) {
     return {
       id: text(notification.id || notification.notificationId || notification.notification_id, 80),
+      taskId: text(notification.taskId,80),
       title: text(notification.title, 180) || 'Task assigned',
       message: text(notification.message || notification.body, 260) || 'A task needs your attention.',
       unread: !(notification.readAt || notification.read_at)
@@ -217,7 +225,7 @@
     const queueItem = reviewCount > 0 && canOpenReviewQueue()
       ? `<button type="button" data-notification-view="talent-review"><span class="notification-dot urgent"></span><span><strong>${escapeHtml(`${reviewCount} Talent ${reviewCount === 1 ? 'profile needs' : 'profiles need'} review`)}</strong><small>Open the live Talent Review Queue to continue.</small></span><b>Open</b></button>`
       : '';
-    const taskItems = taskNotifications.map(item => `<button type="button" data-notification-view="tasks" data-notification-id="${escapeHtml(item.id)}"><span class="notification-dot"></span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.message)}</small></span><b>Open</b></button>`).join('');
+    const taskItems = taskNotifications.map(item => `<button type="button" data-notification-view="tasks" data-notification-task="${escapeHtml(item.taskId)}" data-notification-id="${escapeHtml(item.id)}"><span class="notification-dot"></span><span><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(item.message)}</small></span><b>Open</b></button>`).join('');
     const supportItem = supportUnread ? `<button type="button" data-notification-view="help"><span class="notification-dot"></span><span><strong>${supportUnread} support ${supportUnread === 1 ? 'ticket has' : 'tickets have'} unread updates</strong><small>Open Help & Support to read and respond.</small></span><b>Open</b></button>` : '';
     const documentItem=documentAttention?`<button type="button" data-notification-view="documents"><span class="notification-dot"></span><span><strong>${documentAttention} document ${documentAttention===1?'request needs':'requests need'} attention</strong><small>Review your assigned documents or returned submissions.</small></span><b>Open</b></button>`:'';
     list.innerHTML = `${queueItem}${taskItems}${supportItem}${documentItem}` || '<p class="notifications-empty">You have no notifications requiring attention.</p>';
@@ -234,6 +242,9 @@
   function populateAssignees() {
     const select = root?.document?.getElementById?.('task-assignee');
     if (!select) return;
+    // Never replace a user's in-progress multi-selection during background polling.
+    if(root.document.getElementById('task-dialog')?.open&&select.options?.length>1)return;
+    select.multiple=true;select.size=4;
     const selectedAssignee = text(select.value, 80);
     if (state.phase === 'loading') {
       select.innerHTML = '<option value="">Loading available employees…</option>';
@@ -279,8 +290,8 @@
       const priority = taskPriority(task);
       const action = task.source?.kind === 'interview_result'
         ? `<button type="button" class="button" data-task-interview="${escapeHtml(task.source.applicantId)}">${status === 'completed' ? 'View interview' : 'Record result'}</button><small>${status === 'completed' ? 'Completed' : 'Result due'} · Updated automatically</small>`
-        : `<button type="button" class="button task-status-action" data-task-status="${status === 'completed' ? 'open' : 'completed'}">${status === 'completed' ? 'Reopen' : 'Complete'}</button>`;
-      return `<tr data-task-id="${escapeHtml(taskId(task))}"><td><span class="task-title"><strong>${escapeHtml(text(task.title, 180) || 'Untitled task')}</strong><small class="task-priority task-priority--${escapeHtml(priority)}">${escapeHtml(PRIORITY_LABELS[priority])}</small></span></td><td>${escapeHtml(relatedLabel(task))}</td><td><span class="${isOverdue(task) ? 'task-due--overdue' : ''}">${escapeHtml(formatDue(task))}</span></td><td>${escapeHtml(assignedName(task))}</td><td>${action} <button type="button" class="button" data-activity-kind="task" data-activity-id="${escapeHtml(taskId(task))}" aria-label="Activity for ${escapeHtml(text(task.title,180))}">History</button></td></tr>`;
+        : `<button type="button" class="button" data-open-task="${escapeHtml(taskId(task))}">${escapeHtml(root.soroTaskDetail?.progressLabels?.[task.progress] || (status==='completed'?'Completed':'Not Started'))}</button>`;
+      return `<tr data-task-id="${escapeHtml(taskId(task))}"><td><span class="task-title"><span><button type="button" class="task-title-link" data-open-task="${escapeHtml(taskId(task))}">${escapeHtml(text(task.title,180)||'Untitled task')}</button>${task.isNew?'<span class="task-new">New</span>':''}</span><small class="task-priority task-priority--${escapeHtml(priority)}">${escapeHtml(PRIORITY_LABELS[priority])}</small></span></td><td>${escapeHtml(relatedLabel(task))}</td><td><span class="${isOverdue(task)?'task-due--overdue':''}">${escapeHtml(formatDue(task))}</span></td><td>${escapeHtml(assignedName(task))}</td><td>${action}</td></tr>`;
     }).join('');
   }
 
@@ -297,7 +308,7 @@
         : state.tasks.length
           ? `${truncationNotice}<div class="panel table-wrap"><table class="data-table task-table"><thead><tr><th>Task</th><th>Related to</th><th>Due</th><th>Owner</th><th>Status</th></tr></thead><tbody>${taskRows()}</tbody></table></div>`
           : '<section class="panel task-empty"><strong>No tasks are assigned to you.</strong><p>New assignments will appear here automatically.</p></section>';
-    return `<main class="page task-center-page"><div class="page-heading"><div><p class="eyebrow">Soro Operations</p><h1>My Tasks</h1><p class="eyebrow" style="margin-top:9px">Your active and completed work, updated from the live task register.</p></div><div class="heading-actions"><button class="button primary" id="add-task">+ Add Task</button></div></div>${content}</main>`;
+    return `<main class="page task-center-page"><div class="page-heading"><div><p class="eyebrow">The Soro Group</p><h1>My Tasks</h1><p class="eyebrow" style="margin-top:9px">${canCreate()?'Tasks you own or are assigned to. Open a task to update progress and see its history.':'Requests from your Talent team. Open a task to read the details and send a response.'}</p></div>${canCreate()?'<div class="heading-actions"><button class="button primary" id="add-task">+ Add Task</button></div>':''}</div>${content}</main>`;
   }
 
   async function updateTask(taskIdValue, status) {
@@ -306,6 +317,7 @@
   }
 
   function bindPage(scope) {
+    scope?.querySelectorAll?.('[data-open-task]').forEach(button=>button.addEventListener('click',()=>root.soroTaskDetail.navigate(button.dataset.openTask)));
     scope?.querySelector?.('#retry-tasks')?.addEventListener('click', refresh);
     scope?.querySelectorAll?.('[data-task-id]')?.forEach(row => {
       row.querySelector('[data-task-interview]')?.addEventListener('click', event => {
@@ -351,7 +363,8 @@
     const assertCurrent = () => {
       if (client !== root.soroSupabase || captured !== scope() || (root.soroPageTaskAction && !root.soroPageTaskAction.canCreate())) throw new Error('Your task workspace changed. Reopen Add Task in your current panel.');
     };
-    const values = Object.fromEntries(new FormData(form).entries());
+    const formData = new FormData(form);
+    const values = Object.fromEntries(formData.entries());
     const idempotencyKey = form.dataset.taskIdempotencyKey || createUuid();
     form.dataset.taskIdempotencyKey = idempotencyKey;
     const body = {
@@ -360,7 +373,7 @@
       priority: text(values.priority, 24) || 'normal', idempotencyKey
     };
     if (!body.title) throw new Error('Enter a task name.');
-    await request('POST', body, assertCurrent);
+    await root.soroTaskDetail.request({action:'create',requestId:idempotencyKey,patch:{title:body.title,details:String(values.details||''),relatedLabel:body.relatedLabel||'',dueDate:body.dueDate,priority:body.priority,assigneeIds:formData.getAll('assignedTo').filter(Boolean)}},assertCurrent);
     if (form.dataset.taskIdempotencyKey === idempotencyKey) delete form.dataset.taskIdempotencyKey;
     return refresh();
   }
@@ -452,7 +465,7 @@
   }
 
   return Object.freeze({
-    ENDPOINT, AUTO_REFRESH_MS, OPERATIONS_TIME_ZONE, PRIORITY_LABELS, canLoad, normalizePayload, currentState: () => state, reviewQueueCount,
+    ENDPOINT, AUTO_REFRESH_MS, OPERATIONS_TIME_ZONE, PRIORITY_LABELS, canLoad, canCreate, normalizePayload, currentState: () => state, reviewQueueCount,
     dashboardData, renderPage, bindPage, bindDashboardMetric, refresh, updateTask, createTask, handleAuthChange, handleReviewQueueUpdate, setSupportNotifications, setDocumentNotifications
   });
 }));

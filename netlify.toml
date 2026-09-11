@@ -4,6 +4,9 @@
 [functions."portal-confirmations"]
   schedule = "* * * * *"
 
+[functions."applicant-request-emails"]
+  schedule = "* * * * *"
+
 [functions."interview-follow-through"]
   schedule = "* * * * *"
 

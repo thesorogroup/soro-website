@@ -12,7 +12,7 @@ const authenticatedEmployeeViews=Object.freeze({
   client_admin:new Set(['documents','overview','client-candidate-review','client-placement','client-talent-profile','my-profile','help']),
   client_reviewer:new Set(['documents','overview','client-candidate-review','client-placement','client-talent-profile','my-profile','help']),
   client_billing:new Set(['documents','overview','my-profile','help']),
-  virtual_assistant:new Set(['overview','talent-my-profile','documents','help'])
+  virtual_assistant:new Set(['overview','tasks','talent-my-profile','documents','help'])
 });
 // Feedback is available to every established portal role, without widening any other access.
 Object.values(authenticatedEmployeeViews).forEach(views=>views.add('feedback'));
@@ -229,8 +229,9 @@ function syncAuthorizedNavigation(access=window.soroCurrentAccess){
   const overviewNav=document.getElementById('overview-nav');
   if(overviewNav)overviewNav.textContent=clientPortal||accessRole==='virtual_assistant'?'Dashboard':'Overview';
   if(!allowed.has(current==='client-record'?'clients':current)){
+    const pendingTask=window.soroTaskDetail?.remember();
     current='overview';selectedTalentId=null;selectedClientId=null;
-    history.replaceState({},'',`${location.pathname}#overview`);
+    if(!pendingTask||actualRole)history.replaceState({},'',`${location.pathname}#overview`);
   }
   setActive();
 }
@@ -296,6 +297,7 @@ function talentDirectory(){const query=talentSearch.trim().toLowerCase();const a
 function table(d){const body=d.rows.length?d.rows.map(r=>`<tr>${r.map((x,i)=>`<td>${i===1&&current==='clients'?`<span class="tag">${escapeHtml(x)}</span>`:escapeHtml(x)}</td>`).join('')}</tr>`).join(''):`<tr><td class="empty" colspan="${d.table.length}">No authorized records are available yet.</td></tr>`;return `<div class="panel table-wrap"><table class="data-table"><thead><tr>${d.table.map(x=>`<th>${escapeHtml(x)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></div>`}function overview(d){const clientPortal=authenticatedClientRoles.has(currentAuthenticatedRole()),primaryContent=d.items.length?list(d.items):`<p class="empty">${escapeHtml(d.emptyMessage||'No authorized records are available yet.')}</p>`,secondaryContent=d.secondaryMessage?`<p class="empty">${escapeHtml(d.secondaryMessage)}</p>`:`${chart()}<p class="eyebrow" style="margin-top:28px">Active placements this week</p>`;return `<div class="card-grid">${d.metrics.map(metricCard).join('')}</div><div class="dashboard-grid"><section class="panel"><div class="panel-head"><h2 id="detail-title">${d.primary}</h2>${clientPortal?'':'<button class="text-button" id="view-all">View all</button>'}</div><div id="detail-list">${primaryContent}</div></section><section class="panel"><div class="panel-head"><h2>${d.secondary}</h2>${d.secondaryMessage?'':'<button class="text-button">Open report</button>'}</div>${secondaryContent}</section></div>`}
 function profilePage(a){if(!a)return `<main class="page"><button class="text-button back-to-directory">← Back to Talent Directory</button><section class="panel profile-missing"><h1>Talent profile not found</h1><p>This profile may have been removed or you may no longer have access.</p></section></main>`;const contact=[a.email,a.phone].filter(Boolean).join(' · ')||'Contact information not recorded';return `<main class="page talent-profile-page"><button class="text-button back-to-directory">← Back to Talent Directory</button><section class="talent-profile-hero"><div class="headshot-wrap"><div class="talent-headshot" id="talent-headshot"><span>${escapeHtml(initials(a.full_name))}</span></div><label class="button headshot-upload">Upload headshot<input type="file" id="headshot-input" accept="image/jpeg,image/png,image/webp" hidden /></label><small>JPG, PNG, or WebP · up to 5 MB</small></div><div class="profile-identity"><p class="eyebrow">Talent profile</p><h1>${escapeHtml(a.full_name)}</h1><p>${escapeHtml(contact)}</p><div class="profile-tags"><span class="tag">${escapeHtml(titleCase(a.status))}</span><span class="tag neutral">${escapeHtml(titleCase(a.work_status))}</span></div></div><div class="profile-actions"><button class="button" id="profile-add-task">+ Add task</button></div></section><section class="profile-stat-grid"><article><p>Location & time zone</p><strong>${escapeHtml(formatTalentLocationTimeZone(a.location,recordedTalentTimeZone(a)))}</strong></article><article><p>Availability</p><strong>${escapeHtml(a.availability_note||a.dedicated_workspace||'Availability to review')}</strong></article><article><p>Application received</p><strong>${a.application_received_at?escapeHtml(new Date(a.application_received_at).toLocaleDateString()):'Not recorded'}</strong></article><article><p>Profile owner</p><strong>${a.talent_review_owner_id?'Assigned':'Unassigned'}</strong></article></section><div class="profile-layout"><section class="panel profile-section"><div class="panel-head"><div><p class="eyebrow">At a glance</p><h2>Profile details</h2></div></div><dl class="profile-details"><div><dt>Work status</dt><dd>${escapeHtml(titleCase(a.work_status))}</dd></div><div><dt>Expected rate</dt><dd>${escapeHtml(a.expected_hourly_rate_text||a.expected_hourly_rate||'Not recorded')}</dd></div><div><dt>English</dt><dd>${escapeHtml(a.english_proficiency||'Not recorded')}</dd></div><div><dt>Equipment</dt><dd>${escapeHtml(a.equipment_summary||'Not recorded')}</dd></div><div><dt>Internet</dt><dd>${escapeHtml(a.internet_summary||'Not recorded')}</dd></div><div><dt>Dream / goal</dt><dd>${escapeHtml(a.greatest_dream||'To be discussed in the Talent interview')}</dd></div></dl></section><section class="panel profile-section profile-documents-section"><div class="panel-head"><div><p class="eyebrow">Private files</p><h2>Documents & assessments</h2></div><button type="button" class="button" data-document-profile="talent" data-document-subject="${escapeHtml(a.id)}">Requests & saved documents</button></div><div id="profile-documents"><p class="eyebrow">Loading documents…</p></div></section></div></main>`}
 function render(){
+  if(!window.soroTaskDetail?.parseHash(location.hash))window.soroTaskDetail?.close();
   window.SoroActivityHistory?.unmount?.();
   window.SoroWorkLog?.unmount?.();
   window.SoroPlacementEnding?.unmount?.();
@@ -418,6 +420,7 @@ function render(){
     root.innerHTML=window.soroTaskCenter.renderPage();
     bindView();
     window.soroTaskCenter.bindPage(root);
+    window.soroTaskDetail?.sync();
     setActive();
     return;
   }
@@ -569,7 +572,8 @@ window.soroOpenTalentProfile=openTalentProfile;
 window.soroGoBackFromReadOnlyTalentProfile=goBackFromReadOnlyTalentProfile;
 nav.addEventListener('click',e=>{const b=e.target.closest('[data-view]');if(!b||!viewAllowedForAuthenticatedRole(b.dataset.view))return;current=b.dataset.view;selectedTalentId=null;selectedClientId=null;history.pushState({},'',`${location.pathname}#${current}`);setActive();render();document.querySelector('.sidebar').classList.remove('open')});window.addEventListener('popstate',()=>{
   const talentMatch=location.hash.match(/^#talent\/([^/]+)$/),clientMatch=location.hash.match(/^#client\/([^/]+)$/),placementMatch=location.hash.match(/^#client-placement\/([^/]+)$/),reviewMatch=location.hash.match(/^#client-candidate-review\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
-  if(/^#help\?ticketId=/.test(location.hash)){selectedTalentId=null;selectedClientId=null;current='help'}
+  if(window.soroTaskDetail?.parseHash(location.hash)){selectedTalentId=null;selectedClientId=null;current='tasks'}
+  else if(/^#help\?ticketId=/.test(location.hash)){selectedTalentId=null;selectedClientId=null;current='help'}
   else if(/^#documents(?:\?|$)/.test(location.hash)){selectedTalentId=null;selectedClientId=null;current='documents'}
   else if(talentMatch){selectedTalentId=talentMatch[1];selectedClientId=null;current='talent-profile'}
   else if(clientMatch){selectedClientId=clientMatch[1];selectedTalentId=null;current='client-record'}
@@ -849,6 +853,10 @@ window.addEventListener('soro:placement-work-log-open',event=>{
 window.addEventListener('soro:task-center-updated',()=>{
   if(current==='tasks'||(current==='overview'&&['admin','sales','talent'].includes(role)))render();
 });
+window.addEventListener('soro:task-route',()=>{
+  if(!viewAllowedForAuthenticatedRole('tasks'))return;
+  current='tasks';selectedTalentId=null;selectedClientId=null;setActive();render();
+});
 window.addEventListener('soro:task-center-open-tasks',()=>{
   if(!viewAllowedForAuthenticatedRole('tasks'))return;
   current='tasks';
@@ -875,7 +883,8 @@ const initialTalentHash=location.hash.match(/^#talent\/([^/]+)$/);
 const initialClientHash=location.hash.match(/^#client\/([^/]+)$/);
 const initialPlacementHash=location.hash.match(/^#client-placement\/([^/]+)$/);
 const initialReviewHash=location.hash.match(/^#client-candidate-review\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/i);
-if(/^#help\?ticketId=/.test(location.hash)){current='help'}
+if(window.soroTaskDetail?.parseHash(location.hash)){current='tasks'}
+else if(/^#help\?ticketId=/.test(location.hash)){current='help'}
 else if(/^#documents(?:\?|$)/.test(location.hash)){current='documents'}
 else if(initialTalentHash){current='talent-profile';selectedTalentId=initialTalentHash[1]}
 else if(initialClientHash){current='client-record';selectedClientId=initialClientHash[1]}

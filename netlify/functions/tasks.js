@@ -257,6 +257,12 @@ function publicTask(value) {
     throw httpError(502, 'task_service_error', 'My Tasks returned an invalid response.');
   }
   if(value.source?.kind === 'interview_result') task.source={kind:'interview_result',applicantId:requiredUuid(value.source.applicantId),interviewId:requiredUuid(value.source.interviewId)};
+  if(value.version!==undefined){
+    if(!Number.isSafeInteger(value.version)||value.version<1||!['not_started','in_progress','blocked','completed','submitted','closed'].includes(value.progress)||!['staff_task','applicant_request'].includes(value.kind))throw httpError(502,'task_service_error','Invalid task details.');
+    Object.assign(task,{version:value.version,kind:value.kind,progress:value.progress,details:nullableText(value.details,4000)||'',response:nullableText(value.response,4000)||'',isNew:value.isNew===true,canEditDetails:value.canEditDetails===true,canUpdateProgress:value.canUpdateProgress===true,canRespond:value.canRespond===true,canCloseRequest:value.canCloseRequest===true});
+    if(!Array.isArray(value.assignees)||value.assignees.length>30)throw httpError(502,'task_service_error','Invalid task assignment.');
+    task.assignees=value.assignees.map(publicPerson);task.canAssign=value.canAssign===true;
+  }
   return task;
 }
 
@@ -473,5 +479,7 @@ exports.TASK_STATUSES = TASK_STATUSES;
 exports.UPDATE_BODY_KEYS = UPDATE_BODY_KEYS;
 exports.hasExactKeys = hasExactKeys;
 exports.publicPayload = publicPayload;
+exports.publicTask = publicTask;
+exports.publicAssignee = publicAssignee;
 exports.validDate = validDate;
 exports.validUuid = validUuid;

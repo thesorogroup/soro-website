@@ -164,6 +164,7 @@
       if (typeof roleConfig !== 'undefined' && roleConfig[role]?.className) document.body.className = roleConfig[role].className;
     }
     updateSignedInIdentity(session, access);
+    window.soroTaskDetail?.restore();
     if (typeof window.soroSyncAuthorizedNavigation === 'function') window.soroSyncAuthorizedNavigation(access);
     if (typeof setActive === 'function') setActive();
     if (typeof render === 'function') render();
@@ -172,6 +173,7 @@
   }
 
   function showRequiredPasswordChange(session, access) {
+    window.soroTaskDetail?.remember();
     window.soroCurrentAccess = { ...access, user_id: session.user.id };
     window.dispatchEvent(new CustomEvent('soro-auth-changed', { detail: { session: null, access: null } }));
     checking.hidden = true;

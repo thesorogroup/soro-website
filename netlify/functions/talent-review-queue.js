@@ -6,7 +6,7 @@ const SERVICE_KEY = String(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || ''
 ).trim();
 
-const MAX_REQUEST_BYTES = 8 * 1024;
+const MAX_REQUEST_BYTES = 24 * 1024;
 const MAX_APPLICANTS = 1000;
 const ACTIONS = new Set([
   'begin_review',
@@ -21,7 +21,9 @@ const ACTIONS = new Set([
 const NOTE_REQUIRED_ACTIONS = new Set(['request_more_info', 'decline', 'archive']);
 const STAGES = new Set(['submitted', 'in_review', 'needs_more_info', 'bench_ready', 'declined']);
 const VIEWER_ROLES = new Set(['admin', 'talent_management']);
-const CHECKLIST_STATES = new Set(['complete', 'missing']);
+const CHECKLIST_STATES = new Set(['complete', 'missing', 'needs_review']);
+const SCREENING_KEYS = new Set(['english', 'disc', 'enneagram', 'mbti', 'internet', 'equipment']);
+const EVIDENCE_STATES = new Set(['available', 'missing', 'unclassified_available']);
 const CHECKLIST_KEYS = new Set([
   'core_profile', 'resume', 'english', 'disc', 'enneagram', 'mbti', 'internet', 'equipment', 'skills'
 ]);
@@ -263,7 +265,16 @@ function publicChecklistItem(value) {
   if (!CHECKLIST_KEYS.has(key) || !CHECKLIST_STATES.has(state)) {
     throw httpError(502, 'review_service_error', 'The Talent review queue returned an invalid response.');
   }
-  return { key, label: requiredText(value.label, 100), state };
+  const item = { key, label: requiredText(value.label, 100), state };
+  if (SCREENING_KEYS.has(key) && ('resultRecorded' in value || 'evidenceState' in value)) {
+    if (typeof value.resultRecorded !== 'boolean' || !EVIDENCE_STATES.has(value.evidenceState)
+      || (state === 'complete') !== (value.evidenceState === 'available')) {
+      throw httpError(502, 'review_service_error', 'The Talent review queue returned an invalid response.');
+    }
+    item.resultRecorded = value.resultRecorded;
+    item.evidenceState = value.evidenceState;
+  }
+  return item;
 }
 
 function publicResumeReference(value) {
@@ -363,12 +374,17 @@ async function getQueue(event) {
 async function changeStage(event) {
   rejectQueryScope(event);
   const body = parseBody(event);
-  if (!hasExactKeys(body, POST_KEYS)) {
+  if (!hasExactKeys(body, body.action==='request_more_info'?[...POST_KEYS,'requestDetails']:POST_KEYS)) {
     throw httpError(400, 'unsupported_scope', 'Only the fields required for this review action are accepted.');
   }
   const action = String(body.action || '').trim().toLowerCase();
   if (!ACTIONS.has(action)) throw httpError(400, 'unsupported_action', 'Choose a supported review action.');
   const user = await authenticatedUser(event);
+  if(action==='request_more_info'){
+    if(typeof body.requestDetails!=='string'||!body.requestDetails.trim()||body.requestDetails.length>4000)throw httpError(400,'invalid_request','Add the message to send the applicant.');
+    const payload=await callRpc('request_talent_information',{p_actor_user_id:user.id,p_request_id:inputUuid(body.requestId,'request id'),p_applicant_id:inputUuid(body.applicantId,'Talent application'),p_expected_updated_at:inputTimestamp(body.expectedUpdatedAt),p_note:body.note?inputNote(body.note,action):'',p_request_details:body.requestDetails.trim()});
+    return json(200,publicPayload(payload));
+  }
   const payload = await callRpc('change_talent_review_stage', {
     p_actor_user_id: user.id,
     p_request_id: inputUuid(body.requestId, 'request id'),

@@ -170,7 +170,16 @@
       const state = text(item.state, 32).toLowerCase();
       if (!/^[a-z0-9][a-z0-9_-]*$/.test(key) || seen.has(key) || !label || !CHECKLIST_STATES.has(state)) return null;
       seen.add(key);
-      return Object.freeze({ key, label, state });
+      const result = { key, label, state };
+      if (['english', 'disc', 'enneagram', 'mbti', 'internet', 'equipment'].includes(key)
+        && ('resultRecorded' in item || 'evidenceState' in item)) {
+        if (typeof item.resultRecorded !== 'boolean'
+          || !['available', 'missing', 'unclassified_available'].includes(item.evidenceState)
+          || (state === 'complete') !== (item.evidenceState === 'available')) return null;
+        result.resultRecorded = item.resultRecorded;
+        result.evidenceState = item.evidenceState;
+      }
+      return Object.freeze(result);
     });
     return items.some(item => !item) ? null : Object.freeze(items);
   }
@@ -769,9 +778,22 @@
 
   function checklistMarkup(applicant) {
     const complete = applicant.checklist.filter(item => item.state === 'complete').length;
+    const sourceReview = applicant.checklist.some(item => item.resultRecorded && item.state !== 'complete');
     return `<div class="talent-review-checklist">
       <div class="talent-review-checklist-heading"><strong>Review checklist</strong><span>${complete} of ${applicant.checklist.length} complete</span></div>
-      <ul>${applicant.checklist.map(item => `<li class="is-${escapeHtml(item.state)}"><span aria-hidden="true">${item.state === 'complete' ? '✓' : item.state === 'needs_review' ? '!' : '–'}</span>${escapeHtml(item.label)}<small>${item.state === 'complete' ? 'Complete' : item.state === 'needs_review' ? 'Needs review' : 'Missing'}</small></li>`).join('')}</ul>
+      <ul>${applicant.checklist.map(item => {
+        let status = item.state === 'complete' ? 'Complete' : item.state === 'needs_review' ? 'Needs Review' : 'Missing';
+        let explanation = '';
+        if (typeof item.resultRecorded === 'boolean') {
+          const fileAvailable = item.evidenceState === 'available';
+          status = item.resultRecorded ? (fileAvailable ? 'Recorded' : 'Recorded · Check Source') : (fileAvailable ? 'Source Categorized' : 'Not Recorded');
+          explanation = item.resultRecorded ? 'A result has been saved to this profile.' : 'No result has been entered yet.';
+          explanation += fileAvailable ? ' A source document is categorized for this item.' : ' No source file is categorized for this item.';
+          if (item.evidenceState === 'unclassified_available') explanation += ' Unclassified assessment files are on the profile; review whether any match this test.';
+        }
+        return `<li class="is-${escapeHtml(item.state)}"${explanation ? ` title="${escapeHtml(explanation)}"` : ''}><span aria-hidden="true">${item.state === 'complete' ? '✓' : item.state === 'needs_review' ? '!' : '–'}</span>${escapeHtml(item.label)}<small>${escapeHtml(status)}</small></li>`;
+      }).join('')}</ul>
+      ${sourceReview ? '<p class="talent-review-checklist-note">Recorded results are saved. Items marked “Check Source” still need a source file in the matching category before the checklist is complete.</p>' : ''}
     </div>`;
   }
 
@@ -1034,7 +1056,8 @@
       <form method="dialog" data-review-action-form>
         <header><div><p class="eyebrow">${dangerous ? 'Guarded record action' : 'Talent review note'}</p><h2>${escapeHtml(title)}</h2></div><button type="button" data-review-dialog-close aria-label="Close">×</button></header>
         <p>${dangerous ? `This changes ${escapeHtml(applicant.fullName)}’s review record. Explain the reason before confirming.` : `Add the information ${escapeHtml(applicant.fullName)} needs before the review can continue.`}</p>
-        <label>Internal review note <span>Required</span><textarea name="note" maxlength="500" required placeholder="Record the reason and the next step"></textarea></label>
+        ${actionContext.action==='request_more_info'?'<label>Message to the Applicant <span>Sent by email and shown in their task</span><textarea name="requestDetails" maxlength="4000" required rows="5" placeholder="Explain exactly what information you need and how they can provide it"></textarea></label>':''}
+        <label>Internal review note <span>${actionContext.action==='request_more_info'?'Optional · Not sent to the applicant':'Required'}</span><textarea name="note" maxlength="500" ${actionContext.action==='request_more_info'?'':'required'} placeholder="Private context for the Soro team"></textarea></label>
         <div class="talent-review-dialog-status" aria-live="polite"></div>
         <footer><button type="button" class="button" data-review-dialog-close>Cancel</button><button type="submit" class="button${dangerous ? ' talent-review-confirm-guarded' : ' primary'}">${escapeHtml(title)}</button></footer>
       </form>
@@ -1341,7 +1364,7 @@
     render();
   }
 
-  async function changeApplicant({ applicantId, expectedUpdatedAt, action, note = '' } = {}) {
+  async function changeApplicant({ applicantId, expectedUpdatedAt, action, note = '', requestDetails = '' } = {}) {
     if (pendingStageAction) throw new Error('Please wait for the current review update to finish.');
     if (!canOpenForRole()) throw new Error('Only Admin and Talent Management can update Talent review records.');
     const id = validUuid(applicantId);
@@ -1355,13 +1378,16 @@
     if (applicant && !applicant.allowedActions.includes(normalizedAction)) {
       throw new Error('That review action is not currently available. Refresh the queue and try again.');
     }
-    if (NOTE_REQUIRED_ACTIONS.has(normalizedAction) && !normalizedNote) throw new Error('Add a review note before continuing.');
+    if (NOTE_REQUIRED_ACTIONS.has(normalizedAction) && normalizedAction!=='request_more_info' && !normalizedNote) throw new Error('Add a review note before continuing.');
+    if(normalizedAction==='request_more_info'&&!String(requestDetails).trim())throw new Error('Add the message to send the applicant.');
     holdReview(id);
     const version = ++requestVersion;
     pendingStageAction = version;
     let next;
     try {
-      next = await requestQueue({ method:'POST', body:{ requestId:makeRequestId(), applicantId:id, expectedUpdatedAt:expected, action:normalizedAction, note:normalizedNote } });
+      const fingerprint=JSON.stringify([id,expected,normalizedAction,normalizedNote,requestDetails]);
+      if(actionContext&&actionContext.fingerprint!==fingerprint)actionContext=Object.freeze({...actionContext,fingerprint,requestId:makeRequestId()});
+      next = await requestQueue({ method:'POST', body:{ requestId:actionContext?.requestId||makeRequestId(), applicantId:id, expectedUpdatedAt:expected, action:normalizedAction, note:normalizedNote,...(normalizedAction==='request_more_info'?{requestDetails:String(requestDetails).trim()}: {}) } });
     } finally { if (pendingStageAction === version) pendingStageAction = false; }
     if (version !== requestVersion) return currentQueue();
     if (mountedRoot) return setQueue(next);
@@ -1371,17 +1397,17 @@
     return queue;
   }
 
-  async function submitAction(applicantId, action, note = '') {
+  async function submitAction(applicantId, action, note = '', requestDetails = '') {
     const applicant = findApplicant(applicantId);
     if (!applicant) throw new Error('That Talent application is no longer in this queue. Refresh and try again.');
     const next = await changeApplicant({
       applicantId: applicant.applicantId,
       expectedUpdatedAt: applicant.updatedAt,
       action,
-      note
+      note, requestDetails
     });
     actionContext = null;
-    feedback = Object.freeze({ type: 'success', message: `${applicant.fullName} moved to the next review step.` });
+    feedback = Object.freeze({ type: 'success', message: action==='request_more_info'?`Information request saved for ${applicant.fullName}. Their task is ready and the email is queued.`:`${applicant.fullName} moved to the next review step.` });
     render();
     return next;
   }
@@ -1593,7 +1619,8 @@
     if (!applicant) { closeActionDialog(); return; }
     const note = text(new FormData(form).get('note'), 500);
     const status = form.querySelector('.talent-review-dialog-status');
-    if (!note) { if (status) status.textContent = 'Add a review note before continuing.'; return; }
+    const requestDetails=String(new FormData(form).get('requestDetails')||'').trim();
+    if (actionContext.action==='request_more_info'?!requestDetails:!note) { if (status) status.textContent = actionContext.action==='request_more_info'?'Add the message to send the applicant.':'Add a review note before continuing.'; return; }
     if (CONFIRM_ACTIONS.has(actionContext.action)) {
       const message = confirmationMessage(applicant, actionContext.action);
       if (!root?.confirm?.(message)) return;
@@ -1601,7 +1628,7 @@
     const submit = form.querySelector('[type="submit"]');
     if (submit) submit.disabled = true;
     if (status) status.textContent = 'Saving the review update…';
-    try { await submitAction(applicant.applicantId, actionContext.action, note); }
+    try { await submitAction(applicant.applicantId, actionContext.action, note,requestDetails); }
     catch (error) {
       if (submit) submit.disabled = false;
       if (status) status.textContent = error.message || 'The review update could not be saved.';
@@ -1729,6 +1756,10 @@
   }
 
   root?.addEventListener?.('soro-auth-changed', handleAuthChange);
+  root?.addEventListener?.('soro:talent-screening-updated', () => {
+    // Refresh the authoritative checklist without clearing held order or filters.
+    if (canOpenForRole()) refresh({ silent: true });
+  });
   if (root?.document) {
     root.addEventListener?.('focus', refreshWhenActive);
     root.document.addEventListener?.('visibilitychange', refreshWhenActive);

@@ -20,7 +20,7 @@ test('review action row shares a flexible height without changing dropdown actio
   assert.match(css,/\.talent-review-action-divider \{ align-self: center/);
   assert.match(css,/\.talent-review-secondary\[open\] > summary::after/);
   assert.match(css,/@media \(max-width: 430px\)[\s\S]*\.talent-review-verification \{ flex: 1 1 100%; \}/);
-  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260910-interview-follow-through/);
+  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260910-checklist-results/);
 });
 
 const APPLICANT_KEYS = Object.freeze([
@@ -65,6 +65,50 @@ function queuePayload(role = 'admin', rows = [applicant()], overrides = {}) {
     ...overrides
   };
 }
+
+test('recorded results display separately from source completion and refresh after profile saves', async t => {
+  let recorded = false;
+  const list = () => [
+    {key:'english',label:'English assessment',state:'complete',resultRecorded:true,evidenceState:'available'},
+    {key:'disc',label:'DISC assessment',state:recorded?'needs_review':'missing',resultRecorded:recorded,evidenceState:'unclassified_available'},
+    {key:'equipment',label:'Computer specifications',state:'complete',resultRecorded:false,evidenceState:'available'}
+  ];
+  const {ui,listeners,calls} = installUi(t,{responsePayload:()=>queuePayload('admin',[applicant({stage:'in_review',checklist:list(),allowedActions:['mark_bench_ready']})])});
+  const target = {innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target); await new Promise(resolve=>setImmediate(resolve));
+  ui.setSearch('Mariel'); ui.setSort('oldest');
+  assert.match(target.innerHTML,/Source Categorized/);
+  assert.match(target.innerHTML,/Not Recorded/);
+  recorded = true;
+  listeners.get('soro:talent-screening-updated')();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(calls.length,2);
+  assert.match(target.innerHTML,/Recorded · Check Source/);
+  assert.match(target.innerHTML,/Unclassified assessment files are on the profile/);
+  assert.match(target.innerHTML,/2 of 3 complete/);
+  assert.match(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
+  assert.match(target.innerHTML,/value="Mariel"/);
+  assert.match(target.innerHTML,/<option value="oldest" selected>/);
+  assert.doesNotMatch(target.innerHTML,/Loading applications/);
+  globalThis.soroCurrentAccess={role:'sales'};
+  listeners.get('soro:talent-screening-updated')();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.equal(calls.length,2,'unauthorized roles do not request the queue');
+  const enhancement=read('operations/operations-enhancements.js');
+  const save=enhancement.slice(enhancement.indexOf('Object.assign(applicant, updates)'));
+  assert.match(save,/\.close\(\);\s*window.dispatchEvent\(new CustomEvent\('soro:talent-screening-updated'/);
+});
+
+test('recording metadata is validated and private data is dropped in the browser', t => {
+  const {ui} = installUi(t);
+  const item={key:'disc',label:'DISC',state:'needs_review',resultRecorded:true,evidenceState:'missing',rawScore:'PRIVATE'};
+  const payload=queuePayload('admin',[applicant({checklist:[item]})]);
+  assert.doesNotMatch(JSON.stringify(ui.normalizePayload(payload,'admin')),/PRIVATE/);
+  for(const change of [{resultRecorded:1},{evidenceState:'guessed'},{state:'complete'}]) {
+    const bad=queuePayload('admin',[applicant({checklist:[{...item,...change}]})]);
+    assert.throws(()=>ui.normalizePayload(bad,'admin'),/invalid applicant/);
+  }
+});
 
 test('newest applications sort first across stages, with user-controlled alternatives', async t => {
   const older = applicant({applicantId:requestId, fullName:'Z Older',stage:'needs_more_info',applicationReceivedAt:'2026-08-01T10:00:00Z'});
@@ -236,7 +280,8 @@ function installUi(t, options = {}) {
     constructor(type, init = {}) { this.type = type; this.detail = init.detail; }
   };
   globalThis.dispatchEvent = event => { events.push(event); return true; };
-  globalThis.addEventListener = () => {};
+  const listeners = new Map();
+  globalThis.addEventListener = (name, handler) => { listeners.set(name, handler); };
   if (options.document) {
     globalThis.document = options.document;
     globalThis.setInterval = () => 0;
@@ -261,7 +306,7 @@ function installUi(t, options = {}) {
       else delete globalThis[key];
     }
   });
-  return { ui, calls, events };
+  return { ui, calls, events, listeners };
 }
 
 test('only the actual Admin and Talent Management roles can open or load the queue', async t => {
@@ -383,7 +428,7 @@ test('client-chosen roles, stale omission, unavailable actions, and missing requ
 
   await assert.rejects(() => ui.changeApplicant({ applicantId, action: 'begin_review', note: '' }), /incomplete|Refresh/i);
   await assert.rejects(() => ui.changeApplicant({ applicantId, expectedUpdatedAt: updatedAt, action: 'restore', note: '' }), /not currently available/i);
-  await assert.rejects(() => ui.changeApplicant({ applicantId, expectedUpdatedAt: updatedAt, action: 'request_more_info', note: '' }), /note/i);
+  await assert.rejects(() => ui.changeApplicant({ applicantId, expectedUpdatedAt: updatedAt, action: 'request_more_info', note: '' }), /message to send/i);
   globalThis.soroCurrentAccess = { role: 'client_admin' };
   await assert.rejects(() => ui.changeApplicant({ applicantId, expectedUpdatedAt: updatedAt, action: 'begin_review', note: '', role: 'admin' }), /Only Admin|Talent Management/i);
   assert.equal(calls.length, baseline);

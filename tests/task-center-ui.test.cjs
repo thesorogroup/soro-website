@@ -34,7 +34,8 @@ test('real task service loads before the canonical renderer and replaces placeho
   assert.doesNotMatch(operations, /Review missing client agreement|Review payout exception|Check in with Alex Ramos|Review 2 incomplete applications|Sign the Soro client agreement|Choose interview windows|Complete your Dream Pathway action|Update payout verification/);
   assert.match(operations, /client:\{[^}]*primary:'Action needed',items:\[\],emptyMessage:'No actions are assigned right now\.'/);
   assert.match(operations, /va:\{[^}]*primary:'Action needed',items:\[\],emptyMessage:'No actions are assigned right now\.'/);
-  assert.doesNotMatch(operations, /virtual_assistant:new Set\(\[[^\]]*['"]tasks['"]/);
+  assert.match(operations, /virtual_assistant:new Set\(\[[^\]]*['"]tasks['"]/);
+  assert.equal(taskCenter.canCreate('virtual_assistant'),false);
 });
 
 test('task center refreshes active sessions and preserves one UUID across a failed create retry', () => {

@@ -41,6 +41,14 @@
       for (let offset = 0; ; offset += 500) {
         const page = await context.client.from('skill_library').select('name,is_active').eq('is_active', true).order('name').range(offset, offset + 499);
         context.check();
+        if (['PGRST205', '42P01'].includes(page.error?.code) && /\bskill_library\b/.test(page.error?.message || '')) {
+          // The optional custom library may not exist on older installations.
+          // Keep the canonical catalog and exact saved skills, never cached rows
+          // or a partial custom-library page. Auth/permission failures still stop.
+          library.length = 0;
+          snapshot.catalogNotice = 'Standard application skills and this profile’s saved skills are available. Additional custom skills are temporarily unavailable.';
+          break;
+        }
         if (page.error || !Array.isArray(page.data)) throw new Error('The skill library could not be loaded. Try again.');
         library.push(...page.data);
         if (page.data.length < 500) break;
@@ -74,6 +82,7 @@
     const updated = { record: result.data, scope: scope() };
     if (catalogSnapshots.has(snapshot)) {
       updated.catalog = snapshot.catalog;
+      if (snapshot.catalogNotice) updated.catalogNotice = snapshot.catalogNotice;
       catalogSnapshots.set(updated, catalogSnapshots.get(snapshot));
     }
     return updated;

@@ -6,15 +6,15 @@ const views=vm.runInNewContext('('+roleBlock+')');
 function setup(role='admin'){
  const classes=new Set(),listeners={},toolbar={hidden:true},button={addEventListener(type,fn){this[type]=fn;}},related={value:''},title={focused:false,focus(){this.focused=true;}},dialog={open:false,opens:0,showModal(){this.open=true;this.opens++;},close(reason){this.open=false;this.reason=reason;}};
  const nodes={'page-task-toolbar':toolbar,'page-add-task':button,'task-dialog':dialog,'task-related':related,'task-name':title};
- const context={soroCurrentAccess:{user_id:'sample-user',role,active:true},soroTaskCenter:{canLoad:r=>['admin','talent_management','sales','sales_management','billing'].includes(r)},viewAllowedForAuthenticatedRole:view=>views[context.soroCurrentAccess?.role]?.has(view),adminPreviewingNonAdminWorkspace:()=>false,location:{hash:'#overview'},currentTalentProfileApplicant:()=>({full_name:'Sample Talent'}),document:{getElementById:id=>nodes[id],body:{classList:{toggle(name,enabled){if(enabled)classes.add(name);else classes.delete(name);}}}},addEventListener(type,fn){listeners[type]=fn;}};
+ const context={soroCurrentAccess:{user_id:'sample-user',role,active:true},soroTaskCenter:{canCreate:r=>['admin','talent_management','sales','sales_management','billing'].includes(r)},viewAllowedForAuthenticatedRole:view=>views[context.soroCurrentAccess?.role]?.has(view),adminPreviewingNonAdminWorkspace:()=>false,location:{hash:'#overview'},currentTalentProfileApplicant:()=>({full_name:'Sample Talent'}),document:{getElementById:id=>nodes[id],body:{classList:{toggle(name,enabled){if(enabled)classes.add(name);else classes.delete(name);}}}},addEventListener(type,fn){listeners[type]=fn;}};
  vm.runInNewContext(source,context);
  return {context,api:context.soroPageTaskAction,toolbar,button,related,title,dialog,classes,listeners};
 }
 test('every actual role with Tasks gets the same shared action regardless of its sidebar page',()=>{
  for(const [role,allowed]of Object.entries(views)){
   const h=setup(role);
-  assert.equal(h.api.canCreate(),allowed.has('tasks'),role);
-  for(const page of allowed){h.context.location.hash='#'+page;assert.equal(h.api.sync(),allowed.has('tasks'),`${role}/${page}`);}
+  assert.equal(h.api.canCreate(),(allowed.has('tasks')&&role!=='virtual_assistant'),role);
+  for(const page of allowed){h.context.location.hash='#'+page;assert.equal(h.api.sync(),(allowed.has('tasks')&&role!=='virtual_assistant'),`${role}/${page}`);}
  }
 });
 test('signed out, inactive, password-change and Admin-preview sessions do not gain task access',()=>{
@@ -50,9 +50,10 @@ test('shared action is outside replaceable view content and initialized before a
 });
 function createRequestHarness(){
  let releaseToken,releaseResponse,calls=0;
- const session=new Promise(resolve=>releaseToken=()=>resolve({data:{session:{access_token:'sample-token'}}}));
+ const session=new Promise(resolve=>releaseToken=()=>resolve({data:{session:{access_token:'sample-token',user:{id:'first-user'}}}}));
  const response=new Promise(resolve=>releaseResponse=()=>resolve({ok:true,json:async()=>({tasks:[],notifications:[],assignees:[],summary:{}})}));
- const context={soroCurrentAccess:{user_id:'first-user',organization_id:'first-org',role:'admin'},soroSupabase:{auth:{getSession:()=>session}},soroPageTaskAction:{canCreate:()=>true},crypto:{randomUUID:()=> 'sample-idempotency'},FormData:class{entries(){return [['title','Local test'],['priority','normal']];}},fetch:async()=>{calls++;return response;}};
+ const context={soroCurrentAccess:{user_id:'first-user',organization_id:'first-org',role:'admin'},soroSupabase:{auth:{getSession:()=>session}},soroPageTaskAction:{canCreate:()=>true},crypto:{randomUUID:()=> 'sample-idempotency'},FormData:class{getAll(){return [];}entries(){return [['title','Local test'],['priority','normal']];}},fetch:async()=>{calls++;return response;}};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../operations/task-detail.js'),'utf8'),context);
  vm.runInNewContext(fs.readFileSync(require.resolve('../operations/task-center.js'),'utf8'),context);
  return {context,api:context.soroTaskCenter,releaseToken,releaseResponse,calls:()=>calls};
 }

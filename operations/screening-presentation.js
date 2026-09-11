@@ -191,7 +191,8 @@
   function firstLabeledNumber(text, label) {
     const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const number = '(\\d[\\d,]*(?:\\.\\d+)?)';
-    const unit = '(?:mbps|mb\\/s|mbit\\/s|megabits?\\s+per\\s+second|ms)';
+    const unit = /^(?:latency|ping)$/.test(label) ? 'ms' : '(?:mbps|mb\\/s|mbit\\/s|megabits?\\s+per\\s+second)';
+    if (new RegExp(`\\b${escaped}\\b\\s*(?:speed\\s*)?[:=]?\\s*(?:not\\s+recorded|pending|unknown|n\\/a)\\b`, 'i').test(text)) return null;
     // Prefer a value immediately before its label. Otherwise a string such as
     // "20.42 Mbps Download - 45.57 Mbps Upload" assigns the following Upload
     // value to Download as well.
@@ -221,6 +222,33 @@
     return Object.freeze({ download, upload, latency });
   }
 
+  function internetSpeedEditorValues(value) {
+    const parsed = parseInternetSpeed(value);
+    return Object.freeze(Object.fromEntries(['download', 'upload'].map(key => [
+      key, Number.isFinite(parsed[key]) && parsed[key] >= 0 ? parsed[key].toLocaleString('en-US', { useGrouping: false, maximumSignificantDigits: 21 }) : ''
+    ])));
+  }
+
+  function serializeInternetSpeed(values = {}, originalValue = null) {
+    const speeds = {};
+    for (const key of ['download', 'upload']) {
+      const raw = String(values[key] ?? '').trim();
+      if (!raw) { speeds[key] = null; continue; }
+      if (!/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw) || !Number.isFinite(Number(raw)) || Number(raw) < 0) {
+        throw new Error('Enter a number of 0 or more for each speed, or leave it blank.');
+      }
+      speeds[key] = Number(raw);
+    }
+    const previous = parseInternetSpeed(originalValue);
+    // Do not erase legacy notes, test URLs or latency when other results change.
+    if (speeds.download === previous.download && speeds.upload === previous.upload) return originalValue || null;
+    const parts = ['download', 'upload'].filter(key => speeds[key] !== null).map(key =>
+      `${key === 'download' ? 'Download' : 'Upload'}: ${speeds[key].toLocaleString('en-US', { useGrouping: false, maximumSignificantDigits: 21 })} Mbps`
+    );
+    if (Number.isFinite(previous.latency) && previous.latency >= 0) parts.push(`Ping: ${previous.latency} ms`);
+    return parts.join(' | ') || null;
+  }
+
   return Object.freeze({
     DEFAULT_THRESHOLDS,
     MBTI_DESCRIPTIONS,
@@ -233,6 +261,8 @@
     parseComputerSpecs,
     serializeComputerSpecs,
     serializePersonalityResults,
-    parseInternetSpeed
+    parseInternetSpeed,
+    internetSpeedEditorValues,
+    serializeInternetSpeed
   });
 }));

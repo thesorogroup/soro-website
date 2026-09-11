@@ -198,7 +198,7 @@ test('Admin workspace previews map all five choices to the real role navigation'
   assert.deepEqual(roleViews(source, 'sales'), ['documents', 'overview', 'tasks', 'clients', 'client-shortlists', 'client-placement', 'available-talent', 'talent-profile', 'placements', 'reports', 'help']);
   assert.deepEqual(roleViews(source, 'talent_management'), ['overview', 'tasks', 'clients', 'client-placement', 'vas', 'available-talent', 'talent-review', 'talent-profile', 'placements', 'documents', 'reports', 'talent-payout-review', 'help']);
   assert.deepEqual(roleViews(source, 'client_admin'), ['documents', 'overview', 'client-candidate-review', 'client-placement', 'client-talent-profile', 'my-profile', 'help']);
-  assert.deepEqual(roleViews(source, 'virtual_assistant'), ['overview', 'talent-my-profile', 'documents', 'help']);
+  assert.deepEqual(roleViews(source, 'virtual_assistant'), ['overview', 'tasks', 'talent-my-profile', 'documents', 'help']);
   assert.deepEqual(roleViews(source, 'billing'), ['overview', 'tasks', 'placements', 'documents', 'reports', 'help']);
 
   assert.match(source, /function actualAuthenticatedRole\(access=window\.soroCurrentAccess\)\{return String\(access\?\.role\|\|''\)\.toLowerCase\(\)\}/);

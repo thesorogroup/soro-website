@@ -13,7 +13,7 @@
   function canCreate() {
     const access = root.soroCurrentAccess;
     return Boolean(access?.user_id && access.active !== false && access.must_change_password !== true
-      && root.soroTaskCenter?.canLoad?.(access.role)
+      && root.soroTaskCenter?.canCreate?.(access.role)
       && root.viewAllowedForAuthenticatedRole?.('tasks')
       && !root.adminPreviewingNonAdminWorkspace?.());
   }

@@ -3,6 +3,7 @@
 .profile-skill-editor-dialog form { padding:24px; }
 .profile-skill-editor-dialog h2 { margin:0; font-size:1.5rem; }
 .profile-skill-editor-dialog .dialog-copy { font-size:.875rem; line-height:1.6; color:#526b85; margin:14px 0; }
+.profile-skill-editor-notice { margin:0 0 14px; padding:10px 12px; border:1px solid #caddec; border-radius:9px; background:#f2f7fb; color:#395a77; font-size:.875rem; line-height:1.5; }
 .profile-skill-editor-tools { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
 .profile-skill-editor-tools label { display:grid; gap:6px; font-size:.875rem; font-weight:700; }
 .profile-skill-editor-tools input,.profile-skill-editor-tools select { width:100%; min-width:0; min-height:42px; border:1px solid #c5d4e2; border-radius:9px; padding:9px 11px; background:white; color:#173b65; font:inherit; }

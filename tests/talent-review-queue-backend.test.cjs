@@ -106,6 +106,33 @@ function bodyOf(result) {
   return JSON.parse(result.body);
 }
 
+test('queue exposes recorded results independently from evidence without exposing result values', async t => {
+  const items = checklist().map(item => item.key === 'disc' ? {
+    ...item, state: 'needs_review', resultRecorded: true, evidenceState: 'unclassified_available',
+    rawScore: 'PRIVATE SCORE', storagePath: 'PRIVATE PATH'
+  } : item);
+  installFetch(t, { rpcBody: queuePayload({ applicants: [applicantRow({ checklist: items })] }) });
+  const result = await backend.handler(event());
+  assert.equal(result.statusCode, 200);
+  const projected = bodyOf(result).applicants[0].checklist.find(item => item.key === 'disc');
+  assert.deepEqual(projected, { key: 'disc', label: 'disc', state: 'needs_review', resultRecorded: true, evidenceState: 'unclassified_available' });
+  assert.doesNotMatch(result.body, /PRIVATE/);
+});
+
+test('queue rejects malformed recording metadata and false evidence-completion combinations', async t => {
+  let metadata;
+  installFetch(t, { rpcBody: () => queuePayload({ applicants: [applicantRow({ checklist: checklist().map(item => item.key === 'disc' ? { ...item, ...metadata } : item) })] }) });
+  for (const invalid of [
+    { resultRecorded: 'true', evidenceState: 'missing' },
+    { resultRecorded: true, evidenceState: 'guessed' },
+    { resultRecorded: true, evidenceState: 'available', state: 'missing' },
+    { resultRecorded: true, evidenceState: 'unclassified_available', state: 'complete' }
+  ]) {
+    metadata = invalid;
+    assert.equal((await backend.handler(event())).statusCode, 502);
+  }
+});
+
 test('GET authenticates once and derives queue scope only from the verified actor', async t => {
   const calls = installFetch(t);
   const result = await backend.handler(event());
@@ -143,19 +170,19 @@ test('GET rejects every client-selected scope before authentication', async t =>
 
 test('POST accepts only the exact optimistic-concurrency keys and sends an actor-scoped RPC', async t => {
   const calls = installFetch(t);
-  const requestBody = { requestId, applicantId, expectedUpdatedAt, action: 'request_more_info', note: 'Please upload the missing proof.' };
+  const requestBody = { requestId, applicantId, expectedUpdatedAt, action: 'request_more_info', note: 'Private review context.',requestDetails:'Please upload the missing proof.' };
   const result = await backend.handler(event({ httpMethod: 'POST', body: JSON.stringify(requestBody) }));
 
   assert.equal(result.statusCode, 200);
   assert.equal(calls.length, 2);
-  assert.equal(calls[1].url, 'https://talent-review-test.supabase.co/rest/v1/rpc/change_talent_review_stage');
+  assert.equal(calls[1].url, 'https://talent-review-test.supabase.co/rest/v1/rpc/request_talent_information');
   assert.deepEqual(JSON.parse(calls[1].options.body), {
     p_actor_user_id: userId,
     p_request_id: requestId,
     p_applicant_id: applicantId,
     p_expected_updated_at: expectedUpdatedAt,
-    p_action: 'request_more_info',
-    p_note: 'Please upload the missing proof.'
+    p_note: 'Private review context.',
+    p_request_details: 'Please upload the missing proof.'
   });
 
   const before = calls.length;
