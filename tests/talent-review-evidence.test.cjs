@@ -18,6 +18,19 @@ function setup(t){
  return {api,calls,conflict:()=>updateEmpty=true,url:v=>signedUrl=v,docs:v=>documents=v,library:v=>library=v,record:v=>record={...record,...v},libraryError:v=>libraryError=v||{message:'Unavailable'},deferLibrary:()=>{let release;libraryWait=new Promise(r=>release=r);return release;},defer:()=>{let release;wait=new Promise(r=>release=r);return release;}};
 }
 
+test('only successful skill saves signal the queue to refresh',async t=>{
+ const h=setup(t),events=[];
+ const previous=globalThis.dispatchEvent;
+ globalThis.dispatchEvent=event=>events.push(event.type);
+ t.after(()=>{if(previous===undefined)delete globalThis.dispatchEvent;else globalThis.dispatchEvent=previous;});
+ const snapshot=await h.api.loadSkills(id);
+ await h.api.saveSkills(id,snapshot,[{name:'Coding',years:''}]);
+ assert.deepEqual(events,['soro:talent-skills-updated']);
+ h.conflict();
+ await assert.rejects(h.api.saveSkills(id,snapshot,[]),/changed/);
+ assert.equal(events.length,1);
+});
+
 test('active library loading paginates beyond a single response cap',async t=>{
  const h=setup(t);h.library(Array.from({length:501},(_,i)=>({name:`Library ${i}`,is_active:true})));
  const snapshot=await h.api.loadSkills(id,{includeCatalog:true});

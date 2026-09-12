@@ -274,6 +274,9 @@ function publicChecklistItem(value) {
     item.resultRecorded = value.resultRecorded;
     item.evidenceState = value.evidenceState;
   }
+  if (key === 'skills' && 'verifiedSkillsCount' in value) {
+    item.verifiedSkillsCount = requiredCount(value.verifiedSkillsCount);
+  }
   return item;
 }
 

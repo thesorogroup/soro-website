@@ -85,6 +85,7 @@
       if (snapshot.catalogNotice) updated.catalogNotice = snapshot.catalogNotice;
       catalogSnapshots.set(updated, catalogSnapshots.get(snapshot));
     }
+    if (typeof root.CustomEvent === 'function') root.dispatchEvent?.(new root.CustomEvent('soro:talent-skills-updated'));
     return updated;
   }
   async function loadResume(applicantId) {

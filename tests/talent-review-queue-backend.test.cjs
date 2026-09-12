@@ -133,6 +133,40 @@ test('queue rejects malformed recording metadata and false evidence-completion c
   }
 });
 
+test('queue exposes only the verified skill count and keeps submission state independent', async t => {
+  let count = 0;
+  installFetch(t, { rpcBody: () => queuePayload({ applicants: [applicantRow({
+    checklist: checklist().map(item => ({
+      ...item, verifiedSkillsCount: count,
+      verifiedSkills: ['PRIVATE VERIFIED SKILL'], verifiedBy: 'PRIVATE REVIEWER'
+    }))
+  })] }) });
+  for (const value of [0, 2]) {
+    count = value;
+    const result = await backend.handler(event());
+    assert.equal(result.statusCode, 200);
+    const projected = bodyOf(result).applicants[0].checklist;
+    assert.deepEqual(projected.find(item => item.key === 'skills'), {
+      key: 'skills', label: 'skills', state: 'missing', verifiedSkillsCount: value
+    });
+    assert.equal(projected.filter(item => 'verifiedSkillsCount' in item).length, 1);
+    assert.doesNotMatch(result.body, /PRIVATE/);
+  }
+});
+
+test('optional verified skill counts reject malformed metadata without coercion', () => {
+  const payloadWithCount = count => queuePayload({ applicants: [applicantRow({
+    checklist: checklist().map(item => item.key === 'skills' ? { ...item, verifiedSkillsCount: count } : item)
+  })] });
+  for (const invalid of [-1, 1.5, '2', true, null, undefined, {}, [], NaN, Infinity, Number.MAX_SAFE_INTEGER + 1]) {
+    assert.throws(() => backend.publicPayload(payloadWithCount(invalid)), error => error.status === 502);
+  }
+  const largest = backend.publicPayload(payloadWithCount(Number.MAX_SAFE_INTEGER));
+  assert.equal(largest.applicants[0].checklist.find(item => item.key === 'skills').verifiedSkillsCount, Number.MAX_SAFE_INTEGER);
+  const legacy = backend.publicPayload(queuePayload()).applicants[0].checklist.find(item => item.key === 'skills');
+  assert.equal('verifiedSkillsCount' in legacy, false, 'missing metadata must not imply zero verified skills');
+});
+
 test('GET authenticates once and derives queue scope only from the verified actor', async t => {
   const calls = installFetch(t);
   const result = await backend.handler(event());

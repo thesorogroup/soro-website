@@ -20,7 +20,7 @@ test('review action row shares a flexible height without changing dropdown actio
   assert.match(css,/\.talent-review-action-divider \{ align-self: center/);
   assert.match(css,/\.talent-review-secondary\[open\] > summary::after/);
   assert.match(css,/@media \(max-width: 430px\)[\s\S]*\.talent-review-verification \{ flex: 1 1 100%; \}/);
-  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260910-checklist-results/);
+  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260912-review-progress/);
 });
 
 const APPLICANT_KEYS = Object.freeze([
@@ -77,15 +77,16 @@ test('recorded results display separately from source completion and refresh aft
   const target = {innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
   ui.mount(target); await new Promise(resolve=>setImmediate(resolve));
   ui.setSearch('Mariel'); ui.setSort('oldest');
-  assert.match(target.innerHTML,/Source Categorized/);
-  assert.match(target.innerHTML,/Not Recorded/);
+  assert.match(target.innerHTML,/File Received/);
+  assert.match(target.innerHTML,/Awaiting Result/);
   recorded = true;
   listeners.get('soro:talent-screening-updated')();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(calls.length,2);
-  assert.match(target.innerHTML,/Recorded · Check Source/);
-  assert.match(target.innerHTML,/Unclassified assessment files are on the profile/);
-  assert.match(target.innerHTML,/2 of 3 complete/);
+  assert.match(target.innerHTML,/Check File Category/);
+  assert.match(target.innerHTML,/2 of 3 Results Recorded/);
+  assert.match(target.innerHTML,/2 of 3 Items Received/);
+  assert.equal((target.innerHTML.match(/talent-review-progress-item is-recorded/g)||[]).length,2);
   assert.match(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
   assert.match(target.innerHTML,/value="Mariel"/);
   assert.match(target.innerHTML,/<option value="oldest" selected>/);
@@ -107,6 +108,57 @@ test('recording metadata is validated and private data is dropped in the browser
   for(const change of [{resultRecorded:1},{evidenceState:'guessed'},{state:'complete'}]) {
     const bad=queuePayload('admin',[applicant({checklist:[{...item,...change}]})]);
     assert.throws(()=>ui.normalizePayload(bad,'admin'),/invalid applicant/);
+  }
+});
+
+test('received submissions never turn staff review green; recorded results and verified counts do', async t => {
+  let saved = false;
+  let submissionOpen = false;
+  const checklist = () => [
+    {key:'core_profile',label:'Core profile',state:'complete'},
+    {key:'resume',label:'Resume',state:'complete'},
+    ...['english','disc','enneagram','mbti','internet','equipment'].map((key,index) => ({key,label:key,state:'complete',resultRecorded:saved && index < 2,evidenceState:'available'})),
+    {key:'skills',label:'Applicant-reported skills',state:'complete',verifiedSkillsCount:saved ? 3 : 0}
+  ];
+  const {ui,listeners} = installUi(t,{responsePayload:()=>queuePayload('admin',[applicant({checklist:checklist()})])});
+  const target = {innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(selector){return selector.startsWith('[data-review-submission=') ? {open:submissionOpen} : null;}};
+  ui.mount(target); await new Promise(resolve=>setImmediate(resolve));
+  assert.match(target.innerHTML,/9 of 9 Items Received/);
+  assert.match(target.innerHTML,/0 of 6 Results Recorded · 0 Skills Verified/);
+  assert.equal((target.innerHTML.match(/Awaiting Result/g)||[]).length,6);
+  assert.doesNotMatch(target.innerHTML,/talent-review-progress-item is-recorded|9 of 9 complete/);
+  saved = true;
+  submissionOpen = true;
+  ui.setSearch('Mariel'); ui.setSort('oldest');
+  listeners.get('soro:talent-skills-updated')();
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.match(target.innerHTML,/2 of 6 Results Recorded · 3 Skills Verified/);
+  assert.equal((target.innerHTML.match(/talent-review-progress-item is-recorded/g)||[]).length,3);
+  assert.match(target.innerHTML,/value="Mariel"/);
+  assert.match(target.innerHTML,/<option value="oldest" selected>/);
+  assert.match(target.innerHTML,new RegExp(`data-review-submission="${applicantId}" open`));
+});
+
+test('older payloads display unknown review state rather than inferring completion from uploads', async t => {
+  const {ui} = installUi(t,{responsePayload:queuePayload('admin',[applicant({checklist:[
+    {key:'disc',label:'DISC',state:'complete'},
+    {key:'skills',label:'Skills',state:'complete'}
+  ]})])});
+  const target = {innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target); await new Promise(resolve=>setImmediate(resolve));
+  assert.match(target.innerHTML,/Recording Status Not Loaded/);
+  assert.match(target.innerHTML,/Skill Verification Not Loaded/);
+  assert.doesNotMatch(target.innerHTML,/talent-review-progress-item is-recorded|0 Skills Verified/);
+});
+
+test('verified skill count validation is strict and drops private skill details', t => {
+  const {ui} = installUi(t);
+  const item = {key:'skills',label:'Skills',state:'complete',verifiedSkillsCount:2,verified_skills:['PRIVATE']};
+  const result = ui.normalizePayload(queuePayload('admin',[applicant({checklist:[item]})]),'admin');
+  assert.equal(result.applicants[0].checklist[0].verifiedSkillsCount,2);
+  assert.doesNotMatch(JSON.stringify(result),/PRIVATE/);
+  for(const value of [-1,1.5,'2',null,Number.MAX_SAFE_INTEGER+1]) {
+    assert.throws(()=>ui.normalizePayload(queuePayload('admin',[applicant({checklist:[{...item,verifiedSkillsCount:value}]})]),'admin'),/invalid applicant/);
   }
 });
 

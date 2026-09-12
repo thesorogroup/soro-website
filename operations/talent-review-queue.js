@@ -179,6 +179,10 @@
         result.resultRecorded = item.resultRecorded;
         result.evidenceState = item.evidenceState;
       }
+      if (key === 'skills' && 'verifiedSkillsCount' in item) {
+        if (!Number.isSafeInteger(item.verifiedSkillsCount) || item.verifiedSkillsCount < 0) return null;
+        result.verifiedSkillsCount = item.verifiedSkillsCount;
+      }
       return Object.freeze(result);
     });
     return items.some(item => !item) ? null : Object.freeze(items);
@@ -777,23 +781,37 @@
   }
 
   function checklistMarkup(applicant) {
-    const complete = applicant.checklist.filter(item => item.state === 'complete').length;
-    const sourceReview = applicant.checklist.some(item => item.resultRecorded && item.state !== 'complete');
+    const submissionOpen = mountedRoot?.querySelector?.(`[data-review-submission="${applicant.applicantId}"]`)?.open === true;
+    const received = applicant.checklist.filter(item => item.state === 'complete').length;
+    const screening = applicant.checklist.filter(item => ['english', 'disc', 'enneagram', 'mbti', 'internet', 'equipment'].includes(item.key));
+    const recorded = screening.filter(item => item.resultRecorded === true).length;
+    const resultsSummary = screening.every(item => typeof item.resultRecorded === 'boolean')
+      ? `${recorded} of ${screening.length} Results Recorded` : 'Recording Status Not Loaded';
+    const skills = applicant.checklist.find(item => item.key === 'skills');
+    const skillsCount = skills?.verifiedSkillsCount;
+    const skillsSummary = Number.isSafeInteger(skillsCount) ? `${skillsCount} ${skillsCount === 1 ? 'Skill' : 'Skills'} Verified` : 'Skill Verification Not Loaded';
+    const sourceLabel = item => item.evidenceState === 'unclassified_available' ? 'Check File Category'
+      : item.state === 'complete' ? 'File Received' : 'File Missing';
+    const reviewItems = screening.concat(skills ? [skills] : []);
     return `<div class="talent-review-checklist">
-      <div class="talent-review-checklist-heading"><strong>Review checklist</strong><span>${complete} of ${applicant.checklist.length} complete</span></div>
-      <ul>${applicant.checklist.map(item => {
-        let status = item.state === 'complete' ? 'Complete' : item.state === 'needs_review' ? 'Needs Review' : 'Missing';
-        let explanation = '';
-        if (typeof item.resultRecorded === 'boolean') {
-          const fileAvailable = item.evidenceState === 'available';
-          status = item.resultRecorded ? (fileAvailable ? 'Recorded' : 'Recorded · Check Source') : (fileAvailable ? 'Source Categorized' : 'Not Recorded');
-          explanation = item.resultRecorded ? 'A result has been saved to this profile.' : 'No result has been entered yet.';
-          explanation += fileAvailable ? ' A source document is categorized for this item.' : ' No source file is categorized for this item.';
-          if (item.evidenceState === 'unclassified_available') explanation += ' Unclassified assessment files are on the profile; review whether any match this test.';
-        }
-        return `<li class="is-${escapeHtml(item.state)}"${explanation ? ` title="${escapeHtml(explanation)}"` : ''}><span aria-hidden="true">${item.state === 'complete' ? '✓' : item.state === 'needs_review' ? '!' : '–'}</span>${escapeHtml(item.label)}<small>${escapeHtml(status)}</small></li>`;
+      <div class="talent-review-checklist-heading"><strong>Team Review</strong><span>${resultsSummary}${skills ? ` · ${skillsSummary}` : ''}</span></div>
+      <ul class="talent-review-progress">${reviewItems.map(item => {
+        const isSkills = item.key === 'skills';
+        const done = isSkills ? skillsCount > 0 : item.resultRecorded === true;
+        const status = isSkills ? (skillsCount === 0 ? 'No Skills Verified' : skillsSummary)
+          : done ? 'Result Recorded' : item.resultRecorded === false ? 'Awaiting Result' : 'Recording Status Not Loaded';
+        const receipt = isSkills ? (item.state === 'complete' ? 'Skills Reported' : 'No Skills Reported') : sourceLabel(item);
+        const label = isSkills ? 'Skills Verification' : item.label;
+        return `<li class="talent-review-progress-item ${done ? 'is-recorded' : 'is-pending'}">
+          <strong>${escapeHtml(label)}</strong>
+          <span class="talent-review-receipt ${item.state === 'complete' ? 'is-received' : 'is-source-missing'}">${escapeHtml(receipt)}</span>
+          <span class="talent-review-progress-status"><b aria-hidden="true">${done ? '✓' : '○'}</b>${escapeHtml(status)}</span>
+        </li>`;
       }).join('')}</ul>
-      ${sourceReview ? '<p class="talent-review-checklist-note">Recorded results are saved. Items marked “Check Source” still need a source file in the matching category before the checklist is complete.</p>' : ''}
+      <p class="talent-review-checklist-note">Received files are not reviewed results. Green means a result is recorded or skills are verified; interview and reference checks are separate.</p>
+      <details class="talent-review-submission" data-review-submission="${applicant.applicantId}"${submissionOpen ? ' open' : ''}><summary><strong>Applicant Submission</strong><span>${received} of ${applicant.checklist.length} Items Received</span></summary>
+        <ul>${applicant.checklist.map(item => `<li class="${item.state === 'complete' ? 'is-received' : 'is-source-missing'}"><strong>${escapeHtml(item.label)}</strong><span>${item.state === 'complete' ? 'Received' : item.evidenceState === 'unclassified_available' ? 'Check File Category' : 'Missing'}</span></li>`).join('')}</ul>
+      </details>
     </div>`;
   }
 
@@ -1758,6 +1776,10 @@
   root?.addEventListener?.('soro-auth-changed', handleAuthChange);
   root?.addEventListener?.('soro:talent-screening-updated', () => {
     // Refresh the authoritative checklist without clearing held order or filters.
+    if (canOpenForRole()) refresh({ silent: true });
+  });
+  root?.addEventListener?.('soro:talent-skills-updated', () => {
+    // Verification dialogs refresh on close; profile editors can refresh now.
     if (canOpenForRole()) refresh({ silent: true });
   });
   if (root?.document) {
