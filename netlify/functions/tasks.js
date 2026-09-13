@@ -257,6 +257,10 @@ function publicTask(value) {
     throw httpError(502, 'task_service_error', 'My Tasks returned an invalid response.');
   }
   if(value.source?.kind === 'interview_result') task.source={kind:'interview_result',applicantId:requiredUuid(value.source.applicantId),interviewId:requiredUuid(value.source.interviewId)};
+  if(value.source?.kind === 'placement_checkin') {
+    if(!['client','talent'].includes(value.source.side)||!['open','completed','cancelled'].includes(value.source.state))throw httpError(502,'task_service_error','Invalid check-in task source.');
+    task.source={kind:'placement_checkin',applicantId:requiredUuid(value.source.applicantId),placementId:requiredUuid(value.source.placementId),planId:requiredUuid(value.source.planId),side:value.source.side,state:value.source.state};
+  }
   if(value.version!==undefined){
     if(!Number.isSafeInteger(value.version)||value.version<1||!['not_started','in_progress','blocked','completed','submitted','closed'].includes(value.progress)||!['staff_task','applicant_request'].includes(value.kind))throw httpError(502,'task_service_error','Invalid task details.');
     Object.assign(task,{version:value.version,kind:value.kind,progress:value.progress,details:nullableText(value.details,4000)||'',response:nullableText(value.response,4000)||'',isNew:value.isNew===true,canEditDetails:value.canEditDetails===true,canUpdateProgress:value.canUpdateProgress===true,canRespond:value.canRespond===true,canCloseRequest:value.canCloseRequest===true});

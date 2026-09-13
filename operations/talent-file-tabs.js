@@ -28,6 +28,12 @@
         typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView());
   }
 
+  function canViewPerformance() {
+    return ['admin','talent_management'].includes(effectiveProfileRole())
+      && window.SoroPlacementCheckins?.allowed()
+      && !(typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView());
+  }
+
   function mountHealthcare(shell) {
     const target = shell?.querySelector('[data-talent-healthcare]');
     if (!target?.isConnected || target.dataset.healthcareMounted) return;
@@ -224,6 +230,12 @@
     fillPath?.setAttribute('d', geometry.fill);
     edgePath?.setAttribute('d', geometry.edge);
     if (requested === 'benefits') mountHealthcare(shell);
+    const performanceHost=shell.querySelector('[data-talent-file-panel="performance"]');
+    if(requested==='performance' && canViewPerformance() && performanceHost?.isConnected && !performanceHost.dataset.performanceMounted){
+      performanceHost.dataset.performanceMounted='true';
+      const applicantId=lastTalentId;
+      window.SoroPlacementCheckins.mount(performanceHost,{applicantId,isCurrent:()=>shell.isConnected && lastTalentId===applicantId && canViewPerformance()});
+    }
     const activityHost=shell.querySelector('[data-talent-file-panel="activity"]');
     if(requested==='activity' && activityHost && !activityHost.dataset.activityMounted){
       activityHost.dataset.activityMounted='true';
@@ -266,13 +278,14 @@
 
     const shell = document.createElement('section');
     shell.className = 'talent-file-shell';
-    const initialTabCount = readOnlySales ? 1 : benefitsAvailable ? 5 : 4;
+    const performanceAvailable=canViewPerformance();
+    const initialTabCount = readOnlySales ? 1 : (benefitsAvailable ? 5 : 4)+(performanceAvailable?1:0);
     const tabMarkup = readOnlySales
       ? tabButton('profile', 'Profile')
-      : `${tabButton('profile', 'Profile')}${benefitsAvailable ? tabButton('benefits', 'Benefits', '<span class="tab-lock" aria-hidden="true"></span>') : ''}${tabButton('attendance', 'Attendance')}${tabButton('activity', 'Activity')}${tabButton('documents', 'Documents')}`;
+      : `${tabButton('profile', 'Profile')}${benefitsAvailable ? tabButton('benefits', 'Benefits', '<span class="tab-lock" aria-hidden="true"></span>') : ''}${tabButton('attendance', 'Attendance')}${performanceAvailable?tabButton('performance','Performance'):''}${tabButton('activity', 'Activity')}${tabButton('documents', 'Documents')}`;
     const panelMarkup = readOnlySales
       ? panel('profile', '', 'talent-file-profile-panel')
-      : `${panel('profile', '', 'talent-file-profile-panel')}${benefitsAvailable ? panel('benefits', benefitsPanel(applicant)) : ''}${panel('attendance', attendancePanel())}${panel('activity', '', 'talent-file-activity-panel')}${panel('documents', '', 'talent-file-documents-panel')}`;
+      : `${panel('profile', '', 'talent-file-profile-panel')}${benefitsAvailable ? panel('benefits', benefitsPanel(applicant)) : ''}${panel('attendance', attendancePanel())}${performanceAvailable?panel('performance','','talent-file-performance-panel'):''}${panel('activity', '', 'talent-file-activity-panel')}${panel('documents', '', 'talent-file-documents-panel')}`;
     shell.innerHTML = `${folderArtwork(initialTabCount)}<div class="talent-file-tabs" role="tablist" aria-label="Talent file sections">${tabMarkup}</div><div class="talent-file-body"></div><div class="talent-file-panels">${panelMarkup}</div>`;
     syncFolderArt(shell);
 
@@ -368,6 +381,7 @@
     }
     await originalLoadTalentProfileDocuments();
     watchFolderHeight(document.querySelector('.talent-file-shell'));
+    if(activeTab==='performance')activateTab(activeTab);
     const applicant = typeof currentTalentProfileApplicant === 'function'
       ? currentTalentProfileApplicant()
       : liveApplicants.find(item => item.id === selectedTalentId);

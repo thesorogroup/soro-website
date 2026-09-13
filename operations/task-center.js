@@ -288,7 +288,9 @@
     return state.tasks.map(task => {
       const status = taskStatus(task);
       const priority = taskPriority(task);
-      const action = task.source?.kind === 'interview_result'
+      const action = task.source?.kind === 'placement_checkin'
+        ? `<button type="button" class="button" data-placement-checkins="${escapeHtml(task.source.placementId)}">${status==='completed'?'View Check-in':'Record Check-in'}</button><small>${task.source.state==='cancelled'?'Reminder Closed':'Updated When Recorded'}</small>`
+        : task.source?.kind === 'interview_result'
         ? `<button type="button" class="button" data-task-interview="${escapeHtml(task.source.applicantId)}">${status === 'completed' ? 'View interview' : 'Record result'}</button><small>${status === 'completed' ? 'Completed' : 'Result due'} · Updated automatically</small>`
         : `<button type="button" class="button" data-open-task="${escapeHtml(taskId(task))}">${escapeHtml(root.soroTaskDetail?.progressLabels?.[task.progress] || (status==='completed'?'Completed':'Not Started'))}</button>`;
       return `<tr data-task-id="${escapeHtml(taskId(task))}"><td><span class="task-title"><span><button type="button" class="task-title-link" data-open-task="${escapeHtml(taskId(task))}">${escapeHtml(text(task.title,180)||'Untitled task')}</button>${task.isNew?'<span class="task-new">New</span>':''}</span><small class="task-priority task-priority--${escapeHtml(priority)}">${escapeHtml(PRIORITY_LABELS[priority])}</small></span></td><td>${escapeHtml(relatedLabel(task))}</td><td><span class="${isOverdue(task)?'task-due--overdue':''}">${escapeHtml(formatDue(task))}</span></td><td>${escapeHtml(assignedName(task))}</td><td>${action}</td></tr>`;

@@ -131,7 +131,8 @@ test('the portal renderer routes Sales through the isolated profile and keeps a 
   assert.match(tabs, /const initialTabCount = readOnlySales \? 1/);
   assert.match(tabs, /readOnlySales[\s\S]*\? tabButton\('profile', 'Profile'\)/);
   assert.match(tabs, /if \(isReadOnlySalesProfile\(\)\)[\s\S]*return;/);
-  assert.ok(html.indexOf('talent-file-tabs.js?v=20260908-healthcare') < html.indexOf('read-only-talent-profile.js?v=20260901-role-view-access'));
+  const tabsScript=html.indexOf('src="talent-file-tabs.js?'),readOnlyScript=html.indexOf('src="read-only-talent-profile.js?');
+  assert.ok(tabsScript>=0 && readOnlyScript>tabsScript);
 });
 
 test('Talent Management keeps Client viewing but does not receive a Clients-page create control', () => {
