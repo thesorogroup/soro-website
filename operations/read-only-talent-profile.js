@@ -135,7 +135,7 @@
       '#edit-skills-experience', '.admin-profile-controls', '.talent-portal-access-card',
       '.talent-profile-danger-zone', '.profile-resume-access', '.screening-source-links',
       '.profile-contact', '.profile-private-address', '.private-identity-detail',
-      '.profile-introduction-video-slot'
+      '.profile-introduction-video-slot', '.talent-dream-summary'
     ].forEach(selector => root.querySelectorAll(selector).forEach(element => element.remove()));
     root.querySelectorAll('.profile-details > div').forEach(row => {
       if (/^Dream\s*\/\s*goal$/i.test(text(row.querySelector('dt')?.textContent))) row.remove();

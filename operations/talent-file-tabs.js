@@ -297,6 +297,16 @@
     const headshot = hero.querySelector('.talent-headshot');
     if (headshot) headshot.insertAdjacentHTML('afterend', paperclipArtwork());
     const profilePanel = shell.querySelector('[data-talent-file-panel="profile"]');
+    const dreamMarkup = window.SoroTalentDreamSummary?.render({
+      access: window.soroCurrentAccess, applicant, effectiveRole: effectiveProfileRole(),
+      selfView: typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView(),
+      benefitsAvailable: !!benefitsAvailable
+    });
+    if (dreamMarkup) profilePanel.insertAdjacentHTML('beforeend', dreamMarkup);
+    // The private aspiration now has one dedicated home, or is hidden for this role.
+    details.querySelectorAll('.profile-details > div').forEach(row => {
+      if (/^Dream\s*\/\s*goal$/i.test(row.querySelector('dt')?.textContent.trim() || '')) row.remove();
+    });
     profilePanel.append(stats, layout);
     if (!readOnlySales) {
       const dangerZone = document.createElement('section');
@@ -390,6 +400,14 @@
   };
 
   document.addEventListener('click', event => {
+    const benefitsLink = event.target.closest('[data-talent-dream-benefits]');
+    if (benefitsLink) {
+      const shell = benefitsLink.closest('.talent-file-shell');
+      if (!shell?.querySelector('[data-talent-file-tab="benefits"]')) return;
+      activateTab('benefits', shell);
+      shell.querySelector('[data-talent-file-tab="benefits"]')?.focus();
+      return;
+    }
     const button = event.target.closest('[data-talent-file-tab]');
     if (!button) return;
     activateTab(button.dataset.talentFileTab);
