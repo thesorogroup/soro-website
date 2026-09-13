@@ -1,2 +1,13 @@
 .talent-self-upload{display:flex;align-items:flex-start;flex-direction:column;gap:8px;min-width:0;margin-top:16px;margin-bottom:14px}.talent-self-upload .button{min-height:40px;max-width:100%;white-space:normal}.talent-self-upload small{font-size:.8125rem;line-height:1.5;color:#55708a}.talent-self-upload [role=status]{font-size:.875rem;line-height:1.5;margin:0;overflow-wrap:anywhere;color:#16466b}.talent-self-upload [role=status]:empty{display:none}.headshot-wrap .talent-self-upload{align-items:center;text-align:center;margin-top:22px}.profile-resume-access+.talent-self-upload{padding:0 0 14px;border-bottom:1px solid #e0e8ef}.talent-self-upload button:disabled{opacity:.65;cursor:wait}
-.profile-hero-media>.talent-self-upload[data-self-upload="introduction_video"]{grid-column:1/-1;margin:12px 0 0;padding:14px 16px;border:1px solid #d9e3ec;border-radius:12px;background:rgba(255,255,255,.8)}
+.profile-introduction-card{width:100%;min-width:0;border:1px solid #d9e3ef;border-radius:13px;background:#fff;box-shadow:0 3px 14px rgba(8,45,92,.06);overflow:hidden}
+.talent-file-body .profile-introduction-card .profile-introduction-video{border:0;border-radius:0;box-shadow:none;padding:18px 18px 16px;background:#fff}
+.profile-introduction-card .profile-introduction-video strong{white-space:normal;overflow-wrap:anywhere;color:#173b61;line-height:1.5}
+.profile-introduction-card .profile-introduction-video-slot{gap:0}
+.profile-introduction-card .profile-introduction-video+.profile-introduction-video{border-top:1px solid #e5edf4}
+.profile-introduction-card>.talent-self-upload[data-self-upload="introduction_video"]{margin:0;padding:16px 18px;gap:10px;border-top:1px solid #e5edf4;background:#f8fbfe}
+.profile-introduction-card .talent-self-upload .button{border-color:#b6ccdf;color:#173b61;background:#fff;font-weight:700}
+.profile-introduction-card .talent-self-upload .button:hover{background:#eaf3fb;border-color:#7498ba}
+.profile-introduction-card .talent-self-upload small{font-size:12px}
+.profile-video-upload-help{font-size:12px;line-height:1.5;color:#55708a;width:100%}
+.profile-video-upload-help summary{cursor:pointer;color:#315d82;font-weight:600}
+.profile-video-upload-help p{margin:8px 0 0}

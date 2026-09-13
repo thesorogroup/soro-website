@@ -23,7 +23,9 @@ function harness(){
  const controls=[],listeners={},calls=[];let current=true,refreshes=0,sessionId=id,stageHook=null;
  const window={soroCurrentAccess:{...access},SORO_SUPABASE_CONFIG:{url:'https://unit.supabase.co'},crypto:require('node:crypto').webcrypto,addEventListener:(n,f)=>listeners[n]=f,soroSupabase:{auth:{getSession:async()=>({data:{session:{access_token:'unit-token',user:{id:sessionId}}}})}}};
  function add(kind){const handlers={},input={files:[],value:'',addEventListener:(n,f)=>handlers[n]=f,click(){}},button={disabled:false,addEventListener:(n,f)=>handlers['button-'+n]=f},status={textContent:''};controls.push({dataset:{selfUpload:kind},input,button,status,handlers,querySelector:s=>s==='input'?input:s==='button'?button:status});}
- const scope={isConnected:true,querySelector:s=>s==='[data-self-upload]'?controls[0]:s==='.headshot-wrap'?{insertAdjacentHTML:()=>add('profile_photo')}:s==='[data-profile-resume]'?{insertAdjacentHTML:()=>add('resume')}:s==='#profile-introduction-video'?{insertAdjacentHTML:(position)=>{assert.equal(position,'afterend');add('introduction_video');}}:null,querySelectorAll:()=>controls};
+ const video={before(card){assert.equal(card.className,'profile-introduction-card');}};
+ window.document={createElement:()=>({append(slot){assert.equal(slot,video);},insertAdjacentHTML(position){assert.equal(position,'beforeend');add('introduction_video');}})};
+ const scope={isConnected:true,querySelector:s=>s==='[data-self-upload]'?controls[0]:s==='.headshot-wrap'?{insertAdjacentHTML:()=>add('profile_photo')}:s==='[data-profile-resume]'?{insertAdjacentHTML:()=>add('resume')}:s==='#profile-introduction-video'?video:null,querySelectorAll:()=>controls};
  window.fetch=async(url,opts)=>{
   const body=typeof opts.body==='string'?JSON.parse(opts.body):null;const stage=body?.action||'put';calls.push({stage,url,opts});await stageHook?.(stage);
   if(stage==='prepare')return Response.json({fileId:id,url:'https://unit.supabase.co/storage/v1/object/upload/sign/soro-private-documents/applicants/own/resume.pdf?token=test'});

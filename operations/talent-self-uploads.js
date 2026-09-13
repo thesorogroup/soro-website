@@ -12,7 +12,7 @@
   if(!type||!RULES[kind].extensions.includes(ext)||(file.type&&file.type!==type))throw Error('That file format is not supported. '+RULES[kind].help);
   return {name:file.name,type,size:file.size,kind};
  }
- function markup(kind){const r=RULES[kind];return '<div class="talent-self-upload" data-self-upload="'+kind+'"><button type="button" class="button" data-self-choose>'+r.label+'</button><input type="file" accept="'+r.accept+'" hidden><small>'+r.help+'</small><p role="status" aria-live="polite" data-self-upload-status></p></div>';}
+ function markup(kind){const r=RULES[kind];return '<div class="talent-self-upload" data-self-upload="'+kind+'"><button type="button" class="button" data-self-choose>'+r.label+'</button><input type="file" accept="'+r.accept+'" hidden>'+(kind==='introduction_video'?'<small>MP4, WebM, or MOV · up to 95 MiB</small><details class="profile-video-upload-help"><summary>Video upload tips</summary><p>H.264 MP4 is recommended. Your newest upload replaces the introduction shown here. Previous Soro uploads stay in your private documents.</p></details>':'<small>'+r.help+'</small>')+'<p role="status" aria-live="polite" data-self-upload-status></p></div>';}
  function uploadURL(value){const u=new URL(value),base=new URL(root.SORO_SUPABASE_CONFIG.url);if(u.origin!==base.origin||!u.pathname.startsWith('/storage/v1/object/upload/sign/soro-private-documents/'))throw Error('The secure upload destination is invalid.');return u.href;}
  function stop(){epoch++;active?.controller.abort();active=null;}
  function mount(scope,applicant,options={}){
@@ -22,9 +22,12 @@
   portrait?.insertAdjacentHTML('beforeend',markup('profile_photo'));
   if(resume)resume.insertAdjacentHTML('afterend',markup('resume'));
   else scope.querySelector('.profile-documents-section .panel-head')?.insertAdjacentHTML('afterend',markup('resume'));
-  // Keep the control outside the player slot so loading/replacing the player
-  // does not destroy its in-flight status, event handlers, or retry button.
-  video?.insertAdjacentHTML('afterend',markup('introduction_video'));
+  // One shared card, with a replaceable player and stable upload footer. Reloading
+  // the player must not destroy an in-flight upload or its Finish upload action.
+  if(video){
+   const card=root.document.createElement('div');card.className='profile-introduction-card';
+   video.before(card);card.append(video);card.insertAdjacentHTML('beforeend',markup('introduction_video'));
+  }
   const user=root.soroCurrentAccess.user_id,org=root.soroCurrentAccess.organization_id;
   const current=()=>canUpload(root.soroCurrentAccess,applicant)&&root.soroCurrentAccess.user_id===user&&root.soroCurrentAccess.organization_id===org&&scope.isConnected!==false&&options.isCurrent();
   const controls=[...scope.querySelectorAll('[data-self-upload]')];
@@ -58,7 +61,7 @@
     }catch(e){if(current()&&c.epoch===epoch){if([400,403,409].includes(e.status))pending=null;status.textContent=attached?'Your file was saved. Refresh this page to view it.':(e.message||'The upload could not be completed. Try again.')+(pending?' Your file is uploaded. Select Finish upload to retry attaching it without uploading again.':'');}}
     finally{if(active===c)active=null;if(current()){controls.forEach(x=>x.querySelector('button').disabled=false);button.textContent=pending?'Finish upload':RULES[control.dataset.selfUpload].label;}}
    };
-   button.addEventListener('click',()=>{if(current()&&!active){if(pending)upload();else input.click();}});
+   button.addEventListener('click',()=>{if(!current()){status.textContent='This profile has changed. Reopen My Profile before uploading.';return;}if(!active){if(pending)upload();else input.click();}});
    input.addEventListener('change',async()=>{const file=input.files?.[0];input.value='';if(file)return upload(file);});
   }
   return controls.length>0;

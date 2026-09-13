@@ -27,6 +27,7 @@
   }
   function markup(data){
     const html=baseMarkup(data),source=data.task.source;
+    if(source?.kind==='dream_pathway')return html.replace('</section>',`<div class="task-detail-callout"><p>${source.reviewCycle!==null?'Record the quarterly check-in in Benefits to complete this reminder.':'This follow-up supports a Dream Pathway milestone.'}</p><button type="button" class="button" data-task-dream="${escape(source.applicantId)}">Open Dream Pathway</button></div></section>`);
     if(source?.kind!=='placement_checkin')return html;
     return html.replace('</section>',`<div class="task-detail-callout"><p>${source.state==='cancelled'?'This reminder was closed without recording a performance outcome.':source.state==='completed'?'This check-in was recorded. View its private observation in Performance History.':'Record the check-in to complete this task. Private observations stay in Performance History.'}</p><button type="button" class="button" data-placement-checkins="${escape(source.placementId)}">Open Check-ins</button></div></section>`);
   }
@@ -36,6 +37,7 @@
     d.addEventListener('cancel',e=>{e.preventDefault();leave();});
     try{const data=await request({action:'get',taskId:id},guard);guard();pendingId=null;d.innerHTML=markup(data); if(!data.task.canAssign)d.querySelector('.task-people')?.setAttribute('disabled',''); if(data.task.canCloseRequest){const response=d.querySelector('[name="response"]');if(response){response.disabled=true;response.closest('label').firstChild.textContent='Applicant Response';}d.querySelector('[type="submit"]').textContent='Close Request';d.querySelector('a[href="#talent-my-profile"]')?.parentElement.remove();} d.querySelectorAll('[data-task-close]').forEach(b=>b.addEventListener('click',leave));
       const form=d.querySelector('form');let key=null,saving=false;
+      d.querySelector('[data-task-dream]')?.addEventListener('click',e=>{const applicantId=e.currentTarget.dataset.taskDream;leave();root.SoroTalentHealthcare?.requestOpen?.(applicantId);root.location.hash='#talent/'+applicantId;});
       form.addEventListener('input',()=>{if(!saving)key=null;});
       form.addEventListener('submit',async e=>{e.preventDefault();if(saving)return;saving=true;key=key||root.crypto.randomUUID();const values=new root.FormData(form),t=data.task;
         const patch=t.kind==='applicant_request'?(t.canCloseRequest?{closeRequest:true}:{response:String(values.get('response')||'')}):{progress:String(values.get('progress')||t.progress),note:String(values.get('note')||''),...(t.canEditDetails?{title:String(values.get('title')||''),details:String(values.get('details')||''),relatedLabel:String(values.get('relatedLabel')||''),dueDate:values.get('dueDate')||null,priority:values.get('priority'),...(t.canAssign?{assigneeIds:values.getAll('assigneeIds')}: {})}: {})};

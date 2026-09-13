@@ -7,22 +7,26 @@
   clientWorkflowMountOptions=function(accessRole){
     const options=originalClientOptions(accessRole);
     const seed=session.store.clients;
-    const adapter=w.SoroClientWorkflow.createApprovalAdapter(seed);
+    const owners=[{id:session.id(3),name:session.personas.sales.name,active:true,current:session.selected==='sales'}];
+    const adapter=w.SoroClientWorkflow.createApprovalAdapter(seed,{owners});
     options.adapter=Object.fromEntries(Object.entries(adapter).map(([key,method])=>[key,typeof method!=='function'?method:async(...args)=>{
       const write=!['listOwners','listClients','loadWorkspace','loadClient'].includes(key);
       if(write&&session.selected!=='sales')throw new Error('This portal can view Client records but cannot edit them.');
       if(['changePortalAccess','resendPortalInvite'].includes(key))throw new Error('Invitations and account access changes are disabled in Test Mode.');
       const result=await method(...args);if(write){session.store.clients=await adapter.listClients();const c=session.store.clients.find(c=>c.id===session.id(50));if(c){session.store.companyName=c.company.name;session.store.contactName=c.primaryContact.name;}session.notice('Sample Client updated. No live record or invitation was created.');}return result;
     }]));
+    // The adapter changes data only. Keep approval-page banners out of the real portal.
+    options.adapter.kind='sample';
     return options;
   };
   const placement=w.SoroClientPlacementWorkflow;
   w.SoroClientPlacementWorkflow={...placement,mount(host,options){
     const data=placement.defaultSeed(options.role),id=session.id;
     data.generatedAt=new Date().toISOString();data.request={...data.request,hiringRequestId:options.hiringRequestId,clientId:id(50),companyName:session.store.companyName,title:'General Virtual Assistant',status:'filled',seats:1,filledSeats:1,updatedAt:data.generatedAt};
-    data.calendarIntegration={configured:false,organizerLabel:'Disabled in Test Mode'};data.candidates=[];data.handoffs=[];
+    data.calendarIntegration={configured:true,organizerLabel:'Talents · Sample Calendar'};
+    data.candidates=[{shortlistItemId:id(23),shortlistId:id(24),clientResponse:'interested',workflowState:'placed',updatedAt:data.generatedAt,applicant:{applicantId:id(10),fullName:session.store.applicants[0].full_name,preferredName:'Jamie'},interviews:[],decision:{decisionId:id(25),decision:'hire',createdAt:data.generatedAt}}];data.handoffs=[];
     data.placements=[{placementId:id(21),applicantId:id(10),fullName:'Jamie Cruz',status:'active',startDate:data.generatedAt.slice(0,10),scheduleSummary:'Monday–Friday · Philippine Time',updatedAt:data.generatedAt,onboardingItems:[]}];
-    return placement.mount(host,{...options,adapter:{kind:'approval',loadWorkflow:async()=>data,mutate:async()=>{throw new Error('Placement changes are not available in this test session.');}}});
+    return placement.mount(host,{...options,adapter:{kind:'sample',loadWorkflow:async()=>data,mutate:async()=>{throw new Error('Placement changes are not available in this test session.');}}});
   }};
   function select(value,reset=false){
     if(!session.personas[value])return;

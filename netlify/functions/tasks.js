@@ -257,6 +257,10 @@ function publicTask(value) {
     throw httpError(502, 'task_service_error', 'My Tasks returned an invalid response.');
   }
   if(value.source?.kind === 'interview_result') task.source={kind:'interview_result',applicantId:requiredUuid(value.source.applicantId),interviewId:requiredUuid(value.source.interviewId)};
+  if(value.source?.kind === 'dream_pathway') {
+    if(value.source.reviewCycle!==null&&(!Number.isSafeInteger(value.source.reviewCycle)||value.source.reviewCycle<0))throw httpError(502,'task_service_error','Invalid Dream task source.');
+    task.source={kind:'dream_pathway',applicantId:requiredUuid(value.source.applicantId),planId:requiredUuid(value.source.planId),milestoneId:value.source.milestoneId?requiredUuid(value.source.milestoneId):null,reviewCycle:value.source.reviewCycle};
+  }
   if(value.source?.kind === 'placement_checkin') {
     if(!['client','talent'].includes(value.source.side)||!['open','completed','cancelled'].includes(value.source.state))throw httpError(502,'task_service_error','Invalid check-in task source.');
     task.source={kind:'placement_checkin',applicantId:requiredUuid(value.source.applicantId),placementId:requiredUuid(value.source.placementId),planId:requiredUuid(value.source.planId),side:value.source.side,state:value.source.state};

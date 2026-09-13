@@ -25,6 +25,7 @@ function context(options = {}) {
     current: options.view || 'overview', role: options.workspaceRole || 'sales',
     selectedClientId: null, selectedTalentId: 'old-talent',
     currentAuthenticatedRole: () => options.effectiveRole || 'sales',
+    liveWorkspaceDataRole: () => options.dataRole || options.effectiveRole || 'sales',
     adminPreviewingNonAdminWorkspace: () => Boolean(options.preview),
     lifecyclePreviewIds: { client: clientId, request: requestId, salesOwner: '30000000-0000-4000-8000-000000000001' },
     root: { querySelector: () => node }, location: { pathname: '/operations/' },

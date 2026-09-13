@@ -1,0 +1,13 @@
+.founder-live-portal {padding:20px 28px 0;}
+.is-live-observer > #app > .content > .topbar {visibility:hidden;height:18px;}
+.is-live-observer > #app > .content > .topbar .mobile-menu {visibility:visible;}
+.is-live-observer #founder-account-nav {display:none;}
+.founder-live-toolbar {display:flex;align-items:end;gap:16px;flex-wrap:wrap;padding:18px 20px;background:#edf5fc;border:1px solid #c9dcef;border-radius:12px;color:#123b6d;}
+.founder-live-toolbar label {display:grid;gap:7px;min-width:240px;flex:1;font-weight:650;}
+.founder-live-toolbar select {width:100%;padding:11px 12px;border:1px solid #b7cee5;border-radius:8px;background:white;color:#0c294d;font:inherit;}
+.founder-live-toolbar p {margin:0;line-height:1.5;flex:2;min-width:230px;}
+.founder-live-toolbar p strong {display:block;}
+.founder-live-status {color:#526b84;line-height:1.5;margin:12px 0;}
+.founder-live-frame {width:100%;height:calc(100dvh - 245px);min-height:520px;border:0;display:block;}
+@media(max-width:650px){.founder-live-portal{padding:14px 10px 0}.founder-live-toolbar{padding:14px;gap:12px}.founder-live-toolbar label{min-width:0;flex-basis:100%}.founder-live-frame{height:75dvh}.founder-live-toolbar p{min-width:0;font-size:14px}}
+@media(max-width:950px){.is-live-observer > #app > .content > .topbar{height:54px;}}

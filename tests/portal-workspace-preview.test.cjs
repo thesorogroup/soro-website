@@ -30,6 +30,7 @@ function operationElement(id = '') {
     dispatch(type, event) { for (const listener of listeners.get(type) || []) listener(event); },
     append() {},
     appendChild() {},
+    before() {},
     close() {},
     closest() { return this; },
     focus() {},
@@ -43,7 +44,7 @@ function operationElement(id = '') {
   };
 }
 
-function loadOperationsController() {
+function loadOperationsController(access = {}) {
   const elements = new Map();
   const element = id => {
     if (!elements.has(id)) elements.set(id, operationElement(id));
@@ -87,7 +88,7 @@ function loadOperationsController() {
     document,
     history,
     location,
-    soroCurrentAccess: { role: 'admin', user_id: 'admin-user', organization_id: 'org-one' },
+    soroCurrentAccess: { role: 'admin', user_id: 'admin-user', organization_id: 'org-one', ...access },
     soroSupabase: { auth: { async getSession() { calls.session += 1; return { data: { session: { access_token: 'admin-token' } } }; } } },
     SoroGlobalSearch: { init(config) { calls.searchConfig = config; }, refreshRole() {} },
     SoroClientWorkflow: {
@@ -130,7 +131,7 @@ function loadOperationsController() {
     MutationObserver: class MutationObserver { observe() {} disconnect() {} },
     navigator: {}, setTimeout() { return 1; }, window
   });
-  const source = `${read('operations/operations.js')}\nwindow.__operationsTest=Object.freeze({applyRole,openClientPlacementWorkflow,openClientProfile,openTalentProfile,searchOperationsRecords,state:()=>({current,preferredHiringRequestId,role})});`;
+  const source = `${read('operations/operations.js')}\nwindow.__operationsTest=Object.freeze({applyRole,openClientPlacementWorkflow,openClientProfile,openTalentProfile,searchOperationsRecords,clientWorkflowMountOptions,availableTalentMountOptions,clientShortlistMountOptions,liveWorkspaceDataRole,adminPreviewingNonAdminWorkspace,state:()=>({current,preferredHiringRequestId,role})});`;
   vm.runInContext(source, context, { filename: 'operations.js' });
   return { api: window.__operationsTest, calls, elements, window };
 }
@@ -221,7 +222,7 @@ test('Admin non-Admin lifecycle previews use local adapters while signed-in role
   const clientReviewRoute = routeBlock(operations, "if(current==='client-candidate-review')", "if(current==='client-placement')");
   const clientsRoute = routeBlock(operations, "if(current==='clients'", "if(current==='talent-profile')");
 
-  assert.match(operations, /function adminPreviewingNonAdminWorkspace\(\)\{return actualAuthenticatedRole\(\)===['"]admin['"]&&currentAuthenticatedRole\(\)!==['"]admin['"]\}/);
+  assert.match(operations, /function adminPreviewingNonAdminWorkspace\(\)\{return actualAuthenticatedRole\(\)===['"]admin['"]&&currentAuthenticatedRole\(\)!==['"]admin['"]&&!founderLiveStaffWorkspace\(\)\}/);
   assert.match(operations, /function clientWorkflowMountOptions\([\s\S]*createApprovalAdapter/);
   assert.match(operations, /function clientShortlistMountOptions\([\s\S]*createShortlistApprovalAdapter[\s\S]*options\.loader=adapter\.loader[\s\S]*options\.submitter=adapter\.submitter/);
   assert.match(operations, /function availableTalentMountOptions\([\s\S]*createAvailableTalentApprovalAdapter[\s\S]*shortlistLoader[\s\S]*shortlistSubmitter/);
@@ -270,6 +271,45 @@ test('workspace preview has no fictional client records and cannot launch live p
   assert.equal(calls.fetch,0);
   assert.equal(api.openClientPlacementWorkflow('not-a-record'),false);
   assert.match(read('operations/operations.js'),/Sample accounts and records have been removed/);
+});
+
+test('Founder live staff workspaces keep the authenticated actor and use live transports', () => {
+  const {api,calls,elements,window}=loadOperationsController({is_founder:true,active:true,must_change_password:false});
+  const identity=window.soroCurrentAccess;
+  for(const workspace of ['sales','talent']){
+    api.applyRole(workspace);
+    assert.equal(window.soroCurrentAccess,identity);
+    assert.equal(window.soroCurrentAccess.role,'admin');
+    assert.equal(api.adminPreviewingNonAdminWorkspace(),false);
+    assert.equal(api.liveWorkspaceDataRole(),'admin');
+    assert.equal(elements.get('global-search').hidden,false);
+    assert.equal(calls.searchConfig.getEffectiveRole(),workspace==='sales'?'sales':'talent_management');
+    assert.doesNotMatch(elements.get('view-root').innerHTML,/Sign in to an actual account/);
+    const uiRole=workspace==='sales'?'sales':'talent_management';
+    const clientRole=workspace==='sales'?'admin':uiRole;
+    assert.equal(api.clientWorkflowMountOptions(uiRole).role,clientRole,'Founder Sales can choose an actual Sales owner; Talent Management stays read-only');
+    assert.equal(api.clientWorkflowMountOptions(uiRole).adapter,undefined);
+    const bench=api.availableTalentMountOptions(uiRole),shortlist=api.clientShortlistMountOptions(uiRole,'sales');
+    assert.equal(bench.role,'admin');
+    assert.equal(shortlist.role,'admin');
+    assert.equal(bench.loader,undefined);
+    assert.equal(shortlist.loader,undefined);
+    api.openClientProfile('10000000-0000-4000-8000-000000000002');
+    assert.equal(calls.localClientMounts.at(-1).options.adapter,undefined);
+    assert.equal(calls.localClientMounts.at(-1).options.role,clientRole);
+  }
+  api.applyRole('client');
+  assert.equal(api.adminPreviewingNonAdminWorkspace(),true,'Client identity is never inferred from the Founder account');
+  api.applyRole('va');
+  assert.equal(api.adminPreviewingNonAdminWorkspace(),true,'Talent identity is never inferred from the Founder account');
+});
+
+test('unverified or disabled Founder access cannot enter a live staff workspace', () => {
+  for(const access of [{is_founder:false,active:true,must_change_password:false},{is_founder:true,active:false,must_change_password:false},{is_founder:true,active:true,must_change_password:true}]){
+    const {api}=loadOperationsController(access);api.applyRole('sales');
+    assert.equal(api.adminPreviewingNonAdminWorkspace(),true);
+    assert.ok(api.clientWorkflowMountOptions('sales').adapter);
+  }
 });
 
 test('workspace preview state never mutates the authenticated authorization record', () => {
@@ -335,7 +375,7 @@ test('every portal uses the same accessible Soro navy sidebar treatment', () => 
 
   assert.match(html, /operations\.css\?v=20260829-profile-center/);
   assert.match(html, /roles\.css\?v=20260831-fox-command/);
-  assert.match(html, /sidebar-theme\.css\?v=20260909-grouped-feedback/);
+  assert.match(html, /sidebar-theme\.css\?v=20260913-live-workspaces/);
   assert.equal((html.match(/src="\.\.\/assets\/soro-ops-fox-command\.svg" alt="Soro Ops"/g) || []).length, 5);
   assert.match(html, /rel="icon"[^>]+soro-ops-fox-command-icon\.png/);
   assert.match(html, /rel="apple-touch-icon"[^>]+soro-ops-fox-command-icon\.png/);

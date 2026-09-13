@@ -44,6 +44,15 @@
       isCurrent: () => lastTalentId === applicant.id && canViewBenefits(applicant) });
   }
 
+  function mountDream(shell) {
+    const target=shell?.querySelector('[data-dream-pathway]');
+    const applicant=typeof currentTalentProfileApplicant==='function'?currentTalentProfileApplicant():null;
+    if(!target?.isConnected||target.dataset.dreamMounted||!window.SoroDreamPathway||!canViewBenefits(applicant))return;
+    if(!window.SoroTalentDreamSummary?.canView(window.soroCurrentAccess,applicant,effectiveProfileRole(),typeof isTalentSelfProfileView==='function'&&isTalentSelfProfileView()))return;
+    target.dataset.dreamMounted='true';
+    window.SoroDreamPathway.mount(target,{applicantId:applicant.id,summaryTarget:shell.querySelector('[data-dream-pathway-summary]'),isCurrent:()=>shell.isConnected&&lastTalentId===applicant.id&&canViewBenefits(applicant)});
+  }
+
   function canViewPay() {
     return !isReadOnlySalesProfile()
       && !(typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView())
@@ -127,6 +136,7 @@
 
   function watchFolderHeight(shell) {
     if (!shell) return;
+    mountDream(shell);
     folderHeightObserver?.disconnect();
     if (folderHeightFallback) window.removeEventListener('resize', folderHeightFallback);
     syncFolderHeight(shell);
@@ -148,7 +158,7 @@
   }
 
   function benefitsPanel(applicant) {
-    return `<div data-talent-healthcare="${escapeHtml(applicant.id)}"></div>`;
+    return `<div data-dream-pathway="${escapeHtml(applicant.id)}"></div><div data-talent-healthcare="${escapeHtml(applicant.id)}"></div>`;
   }
 
   function attendancePanel() {
@@ -229,7 +239,7 @@
     activeArtwork?.removeAttribute('transform');
     fillPath?.setAttribute('d', geometry.fill);
     edgePath?.setAttribute('d', geometry.edge);
-    if (requested === 'benefits') mountHealthcare(shell);
+    if (requested === 'benefits') {mountDream(shell);mountHealthcare(shell);}
     const performanceHost=shell.querySelector('[data-talent-file-panel="performance"]');
     if(requested==='performance' && canViewPerformance() && performanceHost?.isConnected && !performanceHost.dataset.performanceMounted){
       performanceHost.dataset.performanceMounted='true';
@@ -303,6 +313,7 @@
       benefitsAvailable: !!benefitsAvailable
     });
     if (dreamMarkup) profilePanel.insertAdjacentHTML('beforeend', dreamMarkup);
+    if(dreamMarkup&&benefitsAvailable)profilePanel.querySelector('.talent-dream-summary')?.insertAdjacentHTML('beforeend','<div data-dream-pathway-summary></div>');
     // The private aspiration now has one dedicated home, or is hidden for this role.
     details.querySelectorAll('.profile-details > div').forEach(row => {
       if (/^Dream\s*\/\s*goal$/i.test(row.querySelector('dt')?.textContent.trim() || '')) row.remove();

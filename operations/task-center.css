@@ -55,6 +55,16 @@
 .task-due--overdue { color: #b2332c; font-weight: 750; }
 .task-status-action { padding: 7px 10px; }
 
+.task-status-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.task-status-group > .button { flex: 0 0 auto; }
+.task-status-group > small { line-height: 1.5; white-space: normal; }
+
 .task-truncation-notice {
   margin: 0 0 12px;
   border: 1px solid #dbe6f1;

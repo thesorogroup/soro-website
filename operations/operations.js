@@ -1,7 +1,7 @@
 const data={overview:{title:'Admin Panel',caption:'Here is what needs your attention.',metrics:[['Tasks needing attention','—','Loading your assigned tasks…',''],['Client pipeline','—','Open Clients for current records',''],['Active Talent today','—','Loading live attendance…',''],['Talent Review Queue','—','Loading live applications…','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Soro at a glance',secondaryMessage:'Summary reporting has not been configured.'},tasks:{title:'My Tasks',caption:'Your active work, in priority order.',table:['Task','Related to','Due','Owner'],rows:[]},clients:{title:'Client Pipeline',caption:'Every client, lead, and next action in one place.',table:['Client','Stage','Next action','Owner'],rows:[]},vas:{title:'Talent Directory',caption:'Search, filter, and open a complete Talent profile from any row.',table:['Talent','Application status','Work status','Location & time zone','Readiness','Owner'],rows:[]},placements:{title:'Placement Journey',caption:'Client and Talent readiness, side by side.',table:['Client','Talent','Status','Next action'],rows:[]},documents:{title:'Document Center',caption:'Assigned forms, uploads, and signed agreements.',table:['Document','Related to','Status','Action'],rows:[]},reports:{title:'Reports',caption:'Saved reports and quick builds, only for data you are authorized to see.',table:['Report','Last run','Owner','Action'],rows:[]}};
 let current='overview',role='admin',liveApplicants=[],selectedTalentId=null,selectedClientId=null,preferredHiringRequestId='',preferredClientTalentId='',talentSearch='',talentStatus='all',ownTalentProfile=null,ownTalentProfileState='idle',ownTalentProfileRequest=0,liveApplicantsRequest=0,liveApplicantsScope='';
 const roleConfig={admin:{label:'The Founder',person:'Matt',className:'role-admin'},sales:{label:'Sales Associate',person:'Sales workspace',className:'role-sales'},talent:{label:'Talent Management',person:'Talent Management workspace',className:'role-talent'},client:{label:'Client Administrator',person:'Client workspace',className:'role-client'},va:{label:'Talent',person:'Talent workspace',className:'role-va'}};
-const roleDashboards={sales:{title:'Sales Panel',caption:'Your priority client work is ready.',metrics:[['Tasks needing attention','—','Loading your assigned tasks…',''],['My client pipeline','—','Not configured',''],['Open hiring requests','—','Not configured',''],['My available Talent','—','Not configured','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Pipeline movement',secondaryMessage:'No live summary is available for this view.'},talent:{title:'Talent Management Panel',caption:'Your Talent readiness and support work is ready.',metrics:[['Talent actions needing attention','—','Loading your assigned tasks…',''],['Active Talent today','—','Loading live attendance…',''],['Talent Review Queue','—','Loading live applications…',''],['Upcoming reviews','—','Not configured','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Talent readiness',secondaryMessage:'No live summary is available for this view.'},client:{title:'Client Portal',caption:'Your active Talent support and Soro actions are all in one place.',metrics:[['Action needed','—','Not configured',''],['Your current Talent','—','Not configured',''],['Open hiring requests','—','Not configured',''],['Invoices','—','Not configured','']],primary:'Action needed',items:[],emptyMessage:'No actions are assigned right now.',secondary:'Your current Talent',secondaryMessage:'No live summary is available for this view.'},va:{title:'Talent Portal',caption:'Your workday, progress, and support are all here.',metrics:[['Today’s work','—','Current placement status will appear here',''],['Dream Pathway','—','Not configured',''],['Next payout','—','Not configured',''],['Documents','—','Not configured','']],primary:'Action needed',items:[],emptyMessage:'No actions are assigned right now.',secondary:'Your progress',secondaryMessage:'No live summary is available for this view.'}};
+const roleDashboards={sales:{title:'Sales Panel',caption:'Your priority client work is ready.',metrics:[['Tasks needing attention','—','Loading your assigned tasks…',''],['My client pipeline','—','Not configured',''],['Open hiring requests','—','Not configured',''],['My available Talent','—','Not configured','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Pipeline movement',secondaryMessage:'No live summary is available for this view.'},talent:{title:'Talent Management Panel',caption:'Your Talent readiness and support work is ready.',metrics:[['Talent actions needing attention','—','Loading your assigned tasks…',''],['Active Talent today','—','Loading live attendance…',''],['Talent Review Queue','—','Loading live applications…',''],['Upcoming reviews','—','Not configured','']],primary:'Priority work',items:[],emptyMessage:'Loading your assigned tasks…',secondary:'Talent readiness',secondaryMessage:'No live summary is available for this view.'},client:{title:'Client Portal',caption:'Your active Talent support and Soro actions are all in one place.',metrics:[['Action needed','—','Not configured',''],['Your current Talent','—','Not configured',''],['Open hiring requests','—','Not configured',''],['Invoices','—','Not configured','']],primary:'Action needed',items:[],emptyMessage:'No actions are assigned right now.',secondary:'Your current Talent',secondaryMessage:'No live summary is available for this view.'},va:{title:'Talent Portal',caption:'Your workday, progress, and support are all here.',metrics:[['Today’s work','—','Current placement status will appear here',''],['Dream Pathway','View Plan','Milestones and upcoming check-ins',''],['Next payout','—','Not configured',''],['Documents','—','Not configured','']],primary:'Action needed',items:[],emptyMessage:'No actions are assigned right now.',secondary:'Your progress',secondaryMessage:'No live summary is available for this view.'}};
 const root=document.getElementById('view-root'),nav=document.getElementById('main-nav');
 const authenticatedEmployeeViews=Object.freeze({
   admin:new Set(['overview','tasks','clients','client-shortlists','client-placement','vas','available-talent','talent-review','talent-profile','placements','documents','reports','activity','employees','payroll','help']),
@@ -89,7 +89,19 @@ function createAvailableTalentApprovalAdapter(viewerRole){
   };
   return Object.freeze({kind:'approval',loader,submitter});
 }
-function adminPreviewingNonAdminWorkspace(){return actualAuthenticatedRole()==='admin'&&currentAuthenticatedRole()!=='admin'}
+function founderLiveStaffWorkspace(){
+  const access=window.soroCurrentAccess;
+  return actualAuthenticatedRole()==='admin'&&access?.is_founder===true&&access.active===true&&access.must_change_password===false&&['sales','talent'].includes(role);
+}
+// A live workspace changes navigation, never the authenticated identity or audit actor.
+function liveWorkspaceDataRole(){return founderLiveStaffWorkspace()?actualAuthenticatedRole():currentAuthenticatedRole()}
+function adminPreviewingNonAdminWorkspace(){return actualAuthenticatedRole()==='admin'&&currentAuthenticatedRole()!=='admin'&&!founderLiveStaffWorkspace()}
+function syncLiveWorkspaceNotice(){
+  let notice=document.getElementById('live-workspace-notice');
+  if(!founderLiveStaffWorkspace()){notice?.remove();return}
+  if(!notice){notice=document.createElement('aside');notice.id='live-workspace-notice';notice.className='live-workspace-notice';root.before(notice);}
+  notice.textContent=`Live ${role==='sales'?'Sales':'Talent Management'} View · Your Founder access is active. Records are live and actions are logged to your account.`;
+}
 function salesTrackerPreviewWorkspace(){return{generatedAt:new Date().toISOString(),viewerRole:'sales',rows:[]};}
 function openSalesTrackerAction(row){
   if(!row||!['sales','sales_management'].includes(currentAuthenticatedRole()))return;
@@ -107,7 +119,7 @@ function mountSalesTracker(){
   if(current!=='overview'||role!=='sales'||!['sales','sales_management'].includes(currentAuthenticatedRole()))return;
   const target=root.querySelector('#sales-lifecycle-tracker'),tracker=window.SoroSalesLifecycleTracker;
   if(!target||!tracker)return;
-  const options={role:currentAuthenticatedRole(),onAction:openSalesTrackerAction,onOpenClient:openSalesTrackerClient,preserveFilters:true};
+  const options={role:liveWorkspaceDataRole(),onAction:openSalesTrackerAction,onOpenClient:openSalesTrackerClient,preserveFilters:true};
   if(adminPreviewingNonAdminWorkspace()){options.loader=async()=>salesTrackerPreviewWorkspace();options.preview=true}
   tracker.mount(target,options);
 }
@@ -116,7 +128,8 @@ function salesOverview(d){
   return `${adminPreviewingNonAdminWorkspace()?'<p class="eyebrow">Sales workspace preview · no sample records</p>':''}<div id="sales-lifecycle-tracker"></div><div class="sales-dashboard-support">${metricCard(d.metrics[0],0)}<section class="panel"><div class="panel-head"><h2 id="detail-title">${d.primary}</h2><button class="text-button" id="view-all">View all tasks</button></div><div id="detail-list">${taskItems}</div></section></div>`;
 }
 function clientWorkflowMountOptions(accessRole){
-  const options={role:accessRole};
+  // Founder-created Clients must choose a real Sales owner, not assign the Founder as Sales.
+  const options={role:founderLiveStaffWorkspace()&&accessRole==='sales'?actualAuthenticatedRole():accessRole};
   if(adminPreviewingNonAdminWorkspace()){
     const seed=window.SoroClientWorkflow.defaultSeed?.(accessRole)||[];
     if(seed[0])seed[0]={...seed[0],id:lifecyclePreviewIds.client};
@@ -125,12 +138,12 @@ function clientWorkflowMountOptions(accessRole){
   return options;
 }
 function clientShortlistMountOptions(accessRole,mode,requestId=''){
-  const options={role:accessRole,mode,requestId};
+  const options={role:founderLiveStaffWorkspace()?actualAuthenticatedRole():accessRole,mode,requestId};
   if(adminPreviewingNonAdminWorkspace()){const adapter=createShortlistApprovalAdapter(accessRole,mode);options.loader=adapter.loader;options.submitter=adapter.submitter;options.passAdapter=adapter.passAdapter}
   return options;
 }
 function availableTalentMountOptions(accessRole){
-  const options={role:accessRole,preferredRequestId:preferredHiringRequestId};
+  const options={role:founderLiveStaffWorkspace()?actualAuthenticatedRole():accessRole,preferredRequestId:preferredHiringRequestId};
   if(adminPreviewingNonAdminWorkspace()){
     const adapter=createAvailableTalentApprovalAdapter(accessRole);options.loader=adapter.loader;options.submitter=adapter.submitter;
     if(accessRole==='sales'){const shortlist=createShortlistApprovalAdapter('sales','sales');options.shortlistLoader=shortlist.loader;options.shortlistSubmitter=shortlist.submitter}
@@ -225,7 +238,7 @@ function syncAuthorizedNavigation(access=window.soroCurrentAccess){
   const notificationsButton=document.getElementById('notifications-button');
   if(notificationsButton)notificationsButton.hidden=!actualRole;
   const globalSearch=document.getElementById('global-search')?.closest('.global-search');
-  if(globalSearch)globalSearch.hidden=clientPortal||accessRole==='virtual_assistant'||(actualRole==='admin'&&accessRole!=='admin');
+  if(globalSearch)globalSearch.hidden=clientPortal||accessRole==='virtual_assistant'||adminPreviewingNonAdminWorkspace();
   const overviewNav=document.getElementById('overview-nav');
   if(overviewNav)overviewNav.textContent=clientPortal||accessRole==='virtual_assistant'?'Dashboard':'Overview';
   if(!allowed.has(current==='client-record'?'clients':current)){
@@ -321,17 +334,17 @@ function render(){
   if(!['client-shortlists','client-candidate-review'].includes(current))window.soroClientShortlistWorkflow?.unmount?.({clear:false});
   if(current!=='clients')window.SoroClientWorkflow?.unmount?.({clear:false});
   if(current!=='client-placement')window.SoroClientPlacementWorkflow?.unmount?.({clear:false});
-  if(current==='placements'&&window.SoroPlacementEnding?.canManage(currentAuthenticatedRole())){
-    window.SoroPlacementEnding.mount(root,{role:currentAuthenticatedRole(),preview:adminPreviewingNonAdminWorkspace(),placementId:history.state?.endingPlacementId,onOpenTalent:openTalentProfile});setActive();return;
+  if(current==='placements'&&window.SoroPlacementEnding?.canManage(liveWorkspaceDataRole())){
+    window.SoroPlacementEnding.mount(root,{role:liveWorkspaceDataRole(),preview:adminPreviewingNonAdminWorkspace(),placementId:history.state?.endingPlacementId,onOpenTalent:openTalentProfile});setActive();return;
   }
   if(current==='feedback'){
     window.SoroFeedback?.mount(root,{preview:adminPreviewingNonAdminWorkspace(),onSupport:()=>{current='help';history.pushState({},'',`${location.pathname}#help`);setActive();render();}});setActive();return;
   }
   if(current==='work-log'){
-    window.SoroWorkLog?.mount(root,{role:currentAuthenticatedRole(),preview:adminPreviewingNonAdminWorkspace(),filters:history.state?.workLogPlacement?{placementId:history.state.workLogPlacement}:{}});setActive();return;
+    window.SoroWorkLog?.mount(root,{role:liveWorkspaceDataRole(),preview:adminPreviewingNonAdminWorkspace(),filters:history.state?.workLogPlacement?{placementId:history.state.workLogPlacement}:{}});setActive();return;
   }
   if(current==='reports'){
-    window.SoroReports?.mount(root,{role:currentAuthenticatedRole(),preview:adminPreviewingNonAdminWorkspace()});setActive();return;
+    window.SoroReports?.mount(root,{role:liveWorkspaceDataRole(),preview:adminPreviewingNonAdminWorkspace()});setActive();return;
   }
   if(current==='activity'){
     root.innerHTML='<main class="page"><p><a class="ah-log-link" href="#reports">← Reports</a></p><div data-activity-log></div></main>';
@@ -349,7 +362,7 @@ function render(){
     setActive();return;
   }
   if(current==='client-record'){
-    if(adminPreviewingNonAdminWorkspace()){
+    if(adminPreviewingNonAdminWorkspace()||founderLiveStaffWorkspace()){
       const accessRole=currentAuthenticatedRole();
       if(!selectedClientId||!window.SoroClientWorkflow?.canOpenForRole?.(accessRole)){
         root.innerHTML='<main class="page"><button class="text-button back-to-clients">← Back to Clients</button><section class="panel profile-missing"><h1>Client profile unavailable</h1><p>This local workspace preview does not contain that Client.</p></section></main>';
@@ -459,9 +472,9 @@ function render(){
       setActive();
       return;
     }
-    const previewingAnotherWorkspace=actualAuthenticatedRole()==='admin'&&accessRole!=='admin';
+    const previewingAnotherWorkspace=adminPreviewingNonAdminWorkspace();
     const options={
-      role:accessRole,
+      role:liveWorkspaceDataRole(),
       hiringRequestId:preferredHiringRequestId,
       onChange:()=>window.dispatchEvent(new CustomEvent('soro:client-placement-updated',{detail:{requestId:preferredHiringRequestId}}))
     };
@@ -540,9 +553,10 @@ function render(){
   bindView();
   if(current==='overview'&&role==='sales')mountSalesTracker();
 }
-function bindView(){window.soroTalentWorkday?.bindDashboardAction(root);window.soroActiveTalentToday?.bindDashboardMetric(root,{currentView:current,actualRole:actualAuthenticatedRole()});window.soroTalentReviewQueue?.bindDashboardMetric?.(root,{currentView:current,actualRole:actualAuthenticatedRole()});window.soroTaskCenter?.bindDashboardMetric?.(root,current);window.soroTalentTimeOff?.bindDashboardActions(root,{currentView:current,actualRole:actualAuthenticatedRole()});document.getElementById('add-task')?.addEventListener('click',()=>{if(role==='client')toast('Your hiring request form is the next portal step.');else document.getElementById('task-dialog').showModal()});document.getElementById('new-record')?.addEventListener('click',()=>{if(window.SoroClientWorkflow?.canEditForRole?.(currentAuthenticatedRole())){const options=clientWorkflowMountOptions(currentAuthenticatedRole());options.start='create';current='clients';selectedClientId=null;selectedTalentId=null;history.pushState({},'',`${location.pathname}#clients`);setActive();window.SoroClientWorkflow.mount(root,options);return}toast(`${role==='talent'?'New Talent':role==='client'?'Request another Talent':'New Client'} form is the next build step.`)});document.getElementById('import-drive')?.addEventListener('click',importDriveFiles);document.getElementById('talent-search')?.addEventListener('input',e=>{talentSearch=e.target.value;render();document.getElementById('talent-search')?.focus()});document.getElementById('talent-status-filter')?.addEventListener('change',e=>{talentStatus=e.target.value;render()});document.querySelectorAll('.talent-row').forEach(row=>{const open=()=>openTalentProfile(row.dataset.talentId);row.addEventListener('click',open);row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}})});document.querySelectorAll('.back-to-directory').forEach(b=>b.addEventListener('click',goToTalentDirectory));document.getElementById('profile-add-task')?.addEventListener('click',()=>{const related=document.getElementById('task-related');if(related)related.value=currentTalentProfileApplicant()?.full_name||'';document.getElementById('task-dialog').showModal()});document.getElementById('headshot-input')?.addEventListener('change',e=>uploadHeadshot(e.target.files?.[0]));document.querySelectorAll('[data-metric]').forEach(el=>el.addEventListener('click',()=>{const dashboard=viewDataForAuthenticatedRole('overview',role==='admin'?data.overview:roleDashboards[role]),m=dashboard.metrics[+el.dataset.metric];document.getElementById('detail-title').textContent=m[0];document.getElementById('detail-list').innerHTML=`<p class="empty">${escapeHtml(m[2])}</p>`}));document.getElementById('view-all')?.addEventListener('click',()=>{current='tasks';setActive();render()})}
+function bindView(){window.soroTalentWorkday?.bindDashboardAction(root);window.soroActiveTalentToday?.bindDashboardMetric(root,{currentView:current,actualRole:actualAuthenticatedRole()});window.soroTalentReviewQueue?.bindDashboardMetric?.(root,{currentView:current,actualRole:actualAuthenticatedRole()});window.soroTaskCenter?.bindDashboardMetric?.(root,current);window.soroTalentTimeOff?.bindDashboardActions(root,{currentView:current,actualRole:actualAuthenticatedRole()});document.getElementById('add-task')?.addEventListener('click',()=>{if(role==='client')toast('Your hiring request form is the next portal step.');else document.getElementById('task-dialog').showModal()});document.getElementById('new-record')?.addEventListener('click',()=>{if(window.SoroClientWorkflow?.canEditForRole?.(currentAuthenticatedRole())){const options=clientWorkflowMountOptions(currentAuthenticatedRole());options.start='create';current='clients';selectedClientId=null;selectedTalentId=null;history.pushState({},'',`${location.pathname}#clients`);setActive();window.SoroClientWorkflow.mount(root,options);return}toast(`${role==='talent'?'New Talent':role==='client'?'Request another Talent':'New Client'} form is the next build step.`)});document.getElementById('import-drive')?.addEventListener('click',importDriveFiles);document.getElementById('talent-search')?.addEventListener('input',e=>{talentSearch=e.target.value;render();document.getElementById('talent-search')?.focus()});document.getElementById('talent-status-filter')?.addEventListener('change',e=>{talentStatus=e.target.value;render()});document.querySelectorAll('.talent-row').forEach(row=>{const open=()=>openTalentProfile(row.dataset.talentId);row.addEventListener('click',open);row.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();open()}})});document.querySelectorAll('.back-to-directory').forEach(b=>b.addEventListener('click',goToTalentDirectory));document.getElementById('profile-add-task')?.addEventListener('click',()=>{const related=document.getElementById('task-related');if(related)related.value=currentTalentProfileApplicant()?.full_name||'';document.getElementById('task-dialog').showModal()});document.getElementById('headshot-input')?.addEventListener('change',e=>uploadHeadshot(e.target.files?.[0]));document.querySelectorAll('[data-metric]').forEach(el=>el.addEventListener('click',()=>{const dashboard=viewDataForAuthenticatedRole('overview',role==='admin'?data.overview:roleDashboards[role]),m=dashboard.metrics[+el.dataset.metric];if(m[0]==='Dream Pathway'&&currentAuthenticatedRole()==='virtual_assistant'){location.hash='#talent-my-profile';return;}document.getElementById('detail-title').textContent=m[0];document.getElementById('detail-list').innerHTML=`<p class="empty">${escapeHtml(m[2])}</p>`}));document.getElementById('view-all')?.addEventListener('click',()=>{current='tasks';setActive();render()})}
 function setActive(){
   if(current!=='feedback')window.SoroFeedback?.unmount?.();
+  syncLiveWorkspaceNotice();
   if(current!=='reports')window.SoroReports?.unmount?.();
   if(current!=='talent-review')window.soroTalentReviewQueue?.unmount?.({clear:false});
   const active=current==='activity'?'reports':current==='talent-profile'?'vas':current==='client-record'?'clients':current==='client-placement'?(authenticatedClientRoles.has(currentAuthenticatedRole())?'client-candidate-review':'placements'):current;
@@ -590,8 +604,9 @@ function applyRole(nextRole){
   selectedClientId=null;
   const c=roleConfig[role];
   const profileButton=document.getElementById('role-switcher');
-  const label=role==='admin'?(profileButton?.dataset.authenticatedRoleLabel||c.label):c.label;
-  const person=role==='admin'?(profileButton?.dataset.authenticatedName||c.person):c.person;
+  const liveFounder=founderLiveStaffWorkspace()||(['client','va'].includes(role)&&window.SoroFounderLivePortal?.eligible());
+  const label=role==='admin'||liveFounder?(profileButton?.dataset.authenticatedRoleLabel||roleConfig.admin.label):c.label;
+  const person=role==='admin'||liveFounder?(profileButton?.dataset.authenticatedName||roleConfig.admin.person):c.person;
   document.getElementById('role-label').textContent=label;
   document.querySelector('.profile strong').textContent=person;
   document.body.className=c.className;
@@ -600,7 +615,8 @@ function applyRole(nextRole){
   window.SoroGlobalSearch?.refreshRole?.();
   render();
   const workspaceName={admin:'Admin Panel',sales:'Sales Panel',talent:'Talent Management Panel',client:'Client Portal',va:'Talent Portal'}[role];
-  toast(`${workspaceName} preview is active.`);
+  toast(`${workspaceName} ${liveFounder?'live view':'preview'} is active.`);
+  if(founderLiveStaffWorkspace()&&viewAllowedForAuthenticatedRole('vas'))loadLiveApplicants();
 }
 document.getElementById('role-switcher').addEventListener('click',event=>{if(event.currentTarget.dataset.accountAction==='my-profile'){goToMyProfile();return}if(event.currentTarget.dataset.accountAction==='workspace-preview'||actualAuthenticatedRole()==='admin')document.getElementById('role-dialog').showModal()});document.getElementById('role-dialog').addEventListener('close',e=>{if(roleConfig[e.target.returnValue])applyRole(e.target.returnValue)});
 async function searchOperationsRecords({query,types,signal}={}){
@@ -843,7 +859,7 @@ function openClientPlacementWorkflow(requestId){
 window.addEventListener('soro:client-placement-open',event=>openClientPlacementWorkflow(event.detail?.requestId));
 window.addEventListener('click',event=>{
   const button=event.target.closest?.('[data-placement-ending-open]');
-  if(!button||!window.SoroPlacementEnding?.canManage(currentAuthenticatedRole())||adminPreviewingNonAdminWorkspace())return;
+  if(!button||!window.SoroPlacementEnding?.canManage(liveWorkspaceDataRole())||adminPreviewingNonAdminWorkspace())return;
   current='placements';history.pushState({endingPlacementId:button.dataset.placementEndingOpen},'',`${location.pathname}#placements`);setActive();render();
 });
 window.addEventListener('soro:placement-work-log-open',event=>{

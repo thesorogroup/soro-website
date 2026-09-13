@@ -313,15 +313,15 @@
     ];
   }
 
-  function createApprovalAdapter(seed = defaultSeed()) {
+  function createApprovalAdapter(seed = defaultSeed(), options = {}) {
     let records = seed.map(record => normalizeClient(record)).filter(Boolean);
     let previewIdSequence = 0;
     const newPreviewId = () => `f0000000-0000-4000-8000-${String(++previewIdSequence).padStart(12, '0')}`;
-    const ownerRecords = [
+    const ownerRecords = (options.owners || [
       normalizeOwner({ id: 'preview-owner-morgan', name: 'Morgan Lee', active: true, current: true }),
       normalizeOwner({ id: 'preview-owner-jordan', name: 'Jordan Reed', active: true }),
       normalizeOwner({ id: 'preview-owner-founder', name: 'Matt Johnson', active: true })
-    ].filter(Boolean);
+    ]).map(normalizeOwner).filter(Boolean);
     function updateRecord(clientId, update, label, detail = '') {
       const now = new Date().toISOString();
       records = records.map(record => {
