@@ -298,6 +298,13 @@
 
   function bindProfile(root, directory, key) {
     refreshVisuals(root);
+    const talent=directory.talents.find(t=>t.id===selectedTalentId)||directory.talents[0];
+    if(talent&&window.SoroDreamInspiration){
+      const page=root.querySelector('[data-client-talent-page]');
+      let slot=page?.querySelector('[data-shared-dream]');
+      if(page&&!slot){slot=document.createElement('div');slot.dataset.sharedDream=talent.id;slot.hidden=true;page.append(slot);}
+      if(slot)window.SoroDreamInspiration.mountShared(slot,{applicantId:talent.id,isCurrent:()=>pageIsCurrent(root,key)&&slot.dataset.sharedDream===(selectedTalentId||talent.id)});
+    }
     root.querySelector('[data-client-talent-select]')?.addEventListener('change', event => {
       if (!pageIsCurrent(root, key)) return;
       const requested = text(event.target.value);

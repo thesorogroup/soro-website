@@ -72,7 +72,7 @@
       else return null;state.requests.push(body.requestId);notice('Sample check-in saved. Private notes are visible only to authorized sample staff.');
     }
     const notes=state.notes.filter(n=>(selected==='talent'||n.side==='client')&&(!u.searchParams.get('kind')||n.kind===u.searchParams.get('kind'))&&(!u.searchParams.get('from')||n.observedOn>=u.searchParams.get('from'))&&(!u.searchParams.get('to')||n.observedOn<=u.searchParams.get('to'))),offset=Number(u.searchParams.get('offset')||0);
-    return{viewerRole:actor.role,subject:u.searchParams.has('applicantId')?'talent':'placement',talentName:'Jamie Cruz',today:day(),placements:[{id:id(21),clientName:store.companyName,canRecord:true,canSchedule:true,sides:[side],owners:[{id:actor.id,name:actor.name,sides:[side]}]}],plans:state.plans.filter(p=>selected==='talent'||p.side==='client').map(p=>({...p,canManage:p.side===side})),notes:notes.slice(offset,offset+30).map(n=>({...n,canCorrect:n.side===side})),total:notes.length};
+    return{viewerRole:actor.role,subject:u.searchParams.has('applicantId')?'talent':'placement',talentName:'Jamie Cruz',today:day(),placements:[{id:id(21),clientId:id(50),clientName:store.companyName,canRecord:true,canSchedule:true,sides:[side],owners:[{id:actor.id,name:actor.name,sides:[side]}]}],plans:state.plans.filter(p=>selected==='talent'||p.side==='client').map(p=>({...p,canManage:p.side===side})),notes:notes.slice(offset,offset+30).map(n=>({...n,canCorrect:n.side===side})),total:notes.length};
   }
   function dreamPathway(method,body,u){
     const applicantId=method==='GET'?u.searchParams.get('applicantId'):body.applicantId,a=store.applicants.find(a=>a.id===applicantId);
@@ -150,6 +150,31 @@
     }
     else if(name==='talent-time-off'&&method==='GET')result={generatedAt:now(),viewerRole:personas[selected].role,eligibility:selected==='va'?{eligible:true,state:'eligible',placementId:id(21),clientName:store.companyName,workTimezone:'Asia/Manila',minStartDate:day()}:null,requests:[]};
     else if(name==='placement-checkins'){result=checkins(method,body,u);if(!result)return new Response(JSON.stringify({message:'This sample role or record cannot perform this check-in action.'}),{status:403});}
+    else if(name==='dream-inspiration'){
+      store.inspirations||={};const aid=body.applicantId||u.searchParams.get('applicantId'),a=store.applicants.find(x=>x.id===aid);
+      const photoId=u.searchParams.get('photoId');
+      if(photoId){const entry=Object.values(store.inspirations).find(x=>x.photoId===photoId),file=localFiles.get('dream/'+photoId);if(!entry||!file||!(selected==='talent'||selected==='va'&&entry.applicantId===id(10)||selected==='client'&&entry.applicantId===id(10)&&entry.sharedPhoto))return new Response('{}',{status:403});result={url:file.url,expiresIn:60};}
+      else if(!a||selected==='sales'||selected==='client'&&u.searchParams.get('shared')!=='true'||selected==='va'&&a.auth_user_id!==personas.va.id)return new Response('{}',{status:403});
+      else {
+        const state=store.inspirations[aid]||={applicantId:aid,photoId:null,caption:'',version:0,sharedStory:'',sharedPhoto:false};
+        if(selected==='client'){if(aid!==id(10))return new Response('{}',{status:403});result={shared:!!(state.sharedStory||state.sharedPhoto),story:state.sharedStory,photoId:state.sharedPhoto?state.photoId:null,caption:state.sharedPhoto?state.caption:''};}
+        else {
+          if(method==='POST'){
+            if(body.version!==state.version)return new Response(JSON.stringify({message:'Sharing settings changed. Refresh and try again.'}),{status:409});
+            if(['upload','caption','remove'].includes(body.action)&&selected!=='va')return new Response('{}',{status:403});
+            if(body.action==='upload'){
+              if(!body.image||!['image/jpeg','image/png','image/webp'].includes(body.image.type)||typeof body.image.dataBase64!=='string'||body.image.dataBase64.length>4194304)return new Response('{}',{status:400});
+              const bytes=Uint8Array.from(atob(body.image.dataBase64),c=>c.charCodeAt(0)),blob=new Blob([bytes],{type:body.image.type});
+              state.photoId=body.requestId;state.caption=body.caption;state.sharedPhoto=false;localFiles.set('dream/'+body.requestId,{blob,url:URL.createObjectURL(blob)});
+            }else if(body.action==='remove'){state.photoId=null;state.caption='';state.sharedPhoto=false;}
+            else if(body.action==='caption'){state.caption=body.caption;state.sharedPhoto=false;}
+            else if(body.action==='share'){if(aid!==id(10)||body.placementId!==id(21)||body.clientId!==id(50)||body.shareDream&&body.approvedStory!==a.greatest_dream||!body.consentNote?.trim()||body.sharePhoto&&!state.photoId)return new Response('{}',{status:400});state.sharedStory=body.shareDream?a.greatest_dream:'';state.sharedPhoto=body.sharePhoto;}
+            else return new Response('{}',{status:400});state.version++;notice('Sample Dream inspiration updated. Nothing was uploaded or shared outside Test Mode.');
+          }
+          result={applicantId:aid,story:a.greatest_dream,photoId:state.photoId,caption:state.caption,version:state.version,canUpload:selected==='va',canShare:true,self:selected==='va',placements:aid===id(10)?[{id:id(21),clientId:id(50),clientName:store.companyName,shareDream:!!state.sharedStory,sharePhoto:state.sharedPhoto,sharedStory:state.sharedStory}]:[]};
+        }
+      }
+    }
     else if(name==='dream-pathway'){result=dreamPathway(method,body,u);if(!result)return new Response(JSON.stringify({message:'This sample role, record, or action is not available. Refresh and check the selections.'}),{status:403});}
     else if(name==='client-dashboard'&&method==='GET')result=dashboard();
     else if(name==='talent-review-queue'&&method==='GET')result=queue();

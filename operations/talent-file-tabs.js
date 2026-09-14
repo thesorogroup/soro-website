@@ -51,6 +51,7 @@
     if(!window.SoroTalentDreamSummary?.canView(window.soroCurrentAccess,applicant,effectiveProfileRole(),typeof isTalentSelfProfileView==='function'&&isTalentSelfProfileView()))return;
     target.dataset.dreamMounted='true';
     window.SoroDreamPathway.mount(target,{applicantId:applicant.id,summaryTarget:shell.querySelector('[data-dream-pathway-summary]'),isCurrent:()=>shell.isConnected&&lastTalentId===applicant.id&&canViewBenefits(applicant)});
+    window.SoroDreamInspiration?.mount([shell.querySelector('[data-dream-inspiration]'),shell.querySelector('[data-dream-inspiration-detail]')],{applicantId:applicant.id,isCurrent:()=>shell.isConnected&&lastTalentId===applicant.id&&canViewBenefits(applicant)});
   }
 
   function canViewPay() {
@@ -158,7 +159,7 @@
   }
 
   function benefitsPanel(applicant) {
-    return `<div data-dream-pathway="${escapeHtml(applicant.id)}"></div><div data-talent-healthcare="${escapeHtml(applicant.id)}"></div>`;
+    return `<div data-dream-inspiration-detail></div><div data-dream-pathway="${escapeHtml(applicant.id)}"></div><div data-talent-healthcare="${escapeHtml(applicant.id)}"></div>`;
   }
 
   function attendancePanel() {
@@ -313,6 +314,7 @@
       benefitsAvailable: !!benefitsAvailable
     });
     if (dreamMarkup) profilePanel.insertAdjacentHTML('beforeend', dreamMarkup);
+    if(dreamMarkup)profilePanel.querySelector('.talent-dream-main')?.insertAdjacentHTML('beforeend','<div data-dream-inspiration></div>');
     if(dreamMarkup&&benefitsAvailable)profilePanel.querySelector('.talent-dream-summary')?.insertAdjacentHTML('beforeend','<div data-dream-pathway-summary></div>');
     // The private aspiration now has one dedicated home, or is hidden for this role.
     details.querySelectorAll('.profile-details > div').forEach(row => {

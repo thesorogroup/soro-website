@@ -148,9 +148,9 @@ test('Client Talent assets load before routing and include desktop/mobile safegu
   const css = read('operations/client-talent-profile.css');
   assert.match(html, /client-talent-profile\.css\?v=20260829-production-visuals/);
   assert.match(html, /talent-profile-visuals\.js\?v=20260829-production-visuals/);
-  assert.match(html, /client-talent-profile\.js\?v=20260907-client-home/);
-  assert.ok(html.indexOf('talent-profile-visuals.js?v=20260829-production-visuals') < html.indexOf('client-talent-profile.js?v=20260907-client-home'));
-  assert.ok(html.indexOf('client-talent-profile.js?v=20260907-client-home') < html.indexOf('src="operations.js?'));
+  assert.match(html, /client-talent-profile\.js\?v=20260913-dream-inspiration/);
+  assert.ok(html.indexOf('talent-profile-visuals.js?v=20260829-production-visuals') < html.indexOf('client-talent-profile.js?v=20260913-dream-inspiration'));
+  assert.ok(html.indexOf('client-talent-profile.js?v=20260913-dream-inspiration') < html.indexOf('src="operations.js?'));
   assert.match(css, /grid-template-columns:\s*230px minmax\(0, 1fr\) minmax\(280px, 350px\)/);
   assert.match(css, /@media \(min-width: 1101px\)[\s\S]*\.client-talent-folder-art/);
   assert.match(css, /\.client-talent-folder-front-seam[\s\S]*stroke:\s*rgba\(144, 125, 91, \.24\)/);

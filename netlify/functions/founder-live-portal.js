@@ -80,6 +80,12 @@ async function read(c,resource,p){
   case 'activity-history':{const q=require('./activity-history').queryFilters(p);return call('get_activity_history',{p_kind:q.kind,p_entity_id:q.id,p_filters:q.filters});}
   case 'talent-healthcare':check(p,['applicantId']);talent();if(p.applicantId!==c.applicantId)throw fail(403,'Choose this Talent profile.');return privateRead('healthcare');
   case 'dream-pathway':check(p,['applicantId']);talent();if(p.applicantId!==c.applicantId)throw fail(403,'Choose this Talent profile.');return rpc('get_dream_pathway',{p_actor_user_id:c.user.id,p_applicant_id:c.applicantId});
+  case 'dream-inspiration':check(p,['applicantId','photoId','shared']);{
+   if(p.photoId){const f=await rpc('get_dream_inspiration_photo',{p_actor_user_id:c.user.id,p_photo_id:id(p.photoId)}),path=require('./dream-inspiration').path(f.path);const r=await service('/storage/v1/object/sign/'+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({expiresIn:60})}),v=await r.json();if(!r.ok)throw fail(503,'Photo unavailable.');return{url:require('./document-center')._test.storageURL(v.signedURL,'sign'),expiresIn:60};}
+   if(c.applicantId){if(p.applicantId!==c.applicantId||p.shared)throw fail(403,'Choose this Talent profile.');}
+   else if(p.shared!=='true')throw fail(403,'Only shared Dream summaries can be observed.');
+   return rpc('get_dream_inspiration',{p_actor_user_id:c.user.id,p_applicant_id:id(p.applicantId),p_shared:p.shared==='true'});
+  }
   case 'profile':check(p,[]);talent();{
    const value=(await rows(`applicants?id=eq.${c.applicantId}&organization_id=eq.${c.access.organization_id}&archived_at=is.null&portal_access_status=eq.active&select=${SELF_FIELDS},legacy_application_data&limit=1`))[0]||null;
    if(value)value.legacy_application_data=Object.fromEntries(['verified_skill_experience','soro_ops_skills','soro_ops_experience'].filter(k=>Object.hasOwn(value.legacy_application_data||{},k)).map(k=>[k,value.legacy_application_data[k]]));return value;
