@@ -6,6 +6,22 @@ const fs = require('node:fs');
 const path = require('node:path');
 const ui = require('../operations/dream-inspiration');
 
+test('the normal Dream photo card has no reload or retry button', () => {
+  const photo = {photoId: 'sample-photo', caption: 'My inspiration', canUpload: true};
+  for (const url of ['', 'blob:sample-photo']) {
+    const html = ui.markup(photo, url);
+    assert.doesNotMatch(html, /data-di-reload|Reload Photo|Try Again/);
+    assert.match(html, /Replace Photo/);
+  }
+});
+
+test('photo recovery is shown only after a failed load', () => {
+  const html = ui.markup({photoId: 'sample-photo'}, '', true);
+  assert.match(html, /Photo unavailable/);
+  assert.match(html, /data-di-reload>Try Again/);
+  assert.doesNotMatch(html, /Photo is loading/);
+});
+
 test('oversized inspiration photos explain the actual size and how to retry', () => {
   const message = ui.photoDimensionError(8333, 8333);
   assert.match(message, /69\.4\s*megapixels/i);
