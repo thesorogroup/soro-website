@@ -70,7 +70,19 @@
 .talent-dream-read-more, .talent-dream-read-less { display: inline-block; margin: 10px 0 0; color: var(--profile-warm-accent); font-size: 12px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
 .talent-dream-read-less, .talent-dream-story[open] > summary > :not(.talent-dream-read-less) { display: none; }
 .talent-dream-story[open] .talent-dream-read-less { display: inline-block; margin: 0 0 10px; }
+/* Reuse the same private Dream card beside Details in every authorized view. */
+.profile-dream-column { min-width: 0; display: grid; align-content: start; gap: 16px; }
+.profile-dream-column > .talent-dream-summary { grid-template-columns: minmax(0, 1fr); margin: 0; }
+.profile-dream-column > .profile-section { margin: 0; }
+.profile-dream-column .talent-dream-main { padding: 26px; }
+.profile-dream-column .talent-dream-companion { padding: 22px 26px; }
+.profile-dream-column .talent-dream-spark { display: none; }
+.profile-dream-column .talent-dream-companion h3 { margin-top: 0; font-size: 22px; }
 @media (max-width: 1100px) {
+  .talent-profile-home-layout--dream > .profile-summary-column { display: contents; }
+  .talent-profile-home-layout--dream .profile-details-section { order: 0; }
+  .talent-profile-home-layout--dream > .profile-dream-column { order: 1; }
+  .talent-profile-home-layout--dream .profile-screening { order: 2; }
   .talent-dream-summary { grid-template-columns: minmax(0, 1fr); }
   .talent-dream-main { padding: 24px; }
   .talent-dream-companion { padding: 22px 24px; }
@@ -79,6 +91,7 @@
 }
 @media (max-width: 520px) {
   .talent-dream-main, .talent-dream-companion { padding: 22px 20px; }
+  .profile-dream-column .talent-dream-main, .profile-dream-column .talent-dream-companion { padding: 22px 20px; }
   .talent-dream-summary h2 { font-size: 27px; }
   .talent-dream-copy { font-size: 16px; }
 }

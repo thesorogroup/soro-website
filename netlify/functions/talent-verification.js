@@ -1,4 +1,5 @@
 const {interviewEmail, interviewTimezone, updateInterviewBody} = require('./lib/branded-email');
+const { publicDeferral } = require('./lib/talent-review-deferral');
 const configuredUrl = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_URL = /^https:\/\/[^/]+\.supabase\.co\/?$/.test(configuredUrl)
   ? configuredUrl.replace(/\/$/, '')
@@ -650,6 +651,19 @@ function publicPayload(value) {
   if (!value.applicant || !value.gate || typeof value.gate.interviewAddressed !== 'boolean' || typeof value.gate.referencesAddressed !== 'boolean' || typeof value.gate.benchReadyEligible !== 'boolean' || !Array.isArray(value.gate.blockers) || !Array.isArray(value.interviewers)) {
     throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid response.');
   }
+  let deferrals;
+  if ('deferrals' in value.gate) {
+    if (!value.gate.deferrals || typeof value.gate.deferrals !== 'object' || Array.isArray(value.gate.deferrals)) {
+      throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid response.');
+    }
+    deferrals = {
+      interview: publicDeferral(value.gate.deferrals.interview),
+      references: publicDeferral(value.gate.deferrals.references)
+    };
+    if ((value.gate.interviewAddressed && deferrals.interview) || (value.gate.referencesAddressed && deferrals.references)) {
+      throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid response.');
+    }
+  }
   return {
     generatedAt: requiredTimestamp(value.generatedAt),
     viewerRole,
@@ -668,7 +682,8 @@ function publicPayload(value) {
       interviewAddressed: value.gate.interviewAddressed,
       referencesAddressed: value.gate.referencesAddressed,
       benchReadyEligible: value.gate.benchReadyEligible,
-      blockers: value.gate.blockers.map(item => requiredText(item, 100))
+      blockers: value.gate.blockers.map(item => requiredText(item, 100)),
+      ...(deferrals ? { deferrals } : {})
     },
     interview: publicInterview(value.interview),
     interviewHistory: (Array.isArray(value.interviewHistory) ? value.interviewHistory : []).map(item => ({...publicInterview(item), calendar: {status: 'not_applicable', joinUrl: null}})),

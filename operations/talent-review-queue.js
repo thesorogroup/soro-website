@@ -9,6 +9,8 @@
   const ENDPOINT = '/.netlify/functions/talent-review-queue';
   const AUTO_REFRESH_MS = 30000;
   const VERIFICATION_ENDPOINT = '/.netlify/functions/talent-verification';
+  const DEFERRALS_ENDPOINT = '/.netlify/functions/talent-review-deferrals';
+  const REQUIREMENT_KEYS = Object.freeze(['core_profile', 'resume', 'english', 'disc', 'enneagram', 'mbti', 'internet', 'equipment', 'skills', 'interview', 'references']);
   const AUTHORIZED_ROLES = new Set(['admin', 'talent_management']);
   const STAGES = Object.freeze(['submitted', 'in_review', 'needs_more_info', 'bench_ready', 'closed']);
   const RECORD_STAGES = Object.freeze(['submitted', 'in_review', 'needs_more_info', 'bench_ready', 'declined']);
@@ -65,6 +67,10 @@
   let pendingStageAction = false;
   let skillsSaving = false;
   let pendingVerificationAction = null;
+  let requirementsContext = null;
+  let requirementsVersion = 0;
+  let requirementsController = null;
+  let pendingRequirementAction = null;
   const verificationGateCache = new Map();
   let feedback = Object.freeze({ type: '', message: '' });
 
@@ -171,6 +177,10 @@
       if (!/^[a-z0-9][a-z0-9_-]*$/.test(key) || seen.has(key) || !label || !CHECKLIST_STATES.has(state)) return null;
       seen.add(key);
       const result = { key, label, state };
+      if (item.deferral != null) {
+        result.deferral = normalizeDeferral(item.deferral);
+        if (!result.deferral || !REQUIREMENT_KEYS.includes(key)) return null;
+      }
       if (['english', 'disc', 'enneagram', 'mbti', 'internet', 'equipment'].includes(key)
         && ('resultRecorded' in item || 'evidenceState' in item)) {
         if (typeof item.resultRecorded !== 'boolean'
@@ -186,6 +196,50 @@
       return Object.freeze(result);
     });
     return items.some(item => !item) ? null : Object.freeze(items);
+  }
+
+  function validDate(value) {
+    const date = text(value, 20);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+    const parsed = new Date(`${date}T00:00:00Z`);
+    return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === date ? date : '';
+  }
+
+  function normalizeDeferral(source) {
+    if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
+    const id = validUuid(source.id), reason = text(source.reason, 500);
+    const createdAt = validTimestamp(source.createdAt), createdByName = text(source.createdByName, 120);
+    const dueDate = source.dueDate == null ? null : validDate(source.dueDate);
+    const taskId = source.taskId == null ? null : validUuid(source.taskId);
+    if (!id || !reason || !createdAt || !createdByName || dueDate === '' || taskId === '') return null;
+    return Object.freeze({ id, reason, createdAt, createdByName, dueDate, taskId });
+  }
+
+  function normalizeRequirementsPayload(payload, expectedApplicantId) {
+    const applicantId = validUuid(payload?.applicantId), updatedAt = validTimestamp(payload?.updatedAt);
+    if (!applicantId || applicantId !== expectedApplicantId || !updatedAt || !Array.isArray(payload?.items) || payload.items.length !== REQUIREMENT_KEYS.length) throw new Error('The review requirements response was invalid. Refresh and try again.');
+    const seen = new Set();
+    const items = payload.items.map(item => {
+      const key = text(item?.key, 64), label = text(item?.label, 100), status = item?.status;
+      const deferral = item?.deferral == null ? null : normalizeDeferral(item.deferral);
+      if (!REQUIREMENT_KEYS.includes(key) || seen.has(key) || !label || !['pending', 'complete', 'deferred'].includes(status) || (item?.deferral != null && !deferral) || (status === 'deferred') !== Boolean(deferral)) throw new Error('The review requirements response was invalid. Refresh and try again.');
+      seen.add(key);
+      return Object.freeze({ key, label, status, deferral });
+    });
+    return Object.freeze({ applicantId, updatedAt, items: Object.freeze(items) });
+  }
+
+  function buildDeferralAction(values = {}) {
+    const applicantId = validUuid(values.applicantId), expectedUpdatedAt = validTimestamp(values.expectedUpdatedAt);
+    const itemKey = text(values.itemKey, 64), action = text(values.action, 16);
+    if (!applicantId || !expectedUpdatedAt || !REQUIREMENT_KEYS.includes(itemKey) || !['defer', 'restore'].includes(action)) throw new Error('Refresh the review requirements and try again.');
+    const reason = String(values.reason || '').trim();
+    if (!reason || reason.length > 500) throw new Error('Add a reason of 1–500 characters before continuing.');
+    if (typeof values.createTask !== 'undefined' && typeof values.createTask !== 'boolean') throw new Error('Choose whether to create a follow-up task.');
+    const createTask = action === 'defer' && values.createTask === true;
+    const dueDate = createTask ? validDate(values.dueDate) : null;
+    if (dueDate === '') throw new Error('Choose a due date for the follow-up task.');
+    return Object.freeze({ requestId: validUuid(values.requestId) || makeRequestId(), applicantId, expectedUpdatedAt, itemKey, action, reason, dueDate, createTask });
   }
 
   function normalizeAllowedActions(source) {
@@ -499,6 +553,139 @@
     activeVerificationController = null;
   }
 
+  async function requestRequirements(applicantId, body = null) {
+    if (!canOpenForRole()) throw new Error('Only Admin and Talent Management can update review requirements.');
+    const scope = accessFingerprint(), version = requirementsVersion;
+    const token = await sessionToken();
+    checkRequestScope(scope);
+    if (version !== requirementsVersion) throw new Error('This review changed. Reopen the requirements and try again.');
+    requirementsController?.abort?.();
+    const controller = typeof root?.AbortController === 'function' ? new root.AbortController() : null;
+    requirementsController = controller;
+    const timeout = controller ? root.setTimeout?.(() => controller.abort(), 25000) : null;
+    try {
+      const response = await root.fetch(body ? DEFERRALS_ENDPOINT : `${DEFERRALS_ENDPOINT}?applicantId=${encodeURIComponent(applicantId)}`, {
+        method: body ? 'POST' : 'GET',
+        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json', ...(body ? { 'Content-Type': 'application/json' } : {}) },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller?.signal
+      });
+      let payload;
+      try { payload = JSON.parse(await response.text()); }
+      catch { throw new Error('The review requirements service returned an unexpected response.'); }
+      if (!response.ok) throw new Error(text(payload?.message, 280) || 'The review requirement could not be updated.');
+      checkRequestScope(scope);
+      return body ? normalizePayload(payload) : normalizeRequirementsPayload(payload, applicantId);
+    } catch (error) {
+      if (error?.name === 'AbortError') throw new Error('The review requirements request took too long. Please try again.');
+      throw error;
+    } finally {
+      if (timeout) root.clearTimeout?.(timeout);
+      if (requirementsController === controller) requirementsController = null;
+    }
+  }
+
+  function cacheRequirementsGate(data) {
+    const interview = data.items.find(item => item.key === 'interview');
+    const references = data.items.find(item => item.key === 'references');
+    verificationGateCache.set(data.applicantId, Object.freeze({
+      interviewAddressed: interview.status === 'complete',
+      referencesAddressed: references.status === 'complete',
+      benchReadyEligible: interview.status !== 'pending' && references.status !== 'pending',
+      blockers: [interview, references].filter(item => item.status === 'pending').map(item => `${item.label} needs review or an individual Verify Later decision.`)
+    }));
+  }
+
+  async function loadRequirements(applicantId) {
+    const version = ++requirementsVersion;
+    requirementsContext = { applicantId, phase: 'loading', data: null, message: '', error: false };
+    render();
+    try {
+      const data = await requestRequirements(applicantId);
+      if (version !== requirementsVersion || !canOpenForRole()) return false;
+      cacheRequirementsGate(data);
+      requirementsContext = { applicantId, phase: 'ready', data, message: '', error: false };
+      render();
+      return true;
+    } catch (error) {
+      if (version !== requirementsVersion) return false;
+      requirementsContext = { applicantId, phase: 'error', data: null, message: error.message, error: true };
+      render();
+      return false;
+    }
+  }
+
+  function openRequirements(applicantId) {
+    const applicant = findApplicant(applicantId);
+    if (!mountedRoot || !canOpenForRole() || !applicant || applicant.stage === 'submitted' || applicant.archived || applicant.stage === 'declined' || pendingStageAction || pendingVerificationAction || pendingRequirementAction) return false;
+    holdReview(applicant.applicantId);
+    loadRequirements(applicant.applicantId);
+    return true;
+  }
+
+  function closeRequirements() {
+    if (pendingRequirementAction) return false;
+    const applicantId = requirementsContext?.applicantId;
+    requirementsVersion += 1;
+    requirementsController?.abort?.();
+    requirementsController = null;
+    requirementsContext = null;
+    render();
+    mountedRoot?.querySelector?.(`[data-review-requirements="${applicantId}"]`)?.focus?.({ preventScroll: true });
+    return true;
+  }
+
+  async function changeRequirement(values = {}) {
+    if (pendingRequirementAction || pendingStageAction || pendingVerificationAction) throw new Error('Please wait for the current review update to finish.');
+    if (!canOpenForRole()) throw new Error('Only Admin and Talent Management can update review requirements.');
+    const context = requirementsContext, version = requirementsVersion;
+    if (!context?.data || context.applicantId !== values.applicantId) throw new Error('Open the review requirements before making a change.');
+    const item = context.data.items.find(item => item.key === values.itemKey);
+    const previousStage = findApplicant(context.applicantId)?.stage;
+    if (!item || (values.action === 'defer' ? item.status !== 'pending' : item.status !== 'deferred')) throw new Error('This requirement changed. Refresh it before continuing.');
+    const body = buildDeferralAction({ ...values, expectedUpdatedAt: context.data.updatedAt });
+    const fingerprint = JSON.stringify({ ...body, requestId: '' });
+    const request = { ...body, requestId: context.fingerprint === fingerprint ? context.requestId : body.requestId };
+    context.fingerprint = fingerprint;
+    context.requestId = request.requestId;
+    const operation = {};
+    pendingRequirementAction = operation;
+    const dialog = mountedRoot?.querySelector?.('[data-requirements-dialog]');
+    const controls = [...(dialog?.querySelectorAll?.('button, input, textarea') || [])].map(control => ({control, disabled: control.disabled}));
+    controls.forEach(({control}) => { control.disabled = true; });
+    dialog?.setAttribute?.('aria-busy', 'true');
+    operation.finish = root.SoroActionProgress?.begin(values.action === 'defer' ? 'Saving Verify Later…' : 'Restoring review requirement…');
+    try {
+      const next = await requestRequirements(context.applicantId, request);
+      if (version !== requirementsVersion || !canOpenForRole()) return false;
+      queue = next;
+      syncNavigationBadge(queue);
+      dispatchUpdated();
+      verificationGateCache.delete(context.applicantId);
+      const data = await requestRequirements(context.applicantId);
+      if (version !== requirementsVersion || !canOpenForRole()) return false;
+      cacheRequirementsGate(data);
+      requirementsContext = { applicantId: context.applicantId, phase: 'ready', data, error: false,
+        message: values.action === 'defer' ? `${item.label} is set to Verify Later.${request.createTask ? ' A follow-up task was created.' : ''} The review stage has not changed.` : `${item.label} is required again.${previousStage === 'bench_ready' && findApplicant(context.applicantId)?.stage === 'in_review' ? ' This Talent returned to In Review.' : ''}${item.deferral?.taskId ? ' Its follow-up task is kept with its current status.' : ''}` };
+      render();
+      return next;
+    } catch (error) {
+      if (version === requirementsVersion && requirementsContext) {
+        // Keep the entered reason and retry identity when a response is uncertain.
+        const status = mountedRoot?.querySelector?.('[data-requirements-status]');
+        if (status) { status.textContent = error.message || 'The requirement could not be updated.'; status.classList?.add('is-error'); }
+      }
+      throw error;
+    } finally {
+      operation.finish?.();
+      if (pendingRequirementAction === operation) {
+        pendingRequirementAction = null;
+        controls.forEach(({control, disabled}) => { if (control.isConnected) control.disabled = disabled; });
+        dialog?.removeAttribute?.('aria-busy');
+      }
+    }
+  }
+
   async function requestVerification(applicantId, { body = null } = {}) {
     if (!canOpenForRole()) throw new Error('Only Admin and Talent Management can access Talent verification.');
     const id = validUuid(applicantId);
@@ -674,11 +861,11 @@
   }
 
   function reviewDialogOpen() {
-    return Boolean(root?.document?.querySelector?.('[data-review-dialog][open], [data-verification-dialog][open]'));
+    return Boolean(requirementsContext || root?.document?.querySelector?.('[data-review-dialog][open], [data-verification-dialog][open]'));
   }
 
   async function refresh(options = {}) {
-    if (!canOpenForRole() || pendingStageAction) return currentQueue();
+    if (!canOpenForRole() || pendingStageAction || pendingRequirementAction) return currentQueue();
     const silent = options.silent === true && queue.phase === 'ready';
     const version = ++requestVersion;
     if (!silent) {
@@ -802,15 +989,16 @@
           : done ? 'Result Recorded' : item.resultRecorded === false ? 'Awaiting Result' : 'Recording Status Not Loaded';
         const receipt = isSkills ? (item.state === 'complete' ? 'Skills Reported' : 'No Skills Reported') : sourceLabel(item);
         const label = isSkills ? 'Skills Verification' : item.label;
-        return `<li class="talent-review-progress-item ${done ? 'is-recorded' : 'is-pending'}">
+        return `<li class="talent-review-progress-item ${item.deferral ? 'is-deferred' : done ? 'is-recorded' : 'is-pending'}">
           <strong>${escapeHtml(label)}</strong>
           <span class="talent-review-receipt ${item.state === 'complete' ? 'is-received' : 'is-source-missing'}">${escapeHtml(receipt)}</span>
           <span class="talent-review-progress-status"><b aria-hidden="true">${done ? '✓' : '○'}</b>${escapeHtml(status)}</span>
+          ${item.deferral ? '<span class="talent-review-deferral-badge">Verify Later</span>' : ''}
         </li>`;
       }).join('')}</ul>
       <p class="talent-review-checklist-note">Received files are not reviewed results. Green means a result is recorded or skills are verified; interview and reference checks are separate.</p>
       <details class="talent-review-submission" data-review-submission="${applicant.applicantId}"${submissionOpen ? ' open' : ''}><summary><strong>Applicant Submission</strong><span>${received} of ${applicant.checklist.length} Items Received</span></summary>
-        <ul>${applicant.checklist.map(item => `<li class="${item.state === 'complete' ? 'is-received' : 'is-source-missing'}"><strong>${escapeHtml(item.label)}</strong><span>${item.state === 'complete' ? 'Received' : item.evidenceState === 'unclassified_available' ? 'Check File Category' : 'Missing'}</span></li>`).join('')}</ul>
+        <ul>${applicant.checklist.map(item => `<li class="${item.state === 'complete' ? 'is-received' : 'is-source-missing'}"><strong>${escapeHtml(item.label)}</strong><span>${item.state === 'complete' ? 'Received' : item.evidenceState === 'unclassified_available' ? 'Check File Category' : 'Missing'}</span>${item.deferral ? '<span class="talent-review-deferral-badge">Verify Later</span>' : ''}</li>`).join('')}</ul>
       </details>
     </div>`;
   }
@@ -819,13 +1007,13 @@
     const primary = ['begin_review', 'mark_bench_ready'].includes(action);
     const guarded = ['decline', 'archive'].includes(action);
     const restore = action === 'restore';
-    const checklistIncomplete = action === 'mark_bench_ready' && applicant.checklist.some(item => item.state !== 'complete');
+    const checklistIncomplete = action === 'mark_bench_ready' && applicant.checklist.some(item => item.state !== 'complete' && !item.deferral);
     const verificationGate = verificationGateCache.get(applicant.applicantId);
     const verificationIncomplete = action === 'mark_bench_ready' && !verificationGate?.benchReadyEligible;
     const disabledReason = checklistIncomplete
-      ? 'Complete every review checklist item first'
+      ? 'Complete or individually defer each pending review requirement first'
       : verificationIncomplete
-        ? verificationGate ? 'Resolve the interview and reference verification items first' : 'Open Verification to confirm Bench Ready eligibility'
+        ? verificationGate ? 'Resolve or individually defer the interview and reference requirements first' : 'Open Review Requirements or Verification to confirm Bench Ready eligibility'
         : '';
     return `<button type="button" class="button talent-review-action${primary ? ' primary' : ''}${guarded ? ' talent-review-action--guarded' : ''}${restore ? ' talent-review-action--restore' : ''}" data-review-action="${escapeHtml(action)}"${disabledReason ? ` disabled title="${escapeHtml(disabledReason)}"` : ''}>${escapeHtml(ACTION_LABELS[action])}</button>`;
   }
@@ -843,6 +1031,11 @@
 
   function interviewButtonMarkup(applicant) {
     return `<button type="button" class="button talent-review-verification" data-review-interview="${escapeHtml(applicant.applicantId)}" aria-label="Schedule interview for ${escapeHtml(applicant.fullName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM8 2v6m8-6v6M4 10h16"/></svg><span><strong>Schedule Interview</strong><small>Appointment &amp; outcome</small></span></button>`;
+  }
+
+  function requirementsButtonMarkup(applicant) {
+    if (applicant.archived || applicant.stage === 'declined') return '';
+    return `<button type="button" class="button talent-review-requirements-button" data-review-requirements="${escapeHtml(applicant.applicantId)}" aria-label="Review requirements for ${escapeHtml(applicant.fullName)}">Review Requirements</button>`;
   }
 
   function applicantMarkup(applicant) {
@@ -867,9 +1060,9 @@
         <span><small>Last updated</small><strong>${escapeHtml(formatDate(applicant.updatedAt))}</strong></span>
       </div>
       ${checklistMarkup(applicant)}
-      ${!notStarted && gate ? `<div class="talent-review-readiness"><strong>Bench readiness</strong><span>${gate.benchReadyEligible ? 'Interview and reference requirements addressed. Complete the checklist before moving to Bench Ready.' : gate.blockers.map(escapeHtml).join(' · ')}</span></div>` : ''}
+      ${!notStarted && gate ? `<div class="talent-review-readiness"><strong>Bench readiness</strong><span>${gate.benchReadyEligible ? 'Interview and reference requirements are complete or set to Verify Later. Complete or individually defer the remaining checklist items before moving to Bench Ready.' : gate.blockers.map(escapeHtml).join(' · ')}</span></div>` : ''}
       <footer class="talent-review-card-actions">
-        <div class="talent-review-card-main-actions">${notStarted ? (applicant.allowedActions.includes('begin_review') ? actionButtonMarkup('begin_review', applicant) : '') : `${resumeButtonMarkup(applicant)}${verificationButtonMarkup(applicant)}${interviewButtonMarkup(applicant)}<span class="talent-review-action-divider" aria-hidden="true"></span>${primaryActions.length ? primaryActions.map(action => actionButtonMarkup(action, applicant)).join('') : '<span class="talent-review-no-actions">No stage action needed</span>'}`}</div>
+        <div class="talent-review-card-main-actions">${notStarted ? (applicant.allowedActions.includes('begin_review') ? actionButtonMarkup('begin_review', applicant) : '') : `${resumeButtonMarkup(applicant)}${verificationButtonMarkup(applicant)}${interviewButtonMarkup(applicant)}${requirementsButtonMarkup(applicant)}<span class="talent-review-action-divider" aria-hidden="true"></span>${primaryActions.length ? primaryActions.map(action => actionButtonMarkup(action, applicant)).join('') : '<span class="talent-review-no-actions">No stage action needed</span>'}`}</div>
         ${!notStarted && guardedActions.length ? `<details class="talent-review-secondary"><summary>More actions</summary><div>${guardedActions.map(action => actionButtonMarkup(action, applicant)).join('')}</div></details>` : ''}
       </footer>
     </article>`;
@@ -1049,7 +1242,8 @@
 
   function gateMarkup(data) {
     const gate = data.gate;
-    return `<section class="talent-verification-gate ${gate.benchReadyEligible ? 'is-ready' : 'is-blocked'}" aria-label="Bench Ready status"><div><p class="eyebrow">Bench Ready gate</p><h3>${gate.benchReadyEligible ? 'Verification complete' : 'Follow-up required'}</h3><p>${gate.benchReadyEligible ? 'Interview and reference requirements are addressed. The review can move to Bench Ready when the main checklist is complete.' : 'Finish the items below before moving this Talent to Bench Ready.'}</p></div>${gate.blockers.length ? `<ul>${gate.blockers.map(blocker => `<li>${escapeHtml(blocker)}</li>`).join('')}</ul>` : '<span class="talent-verification-ready-mark" aria-hidden="true">✓</span>'}</section>`;
+    const verified = gate.interviewAddressed && gate.referencesAddressed;
+    return `<section class="talent-verification-gate ${verified ? 'is-ready' : 'is-blocked'}" aria-label="Bench Ready status"><div><p class="eyebrow">Bench Ready gate</p><h3>${verified ? 'Verification complete' : gate.benchReadyEligible ? 'Verification set to Verify Later' : 'Follow-up required'}</h3><p>${verified ? 'Interview and reference requirements are addressed. Complete or individually defer the remaining checklist items before moving to Bench Ready.' : gate.benchReadyEligible ? 'One or more verification checks remain pending with an individual Verify Later decision. Complete or defer the remaining requirements before moving to Bench Ready.' : 'Complete or individually defer the items below in Review Requirements before moving this Talent to Bench Ready.'}</p></div>${gate.blockers.length ? `<ul>${gate.blockers.map(blocker => `<li>${escapeHtml(blocker)}</li>`).join('')}</ul>` : verified ? '<span class="talent-verification-ready-mark" aria-hidden="true">✓</span>' : '<span class="talent-review-deferral-badge">Verify Later</span>'}</section>`;
   }
 
   function verificationDialogMarkup() {
@@ -1094,7 +1288,41 @@
       </section>
       ${actionDialogMarkup()}
       ${verificationDialogMarkup()}
+      ${requirementsDialogMarkup()}
     </main>`;
+  }
+
+  function requirementsDialogMarkup() {
+    if (!requirementsContext) return '';
+    const context = requirementsContext, applicant = findApplicant(context.applicantId);
+    const items = context.data?.items || [];
+    const pending = items.filter(item => item.status === 'pending').length;
+    const deferred = items.filter(item => item.status === 'deferred').length;
+    const completed = items.filter(item => item.status === 'complete').length;
+    return `<dialog class="talent-requirements-dialog" data-requirements-dialog aria-labelledby="talent-requirements-title">
+      <header><div><p class="eyebrow">${escapeHtml(applicant?.fullName || 'Talent review')}</p><h2 id="talent-requirements-title">Review Requirements</h2></div><button type="button" data-requirements-close aria-label="Close review requirements">×</button></header>
+      <div class="talent-requirements-body">
+        <p class="talent-requirements-intro">Choose <strong>Verify Later</strong> for any pending requirement, with a reason and an optional follow-up task. Individual deferrals allow Bench Ready while those checks remain pending. Saving a deferral does not change the review stage.</p>
+        <div class="talent-requirements-status${context.error ? ' is-error' : ''}" data-requirements-status role="status" aria-live="polite">${escapeHtml(context.message || '')}</div>
+        ${context.phase === 'loading' ? '<p class="talent-requirements-loading" role="status">Loading review requirements…</p>' : context.phase === 'error' ? '<button type="button" class="button" data-requirements-retry>Retry requirements</button>' : `<div class="talent-requirements-totals"><span><strong>${completed}</strong> requirements met</span><span><strong>${pending}</strong> pending</span><span class="is-deferred"><strong>${deferred}</strong> Verify Later</span></div><ul class="talent-requirements-list">${items.map(item => requirementRowMarkup(item, applicant)).join('')}</ul>`}
+      </div>
+      <footer><span>Recorded results and received files keep their original status.</span><button type="button" class="button" data-requirements-close>Done</button></footer>
+    </dialog>`;
+  }
+
+  function requirementRowMarkup(item, applicant) {
+    const deferral = item.deferral, restore = item.status === 'deferred';
+    const title = restore ? 'Restore Requirement' : 'Verify Later';
+    const key = escapeHtml(item.key);
+    return `<li class="talent-requirement-row is-${item.status}"><div class="talent-requirement-heading"><strong>${escapeHtml(item.label)}</strong><span class="talent-requirement-state">${item.status === 'complete' ? 'Requirement met' : restore ? 'Verify Later' : 'Pending'}</span></div>
+      ${restore ? `<div class="talent-requirement-deferral"><p>${escapeHtml(deferral.reason)}</p><small>Saved by ${escapeHtml(deferral.createdByName)} · ${escapeHtml(formatDate(deferral.createdAt))}${deferral.taskId ? ` · Follow-up task${deferral.dueDate ? ` due ${escapeHtml(deferral.dueDate)}` : ''}` : ' · No follow-up task'}</small>${deferral.taskId ? `<button type="button" class="talent-requirement-task-link" data-requirement-open-task="${deferral.taskId}">Open Task</button>` : ''}</div>` : ''}
+      ${item.status === 'complete' ? '' : `<details class="talent-requirement-edit" name="talent-requirement-editor"><summary>${title}</summary><form data-requirement-form="${key}" data-requirement-action="${restore ? 'restore' : 'defer'}">
+        ${restore ? `<p class="talent-requirement-warning">This item will be required again.${applicant?.stage === 'bench_ready' ? ' This Talent will return to In Review because this requirement is still pending.' : ''}${deferral.taskId ? ' The existing follow-up task will be kept with its current status.' : ''}</p>` : ''}
+        <label for="requirement-reason-${key}">${restore ? 'Reason for restoring' : 'Reason for verifying later'} <span>Required</span></label><textarea id="requirement-reason-${key}" name="reason" required maxlength="500" rows="3" placeholder="Add the context the team needs to follow up."></textarea>
+        ${restore ? '' : `<label class="talent-requirement-task-option"><input type="checkbox" name="createTask" data-requirement-task> Create a follow-up task assigned to me</label><label class="talent-requirement-date" data-requirement-due hidden>Task due date <input type="date" name="dueDate" disabled></label>`}
+        <div class="talent-requirement-form-actions"><button type="button" class="button" data-requirement-cancel>Cancel</button><button type="submit" class="button talent-requirement-save">${restore ? 'Restore Requirement' : 'Save Verify Later'}</button></div>
+      </form></details>`}
+    </li>`;
   }
 
   function pageMarkup() {
@@ -1109,6 +1337,16 @@
 
   function render() {
     if (!mountedRoot) return false;
+    const existingRequirements = mountedRoot.querySelector?.('[data-requirements-dialog]');
+    if (existingRequirements && requirementsContext && root.document?.createElement) {
+      const template = root.document.createElement('template');
+      template.innerHTML = requirementsDialogMarkup();
+      const body = existingRequirements.querySelector('.talent-requirements-body');
+      const scroll = body.scrollTop;
+      body.innerHTML = template.content.querySelector('.talent-requirements-body').innerHTML;
+      body.scrollTop = scroll;
+      return true;
+    }
     const existing = mountedRoot.querySelector?.('[data-verification-dialog]');
     if (existing && verificationContext && existing.dataset.verificationOwner === verificationContext.applicantId && existing.dataset.verificationMode === verificationContext.mode && root.document?.createElement) {
       // Leave the résumé browsing context mounted. Keep any unsaved skill choices
@@ -1142,11 +1380,12 @@
     mountedRoot.innerHTML = pageMarkup();
     const body = mountedRoot.querySelector?.('.talent-verification-body');
     if (body) body.scrollTop = bodyScroll;
-    const dialog = mountedRoot.querySelector?.('[data-review-dialog], [data-verification-dialog]');
+    const dialog = mountedRoot.querySelector?.('[data-review-dialog], [data-verification-dialog], [data-requirements-dialog]');
     if (dialog) {
       dialog.addEventListener?.('cancel', event => {
         event.preventDefault();
-        if (dialog.matches?.('[data-verification-dialog]')) closeVerification();
+        if (dialog.matches?.('[data-requirements-dialog]')) closeRequirements();
+        else if (dialog.matches?.('[data-verification-dialog]')) closeVerification();
         else closeActionDialog();
       });
       if (typeof dialog.showModal === 'function' && !dialog.open) dialog.showModal();
@@ -1257,7 +1496,7 @@
   }
 
   function openVerification(applicantId, mode = 'verification') {
-    if (pendingVerificationAction) return false;
+    if (pendingVerificationAction || pendingRequirementAction || requirementsContext) return false;
     if (!canOpenForRole()) return false;
     const applicant = findApplicant(applicantId);
     if (!applicant || (applicant.stage === 'submitted' && !applicant.archived)) return false;
@@ -1383,7 +1622,7 @@
   }
 
   async function changeApplicant({ applicantId, expectedUpdatedAt, action, note = '', requestDetails = '' } = {}) {
-    if (pendingStageAction) throw new Error('Please wait for the current review update to finish.');
+    if (pendingStageAction || pendingRequirementAction) throw new Error('Please wait for the current review update to finish.');
     if (!canOpenForRole()) throw new Error('Only Admin and Talent Management can update Talent review records.');
     const id = validUuid(applicantId);
     const expected = validTimestamp(expectedUpdatedAt);
@@ -1438,6 +1677,29 @@
   }
 
   async function handleClick(event) {
+    if (pendingRequirementAction) { event.preventDefault(); return; }
+    const requirementsButton = event.target.closest?.('[data-review-requirements]');
+    if (requirementsButton) { event.preventDefault(); openRequirements(requirementsButton.dataset.reviewRequirements); return; }
+    if (event.target.closest?.('[data-requirements-close]')) { event.preventDefault(); closeRequirements(); return; }
+    if (event.target.closest?.('[data-requirements-retry]')) { event.preventDefault(); loadRequirements(requirementsContext?.applicantId); return; }
+    const requirementTask = event.target.closest?.('[data-requirement-open-task]');
+    if (requirementTask) {
+      event.preventDefault();
+      const taskId = validUuid(requirementTask.dataset.requirementOpenTask);
+      if (taskId && canOpenForRole() && closeRequirements()) root.soroTaskDetail?.navigate?.(taskId);
+      return;
+    }
+    const requirementCancel = event.target.closest?.('[data-requirement-cancel]');
+    if (requirementCancel) {
+      event.preventDefault();
+      const details = requirementCancel.closest('details');
+      const form = requirementCancel.closest('form');
+      form?.reset?.();
+      const due = form?.querySelector?.('[data-requirement-due]');
+      if (due) { due.hidden = true; const date = due.querySelector('input'); date.disabled = true; date.required = false; }
+      if (details) { details.open = false; details.querySelector('summary')?.focus?.(); }
+      return;
+    }
     if (pendingVerificationAction && event.target.closest?.('[data-verification-dialog]')) { event.preventDefault(); return; }
     const evidenceRetry = event.target.closest?.('[data-evidence-retry]');
     if (evidenceRetry) { event.preventDefault(); loadEvidence(evidenceRetry.dataset.evidenceRetry === 'resume' ? 'resume' : 'skills'); return; }
@@ -1542,6 +1804,16 @@
   }
 
   function handleChange(event) {
+    const taskOption = event.target.closest?.('[data-requirement-task]');
+    if (taskOption) {
+      const due = taskOption.closest('form').querySelector('[data-requirement-due]');
+      const input = due.querySelector('input');
+      due.hidden = !taskOption.checked;
+      input.disabled = !taskOption.checked;
+      input.required = taskOption.checked;
+      if (!taskOption.checked) input.value = '';
+      return;
+    }
     if (event.target.matches?.('[name="interviewerUserId"], [name="additionalAttendeeUserId"]')) updateAttendeePicker(event.target.closest('form'));
     const sort = event.target.closest?.('[data-review-sort]');
     if (sort) setSort(sort.value);
@@ -1622,6 +1894,20 @@
   }
 
   async function handleSubmit(event) {
+    const requirementForm = event.target.closest?.('[data-requirement-form]');
+    if (requirementForm) {
+      event.preventDefault();
+      if (pendingRequirementAction || !requirementsContext?.data || requirementForm.reportValidity?.() === false) return;
+      const values = new FormData(requirementForm);
+      const action = requirementForm.dataset.requirementAction;
+      if (action === 'restore' && findApplicant(requirementsContext.applicantId)?.stage === 'bench_ready' && !root.confirm?.('Restore this pending requirement? This Talent will return to In Review. Any existing follow-up task remains open.')) return;
+      try { await changeRequirement({ applicantId: requirementsContext.applicantId, itemKey: requirementForm.dataset.requirementForm, action, reason: values.get('reason'), createTask: values.get('createTask') === 'on', dueDate: values.get('dueDate') || null }); }
+      catch (error) {
+        const status = mountedRoot?.querySelector?.('[data-requirements-status]');
+        if (status) { status.textContent = error.message; status.classList?.add('is-error'); }
+      }
+      return;
+    }
     const skillsForm = event.target.closest?.('[data-review-skills-form]');
     if (skillsForm) { event.preventDefault(); await saveReviewSkills(skillsForm); return; }
     const verificationForm = event.target.closest?.('[data-verification-form]');
@@ -1654,11 +1940,17 @@
   }
 
   function unmount({ clear = true, reset = false } = {}) {
+    pendingRequirementAction?.finish?.();
+    pendingRequirementAction = null;
     pendingVerificationAction?.finish?.();
     pendingVerificationAction = null;
     // The sidebar owns a background queue load even when the queue view is absent.
     // Other portal renders must not cancel that load or strand it in loading state.
     if (!mountedRoot && !reset) return false;
+    requirementsVersion += 1;
+    requirementsController?.abort?.();
+    requirementsController = null;
+    requirementsContext = null;
     stopResumeViewer();
     requestVersion += 1;
     verificationRequestVersion += 1;
@@ -1792,6 +2084,8 @@
     ENDPOINT,
     AUTO_REFRESH_MS,
     VERIFICATION_ENDPOINT,
+    DEFERRALS_ENDPOINT,
+    REQUIREMENT_KEYS,
     STAGES,
     ACTIONS,
     STAGE_LABELS,
@@ -1799,6 +2093,8 @@
     canOpenForRole,
     normalizePayload,
     normalizeVerificationPayload,
+    normalizeRequirementsPayload,
+    buildDeferralAction,
     buildVerificationAction,
     zonedLocalToIso,
     currentQueue,
@@ -1808,6 +2104,9 @@
     setSort,
     openResume,
     openVerification,
+    openRequirements,
+    closeRequirements,
+    changeRequirement,
     openInterviewFromTask,
     changeApplicant,
     refresh,

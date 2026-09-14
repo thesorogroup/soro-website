@@ -6,6 +6,7 @@
   const clone=v=>JSON.parse(JSON.stringify(v));
   const now=()=>new Date().toISOString();
   const day=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Manila',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const validCalendarDate=value=>{if(typeof value!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(value))return false;const parsed=new Date(value+'T00:00:00Z');return Number.isFinite(parsed.getTime())&&parsed.toISOString().slice(0,10)===value;};
   const personas={client:{role:'client_admin',name:'Alex Carter',id:id(1)},talent:{role:'talent_management',name:'Taylor Morgan',id:id(2)},sales:{role:'sales',name:'Jordan Lee',id:id(3)},va:{role:'virtual_assistant',name:'Jamie Cruz',id:id(4)}};
   let selected='client',store;
   const localFiles=new Map();
@@ -19,7 +20,7 @@
     store.applicants[0].verified_skills=['Calendar management','Email management'];
     store.applicants.push({...clone(store.applicants[0]),id:id(11),auth_user_id:null,full_name:'Santos, Riley',first_name:'Riley',last_name:'Santos',preferred_name:'Riley',email:'riley@example.test',verified_skills:[]});
     for(const a of store.applicants)Object.assign(a,{relevant_experience_years:a.experience_years,relevant_experience_summary:a.experience_summary,education_training_summary:'Business administration coursework and virtual assistance training.',self_reported_experience_areas:a.work_areas.slice(),availability_note:'Full time · Monday–Friday',address_line_1:'100 Sample Street',city:'Cebu City',province_state:'Cebu',postal_code:'6000',portal_access_status:a.auth_user_id?'active':'not_activated'});
-    store.documents=[];store.uploads=[];
+    store.documents=[];store.uploads=[];store.reviewDeferrals={};store.reviewDeferralRequests={};store.reviewDeferralTaskIds={};store.taskNotifications=[];
     store.clients=[{id:id(50),company:{name:store.companyName,industry:'Professional services',website:'example.test',country:'United States'},primaryContact:{name:store.contactName,title:'Owner',email:'alex@example.test',phone:''},owner:{id:id(3),name:'Jordan Lee',current:true},lifecycleStage:'active',portal:{requested:true,status:'active',email:'alex@example.test'},hiringRequests:[{id:id(20),roleTitle:'General Virtual Assistant',vaType:'General',seats:1,skills:['Calendar management','Email management'],schedule:'Monday–Friday · Philippine Time',timeZone:'Asia/Manila',targetStartDate:day(),status:'filled',progressStep:'active',candidateCount:0}],activity:[{label:'Sample account',detail:'Fictional data for Test Mode.',timestamp:now()}]}];
     store.tasks=[{id:id(30),title:'Review your sample profile',details:'Check your details and let your Soro team know if anything needs updating. This is a fictional task.',kind:'manual',version:1,progress:'not_started',status:'open',priority:'normal',dueDate:day(),createdAt:now(),updatedAt:now(),relatedLabel:'Sample Talent Profile',isUnread:true,assignees:[{id:id(4),userId:id(4),name:'Jamie Cruz'}],assignedTo:{id:id(4),name:'Jamie Cruz'},createdBy:{id:id(2),name:'Taylor Morgan'},history:[]}];
     store.tasks.push({...clone(store.tasks[0]),id:id(31),title:'Review client requirements',details:'Check the sample Client account and its role requirements.',relatedLabel:'Sample Company',assignees:[{id:id(3),userId:id(3),name:'Jordan Lee'}],assignedTo:{id:id(3),name:'Jordan Lee'},createdBy:{id:id(3),name:'Jordan Lee'}});
@@ -53,8 +54,61 @@
   for(const method of ['replaceState','pushState'])w.history[method]=(state,title,url)=>{routeState=state;const hash=String(url||'').includes('#')?'#'+String(url).split('#').slice(1).join('#'):'';nativeReplace(state,title,'about:srcdoc'+hash);};
   try{Object.defineProperty(w.history,'state',{get:()=>routeState});}catch{}
   function dashboard(){return{generatedAt:now(),viewerRole:personas[selected].role,companyName:store.companyName,contactName:store.contactName,salesContact:{name:'Jordan Lee',email:'jordan@example.test',phone:''},requests:[{requestId:id(20),roleTitle:'General Virtual Assistant',status:'filled',targetStartDate:day(),seatCount:1,candidateCount:0,pendingReviewCount:0,pendingDecisionCount:0,placementCount:1,activePlacementCount:1,onboardingCount:0}],interviews:[],talent:[{placementId:id(21),applicantId:id(10),fullName:'Jamie Cruz',preferredName:'Jamie',roleTitle:'General Virtual Assistant',status:'active',startDate:day(),scheduleSummary:'Monday–Friday · 9 AM–5 PM Philippine Time'}]};}
-  function queue(){const a=store.applicants[1],keys=['core_profile','resume','english','disc','enneagram','mbti','internet','equipment','skills'],labels=['Core profile','Resume','English assessment','DISC assessment','Enneagram assessment','Four-letter personality assessment','Internet speed proof','Computer specifications','Applicant-reported skills'];const personality=w.soroScreeningPresentation?.parsePersonalityResults(a.personality_profile_score)||{};const values={english:a.english_test_result,disc:personality.disc,enneagram:personality.enneagram,mbti:personality.mbti,internet:a.internet_speed,equipment:a.computer_specs};return{generatedAt:now(),viewerRole:personas[selected].role,summary:{all:1,submitted:store.stage==='submitted'?1:0,in_review:store.stage==='in_review'?1:0,needs_more_info:store.stage==='needs_more_info'?1:0,bench_ready:0,closed:0},applicants:[{applicantId:a.id,fullName:a.full_name,email:a.email,applicationReceivedAt:a.application_received_at,updatedAt:a.updated_at,stage:store.stage,archived:false,owner:{id:id(2),name:'Taylor Morgan'},resume:{available:false,label:'No sample résumé'},checklist:keys.map((key,i)=>({key,label:labels[i],state:key==='resume'?'missing':'complete',...(i>=2&&i<=7?{resultRecorded:Boolean(values[key]),evidenceState:'available'}:{}),...(key==='skills'?{verifiedSkillsCount:a.verified_skills.length}:{})})),allowedActions:store.stage==='submitted'?['begin_review']:['request_more_info']}]};}
-  function taskWorkspace(){const actor=personas[selected].id,tasks=store.tasks.filter(t=>t.assignees.some(p=>p.id===actor)||t.createdBy.id===actor).map(t=>({...t,isNew:!t.viewedBy?.includes(actor)}));return{tasks,notifications:[],assignees:Object.values(personas).filter(p=>['sales','talent_management'].includes(p.role)).map(p=>({id:p.id,userId:p.id,name:p.name,role:p.role})),summary:{open:tasks.filter(t=>t.status!=='completed').length,overdue:0,urgentUnread:0}};}
+  function queue(){
+    const a=store.applicants[1],keys=['core_profile','resume','english','disc','enneagram','mbti','internet','equipment','skills'],labels=['Core profile','Resume','English assessment','DISC assessment','Enneagram assessment','Four-letter personality assessment','Internet speed proof','Computer specifications','Skills'];
+    const personality=w.soroScreeningPresentation?.parsePersonalityResults(a.personality_profile_score)||{};
+    const values={english:a.english_test_result,disc:personality.disc,enneagram:personality.enneagram,mbti:personality.mbti,internet:a.internet_speed,equipment:a.computer_specs};
+    const checklist=keys.map((key,i)=>{
+      const state=key==='resume'?'missing':key==='skills'&&![...(a.self_reported_skills||[]),...(a.self_reported_experience_areas||[]),...(a.verified_skills||[])].some(x=>String(x).trim())?'missing':'complete';
+      const deferral=state!=='complete'?store.reviewDeferrals[key]:null;
+      if(state==='complete')delete store.reviewDeferrals[key];
+      return{key,label:labels[i],state,...(i>=2&&i<=7?{resultRecorded:Boolean(values[key]),evidenceState:'available'}:{}),...(key==='skills'?{verifiedSkillsCount:a.verified_skills.length}:{}),...(deferral?{deferral:clone(deferral)}:{})};
+    });
+    return{generatedAt:now(),viewerRole:personas[selected].role,summary:{all:1,submitted:store.stage==='submitted'?1:0,in_review:store.stage==='in_review'?1:0,needs_more_info:store.stage==='needs_more_info'?1:0,bench_ready:store.stage==='bench_ready'?1:0,closed:0},applicants:[{applicantId:a.id,fullName:a.full_name,email:a.email,applicationReceivedAt:a.application_received_at,updatedAt:a.updated_at,stage:store.stage,archived:false,owner:{id:id(2),name:'Taylor Morgan'},resume:{available:false,label:'No sample résumé'},checklist,allowedActions:store.stage==='submitted'?['begin_review']:store.stage==='bench_ready'?['return_to_review']:['request_more_info','mark_bench_ready']}]};
+  }
+  function reviewRequirements(){
+    const a=queue().applicants[0];
+    return{applicantId:a.applicantId,updatedAt:a.updatedAt,items:[...a.checklist.map(item=>({key:item.key,label:item.label,status:item.deferral?'deferred':item.state==='complete'?'complete':'pending',deferral:item.deferral||null})),...['interview','references'].map(key=>({key,label:key==='interview'?'Interview':'Employment references',status:store.reviewDeferrals[key]?'deferred':'pending',deferral:store.reviewDeferrals[key]||null}))]};
+  }
+  function reviewGate(){
+    const items=reviewRequirements().items.filter(i=>['interview','references'].includes(i.key));
+    return{interviewAddressed:false,referencesAddressed:false,benchReadyEligible:items.every(i=>i.status!=='pending'),blockers:items.filter(i=>i.status==='pending').map(i=>i.label+' must be addressed'),deferrals:{interview:store.reviewDeferrals.interview||null,references:store.reviewDeferrals.references||null}};
+  }
+  function changeReviewDeferral(body){
+    const a=store.applicants[1],item=reviewRequirements().items.find(i=>i.key===body.itemKey);
+    if(selected!=='talent'||body.applicantId!==a.id||!item||!['defer','restore'].includes(body.action)||!String(body.reason||'').trim()||body.reason.length>500)return null;
+    const fingerprint=JSON.stringify(body),prior=store.reviewDeferralRequests[body.requestId];
+    if(prior)return prior===fingerprint?queue():null;
+    if(a.updated_at!==body.expectedUpdatedAt||!['in_review','needs_more_info','bench_ready'].includes(store.stage)||item.status==='complete')return null;
+    if(body.action==='restore'){
+      if(!store.reviewDeferrals[item.key]||body.createTask||body.dueDate)return null;
+      delete store.reviewDeferrals[item.key];
+      if(store.stage==='bench_ready')store.stage='in_review';
+    }else{
+      if(item.status==='deferred'||typeof body.createTask!=='boolean'||(body.createTask?!validCalendarDate(body.dueDate):body.dueDate!==null))return null;
+      const taskId=body.createTask?crypto.randomUUID():null,stamp=now(),person=personas.talent;
+      store.reviewDeferrals[item.key]={id:crypto.randomUUID(),reason:body.reason.trim(),createdAt:stamp,createdByName:person.name,dueDate:body.dueDate,taskId};
+      if(taskId){
+        // Retain this audience restriction after the active deferral is closed.
+        store.reviewDeferralTaskIds[taskId]=true;
+        const title='Complete deferred review: '+item.label;
+        store.tasks.push({id:taskId,title,details:'Open Talent Review for '+a.full_name+' and complete '+item.label+'. Reason for deferral: '+body.reason.trim()+'\nCompleting this reminder does not verify the requirement.',kind:'manual',version:1,progress:'not_started',status:'open',priority:'normal',dueDate:body.dueDate,createdAt:stamp,updatedAt:stamp,relatedLabel:a.full_name,isUnread:true,assignees:[{id:person.id,userId:person.id,name:person.name}],assignedTo:{id:person.id,name:person.name},createdBy:{id:person.id,name:person.name},history:[{actor:person.name,at:stamp,summary:'Follow-up task created for a deferred Talent review requirement.',note:''}]});
+        store.taskNotifications.push({id:crypto.randomUUID(),taskId,recipientUserId:person.id,title,message:'A task needs your attention.',readAt:null,createdAt:stamp});
+      }
+    }
+    a.updated_at=now();store.reviewDeferralRequests[body.requestId]=fingerprint;
+    notice('Sample requirement updated. Verification stays pending until actually completed.');return queue();
+  }
+  const isReviewDeferralTask=task=>Boolean(store.reviewDeferralTaskIds[task.id]);
+  const reviewTaskRole=person=>['admin','talent_management'].includes(person.role);
+  const taskReadable=task=>(!isReviewDeferralTask(task)||reviewTaskRole(personas[selected]))&&(task.assignees.some(p=>p.id===personas[selected].id)||task.createdBy.id===personas[selected].id);
+  function taskAssignees(task){return Object.values(personas).filter(p=>isReviewDeferralTask(task)?reviewTaskRole(p):['admin','sales','talent_management'].includes(p.role)).map(p=>({id:p.id,userId:p.id,name:p.name,role:p.role}));}
+  function taskWorkspace(){
+    const actor=personas[selected].id,tasks=store.tasks.filter(taskReadable).map(t=>({...t,isNew:!t.viewedBy?.includes(actor)}));
+    const visibleIds=new Set(tasks.map(t=>t.id));
+    const notifications=store.taskNotifications.filter(n=>n.recipientUserId===actor&&visibleIds.has(n.taskId)).map(({recipientUserId,...notification})=>notification);
+    return{tasks,notifications,assignees:Object.values(personas).filter(p=>['admin','sales','talent_management'].includes(p.role)).map(p=>({id:p.id,userId:p.id,name:p.name,role:p.role})),summary:{open:tasks.filter(t=>t.status!=='completed').length,overdue:0,urgentUnread:notifications.filter(n=>!n.readAt).length}};
+  }
   function clientTalent(){const a=store.applicants[0];return{talents:[{id:a.id,displayName:a.full_name,location:{country:a.country,timeZone:a.timezone},skills:{verified:a.verified_skills},experience:{years:a.relevant_experience_years,summary:a.relevant_experience_summary,educationAndTraining:a.education_training_summary},screening:{englishResult:a.english_test_result,personalityResult:a.personality_profile_score,computerSpecifications:a.computer_specs,internetSpeed:a.internet_speed},assignments:[{id:id(21),status:'active',startDate:a.created_at.slice(0,10),scheduleSummary:'Monday–Friday · Philippine Time'}]}]};}
   function clientProfile(){const c=store.clients[0];return{profile:{contact:{fullName:c.primaryContact.name,phone:c.primaryContact.phone},company:c.company,signInEmail:'alex@example.test'},permissions:{canEditCompany:true}};}
   function tracker(){return{generatedAt:now(),viewerRole:personas[selected].role,rows:store.clients.flatMap(c=>c.hiringRequests.map(r=>({clientId:c.id,clientName:c.company.name,requestId:r.id,roleTitle:r.roleTitle,ownerId:id(3),ownerName:'Jordan Lee',status:r.status,stage:r.status==='filled'?'active':'matching',candidateCount:0,interviewCount:0,placementCount:r.status==='filled'?1:0,seatCount:1,activePlacementCount:r.status==='filled'?1:0,onboardingCount:0,targetStartDate:day(),lastActivityAt:now(),nextInterviewAt:'',attentionCode:'',nextAction:r.status==='filled'?'view_placement':'find_candidates',responsibleRole:'sales'})))};}
@@ -178,15 +232,32 @@
     else if(name==='dream-pathway'){result=dreamPathway(method,body,u);if(!result)return new Response(JSON.stringify({message:'This sample role, record, or action is not available. Refresh and check the selections.'}),{status:403});}
     else if(name==='client-dashboard'&&method==='GET')result=dashboard();
     else if(name==='talent-review-queue'&&method==='GET')result=queue();
-    else if(name==='talent-verification'&&method==='GET'&&selected==='talent'){const a=queue().applicants[0];result={generatedAt:now(),viewerRole:personas[selected].role,applicant:a,gate:{interviewAddressed:false,referencesAddressed:false,benchReadyEligible:false,blockers:['Interview and reference review are still pending.']},interview:null,interviewHistory:[],references:[],interviewers:[{id:id(2),name:'Taylor Morgan'}],availableAttendees:[{id:id(3),name:'Jordan Lee'}],calendarIntegration:{configured:false,organizerLabel:'Disabled in Test Mode'}};}
+    else if(name==='talent-review-deferrals'){
+      if(selected!=='talent'||(method==='GET'?u.searchParams.get('applicantId'):body.applicantId)!==id(11))return new Response(JSON.stringify({message:'This sample review is unavailable.'}),{status:403});
+      result=method==='GET'?reviewRequirements():changeReviewDeferral(body);
+      if(!result)return new Response(JSON.stringify({message:'The sample review changed or required information is missing. Refresh and try again.'}),{status:409});
+    }
+    else if(name==='talent-verification'&&method==='GET'&&selected==='talent'){const a=queue().applicants[0];result={generatedAt:now(),viewerRole:personas[selected].role,applicant:a,gate:reviewGate(),interview:null,interviewHistory:[],references:[],interviewers:[{id:id(2),name:'Taylor Morgan'}],availableAttendees:[{id:id(3),name:'Jordan Lee'}],calendarIntegration:{configured:false,organizerLabel:'Disabled in Test Mode'}};}
     else if(name==='talent-review-queue'&&method==='POST'&&body.action==='begin_review'&&selected==='talent'){store.stage='in_review';store.applicants[1].updated_at=now();result=queue();}
+    else if(name==='talent-review-queue'&&method==='POST'&&['mark_bench_ready','return_to_review'].includes(body.action)&&selected==='talent'){
+      if(body.applicantId!==id(11)||body.expectedUpdatedAt!==store.applicants[1].updated_at||(body.action==='mark_bench_ready'&&(store.stage!=='in_review'||reviewRequirements().items.some(i=>i.status==='pending'))))return new Response(JSON.stringify({message:'Resolve or explicitly defer each remaining requirement before Bench Ready.'}),{status:409});
+      store.stage=body.action==='mark_bench_ready'?'bench_ready':'in_review';store.applicants[1].updated_at=now();result=queue();
+    }
     else if((name==='tasks'&&method==='GET')||(name==='task-detail'&&body.action==='workspace'))result=taskWorkspace();
     else if(name==='task-detail'&&body.action==='create'&&['talent','sales'].includes(selected)){const p=body.patch||{},task={id:crypto.randomUUID(),kind:'manual',version:1,...p,status:'open',isUnread:true,progress:'not_started',createdAt:now(),updatedAt:now(),createdBy:{id:personas[selected].id,name:personas[selected].name},history:[],assignees:Object.values(personas).filter(x=>(p.assigneeIds||[]).includes(x.id)).map(x=>({id:x.id,userId:x.id,name:x.name}))};store.tasks.push(task);result={task};notice('Sample task created. It exists only in this Test Mode session.');}
     else if(name==='task-detail'&&['get','view','save'].includes(body.action)){
       const task=taskWorkspace().tasks.some(t=>t.id===body.taskId)&&store.tasks.find(t=>t.id===body.taskId);if(!task)return new Response('{}',{status:404});
-      if(body.action==='view'){task.isUnread=false;task.viewedBy=[...new Set([...(task.viewedBy||[]),personas[selected].id])];}
-      if(body.action==='save'){if((task.source?.kind==='placement_checkin'||task.source?.kind==='dream_pathway'&&task.source.reviewCycle!==null))return new Response('{}',{status:403});const p=body.patch||{};for(const key of (selected==='va'?['progress']:['title','details','relatedLabel','dueDate','priority','progress']))if(Object.hasOwn(p,key))task[key]=p[key];task.status=task.progress==='completed'?'completed':'open';task.version++;task.history.unshift({actor:personas[selected].name,at:now(),summary:'Sample task updated',note:p.note||''});notice('Sample task saved. Switch views to inspect the shared update.');}
-      result={task:{...task,canUpdateProgress:!(task.source?.kind==='placement_checkin'||task.source?.kind==='dream_pathway'&&task.source.reviewCycle!==null),canEditDetails:selected!=='va'&&!(task.source?.kind==='placement_checkin'||task.source?.kind==='dream_pathway'&&task.source.reviewCycle!==null),canAssign:false},history:task.history,assignees:taskWorkspace().assignees};
+      if(body.action==='view'){task.isUnread=false;task.viewedBy=[...new Set([...(task.viewedBy||[]),personas[selected].id])];for(const notification of store.taskNotifications)if(notification.taskId===task.id&&notification.recipientUserId===personas[selected].id)notification.readAt=now();}
+      if(body.action==='save'){
+        if((task.source?.kind==='placement_checkin'||task.source?.kind==='dream_pathway'&&task.source.reviewCycle!==null))return new Response('{}',{status:403});
+        const p=body.patch||{};
+        if(isReviewDeferralTask(task)&&Object.hasOwn(p,'assigneeIds')){
+          if(!Array.isArray(p.assigneeIds)||!p.assigneeIds.length||p.assigneeIds.length>50||new Set(p.assigneeIds).size!==p.assigneeIds.length||p.assigneeIds.some(userId=>!Object.values(personas).some(person=>person.id===userId&&reviewTaskRole(person))))return new Response(JSON.stringify({message:'Deferred review follow-up tasks can be assigned only to Admin or Talent Management accounts.'}),{status:403});
+          task.assignees=taskAssignees(task).filter(person=>p.assigneeIds.includes(person.id));task.assignedTo={id:task.assignees[0].id,name:task.assignees[0].name};
+        }
+        for(const key of (selected==='va'?['progress']:['title','details','relatedLabel','dueDate','priority','progress']))if(Object.hasOwn(p,key))task[key]=p[key];task.status=task.progress==='completed'?'completed':'open';task.version++;task.history.unshift({actor:personas[selected].name,at:now(),summary:'Sample task updated',note:p.note||''});notice('Sample task saved. Switch views to inspect the shared update.');
+      }
+      result={task:{...task,canUpdateProgress:!(task.source?.kind==='placement_checkin'||task.source?.kind==='dream_pathway'&&task.source.reviewCycle!==null),canEditDetails:selected!=='va'&&!(task.source?.kind==='placement_checkin'||task.source?.kind==='dream_pathway'&&task.source.reviewCycle!==null),canAssign:isReviewDeferralTask(task)&&reviewTaskRole(personas[selected])},history:task.history,assignees:taskAssignees(task)};
     }
     else if(name==='client-profile'&&selected==='client'){if(method==='PATCH'){const c=store.clients[0];Object.assign(c.company,body.company||{});if(body.contact?.fullName)c.primaryContact.name=body.contact.fullName;if(Object.hasOwn(body.contact||{},'phone'))c.primaryContact.phone=body.contact.phone;store.contactName=c.primaryContact.name;store.companyName=c.company.name;notice('Sample account details saved. The Sales view uses this same sample account.');}result=clientProfile();}
     else if(name==='client-talent-profile'&&method==='GET'&&selected==='client')result=clientTalent();

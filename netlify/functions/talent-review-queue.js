@@ -1,3 +1,4 @@
+const { publicDeferral } = require('./lib/talent-review-deferral');
 const configuredUrl = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_URL = /^https:\/\/[^/]+\.supabase\.co\/?$/.test(configuredUrl)
   ? configuredUrl.replace(/\/$/, '')
@@ -276,6 +277,12 @@ function publicChecklistItem(value) {
   }
   if (key === 'skills' && 'verifiedSkillsCount' in value) {
     item.verifiedSkillsCount = requiredCount(value.verifiedSkillsCount);
+  }
+  if ('deferral' in value) {
+    item.deferral = publicDeferral(value.deferral);
+    if (state === 'complete' && item.deferral) {
+      throw httpError(502, 'review_service_error', 'The Talent review queue returned an invalid response.');
+    }
   }
   return item;
 }

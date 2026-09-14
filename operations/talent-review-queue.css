@@ -600,3 +600,72 @@
 .talent-interview-history summary small { display:block; padding-top:6px; color:#526b85; font-size:13px; }
 .talent-interview-history-body { padding:0 16px 16px; font-size:16px; line-height:1.6; }
 .talent-interview-result-due { padding:14px 16px; border-left:3px solid #e87924; background:#fff6ec; color:#68411b; border-radius:6px; font-size:14px; line-height:1.6; }
+
+/* Requirement deferrals keep incomplete work visible without changing receipt counts. */
+.talent-review-requirements-button { border-color: #b8cbdc; color: #24496c; font-size: 12px; font-weight: 750; }
+.talent-review-deferral-badge { display: inline-flex; align-items: center; width: fit-content; padding: 4px 8px; border: 1px solid #e9c588; border-radius: 999px; background: #fff3dc; color: #845118; font-size: 10px; font-weight: 750; white-space: nowrap; }
+.talent-review-progress-item.is-deferred { border-color: #e6c891; background: #fffbf4; }
+.talent-review-progress-item.is-deferred .talent-review-progress-status { color: #845118; }
+.talent-review-progress-item.is-deferred .talent-review-deferral-badge { margin-top: 5px; }
+.talent-requirements-dialog { width: min(760px, calc(100vw - 32px)); max-width: none; max-height: calc(100dvh - 40px); padding: 0; border: 1px solid #d4dfea; border-radius: 20px; background: #f7f9fc; color: #183a5c; box-shadow: 0 28px 90px rgba(8, 31, 57, .3); }
+.talent-requirements-dialog::backdrop { background: rgba(7, 25, 49, .62); }
+.talent-requirements-dialog[open] { display: flex; flex-direction: column; }
+.talent-requirements-dialog > header { display: flex; flex: 0 0 auto; justify-content: space-between; align-items: flex-start; gap: 20px; padding: 25px 28px 20px; background: #fff; border-bottom: 1px solid #dce5ee; }
+.talent-requirements-dialog .eyebrow { margin: 0 0 8px; color: #617991; font-size: 10px; font-weight: 750; text-transform: uppercase; letter-spacing: .09em; }
+.talent-requirements-dialog h2 { margin: 0; color: var(--navy, #0b2b50); font: 400 29px/1.15 Georgia, "Times New Roman", serif; }
+.talent-requirements-dialog > header button { width: 38px; min-width: 38px; height: 38px; border: 1px solid #d3dee8; border-radius: 10px; color: #24496c; background: #fff; font-size: 25px; cursor: pointer; }
+.talent-requirements-body { overflow-y: auto; overscroll-behavior: contain; padding: 20px 28px 26px; }
+.talent-requirements-intro { margin: 0; color: #5c7187; font-size: 13px; line-height: 1.65; }
+.talent-requirements-intro strong { color: #845118; }
+.talent-requirements-status:empty { display: none; }
+.talent-requirements-status { margin-top: 16px; padding: 12px 14px; border: 1px solid #c4dce9; border-radius: 9px; background: #eef6fc; color: #24496c; font-size: 13px; line-height: 1.5; }
+.talent-requirements-status.is-error { border-color: #efc4ba; background: #fff3ef; color: #963b2a; }
+.talent-requirements-totals { display: flex; flex-wrap: wrap; gap: 9px; margin: 20px 0 16px; }
+.talent-requirements-totals > span { padding: 7px 11px; border: 1px solid #d7e2eb; border-radius: 8px; background: #fff; color: #566e85; font-size: 12px; }
+.talent-requirements-totals > .is-deferred { border-color: #ecd1a5; color: #845118; background: #fff6e8; }
+.talent-requirements-totals strong { margin-right: 4px; font-size: 15px; }
+.talent-requirements-list { display: grid; gap: 10px; padding: 0; margin: 0; list-style: none; }
+.talent-requirement-row { min-width: 0; padding: 16px; border: 1px solid #dbe4ed; border-radius: 12px; background: #fff; }
+.talent-requirement-row.is-deferred { border-color: #e6c891; background: #fffcf6; }
+.talent-requirement-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.talent-requirement-heading > strong { color: #244563; font-size: 14px; }
+.talent-requirement-state { flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: #eef2f6; color: #60758b; font-size: 10px; font-weight: 750; }
+.talent-requirement-row.is-complete .talent-requirement-state { color: #17624e; background: #e6f5ee; }
+.talent-requirement-row.is-deferred .talent-requirement-state { color: #845118; background: #fff0d3; }
+.talent-requirement-deferral { margin-top: 12px; padding-left: 12px; border-left: 2px solid #dfb565; }
+.talent-requirement-deferral p { margin: 0 0 5px; color: #65543a; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-height: 1.6; }
+.talent-requirement-deferral small { color: #7b715f; font-size: 11px; line-height: 1.5; }
+.talent-requirement-task-link { display: block; margin-top: 8px; padding: 4px 0; border: 0; background: transparent; color: #315e84; font: inherit; font-size: 12px; font-weight: 750; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.talent-requirement-edit { margin-top: 12px; }
+.talent-requirement-edit > summary { display: inline-flex; align-items: center; min-height: 36px; padding: 7px 12px; border: 1px solid #c8d7e5; border-radius: 8px; background: #f7fafc; color: #345674; font-size: 12px; font-weight: 750; list-style: none; cursor: pointer; }
+.talent-requirement-edit > summary::-webkit-details-marker { display: none; }
+.talent-requirement-edit[open] > summary { margin-bottom: 14px; }
+.talent-requirement-edit form { display: grid; gap: 9px; }
+.talent-requirement-edit label { color: #415b74; font-size: 12px; font-weight: 700; }
+.talent-requirement-edit label > span { margin-left: 5px; color: #99632b; font-size: 10px; font-weight: 500; }
+.talent-requirement-edit textarea, .talent-requirement-edit input[type="date"] { box-sizing: border-box; width: 100%; padding: 10px 12px; border: 1px solid #c6d5e3; border-radius: 8px; background: #fff; color: #294760; font: inherit; font-size: 14px; }
+.talent-requirement-edit textarea { min-height: 84px; resize: vertical; }
+.talent-requirement-edit .talent-requirement-task-option { display: flex; align-items: center; gap: 9px; min-height: 42px; font-weight: 500; }
+.talent-requirement-task-option input { width: 17px; height: 17px; margin: 0; accent-color: #24496c; }
+.talent-requirement-date { display: grid; gap: 7px; max-width: 230px; }
+.talent-requirement-date[hidden] { display: none; }
+.talent-requirement-warning { margin: 0 0 5px; padding: 10px 12px; border: 1px solid #ebcf9f; border-radius: 8px; background: #fff6e5; color: #7f5522; font-size: 12px; line-height: 1.6; }
+.talent-requirement-form-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 5px; }
+.talent-requirement-form-actions .button { min-height: 38px; font-size: 12px; }
+.talent-requirement-save { background: #fff1d9; border-color: #ddb979; color: #744612; }
+.talent-requirements-dialog > footer { display: flex; flex: 0 0 auto; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 28px; border-top: 1px solid #dce5ee; background: #fff; }
+.talent-requirements-dialog > footer > span { color: #6a7e91; font-size: 11px; line-height: 1.5; }
+.talent-requirements-dialog > footer .button { min-width: 78px; }
+.talent-requirements-dialog button:disabled, .talent-requirements-dialog input:disabled, .talent-requirements-dialog textarea:disabled { opacity: .6; cursor: wait; }
+.talent-requirements-dialog :focus-visible { outline: 3px solid #88b2d5; outline-offset: 3px; }
+@media (max-width: 580px) {
+  .talent-requirements-dialog { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 14px; }
+  .talent-requirements-dialog > header { padding: 20px 17px 17px; }
+  .talent-requirements-dialog h2 { font-size: 25px; }
+  .talent-requirements-body { padding: 17px 14px 22px; }
+  .talent-requirements-dialog > footer { padding: 14px 17px; }
+  .talent-requirement-row { padding: 14px; }
+  .talent-requirement-heading { align-items: flex-start; }
+  .talent-requirement-edit textarea, .talent-requirement-edit input[type="date"] { font-size: 16px; }
+  .talent-requirement-edit > summary { min-height: 42px; }
+}

@@ -20,7 +20,7 @@ test('review action row shares a flexible height without changing dropdown actio
   assert.match(css,/\.talent-review-action-divider \{ align-self: center/);
   assert.match(css,/\.talent-review-secondary\[open\] > summary::after/);
   assert.match(css,/@media \(max-width: 430px\)[\s\S]*\.talent-review-verification \{ flex: 1 1 100%; \}/);
-  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260912-review-progress/);
+  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260914-verify-later/);
 });
 
 const APPLICANT_KEYS = Object.freeze([
@@ -678,4 +678,112 @@ test('leaving the queue during its first load leaves retryable state rather than
   await new Promise(setImmediate);
   await ui.refresh({ silent: true });
   assert.equal(ui.currentQueue().phase, 'ready');
+});
+
+const requirementKeys = ['core_profile','resume','english','disc','enneagram','mbti','internet','equipment','skills','interview','references'];
+const deferralRecord = {id:requestId,reason:'Confirm during onboarding.',createdAt:updatedAt,createdByName:'Jordan Reed',dueDate:null,taskId:null};
+function requirementsPayload(overrides = {}) {
+  return {applicantId,updatedAt,items:requirementKeys.map(key=>({key,label:key,status:'pending',deferral:null})),...overrides};
+}
+
+test('requirement deferrals validate all eleven requirements and expose only safe metadata', t => {
+  const {ui} = installUi(t);
+  const source = requirementsPayload();
+  source.items[0]={...source.items[0],status:'deferred',deferral:{...deferralRecord,internalProof:'PRIVATE'}};
+  assert.equal(ui.normalizeRequirementsPayload(source,applicantId).items[0].deferral.reason,deferralRecord.reason);
+  assert.doesNotMatch(JSON.stringify(ui.normalizeRequirementsPayload(source,applicantId)),/PRIVATE/);
+  assert.throws(()=>ui.normalizeRequirementsPayload({...source,items:source.items.slice(1)},applicantId),/invalid/);
+  assert.throws(()=>ui.normalizeRequirementsPayload({...source,items:[source.items[0],...source.items.slice(0,-1)]},applicantId),/invalid/);
+  assert.throws(()=>ui.normalizeRequirementsPayload(source,ownerId),/invalid/);
+  assert.throws(()=>ui.normalizeRequirementsPayload({...source,items:source.items.map(item=>({...item,status:'deferred',deferral:null}))},applicantId),/invalid/);
+  const normalized=ui.normalizePayload(queuePayload('admin',[applicant({checklist:[{key:'resume',label:'Resume',state:'missing',deferral:deferralRecord}]})]),'admin');
+  assert.equal(normalized.applicants[0].checklist[0].state,'missing');
+  assert.equal(normalized.applicants[0].checklist[0].deferral.id,requestId);
+});
+
+test('defer and restore require a reason, and follow-up tasks require a real due date', t => {
+  const {ui} = installUi(t);
+  const base={applicantId,expectedUpdatedAt:updatedAt,itemKey:'resume',action:'defer',reason:'  Check next week.  ',createTask:true,dueDate:'2026-09-20'};
+  assert.deepEqual(ui.buildDeferralAction(base),{requestId,applicantId,expectedUpdatedAt:updatedAt,itemKey:'resume',action:'defer',reason:'Check next week.',createTask:true,dueDate:'2026-09-20'});
+  assert.equal(ui.buildDeferralAction({...base,createTask:false}).dueDate,null);
+  assert.deepEqual(ui.buildDeferralAction({...base,action:'restore'}),{requestId,applicantId,expectedUpdatedAt:updatedAt,itemKey:'resume',action:'restore',reason:'Check next week.',createTask:false,dueDate:null});
+  for(const values of [{reason:''},{reason:'x'.repeat(501)},{dueDate:null},{dueDate:'2026-02-30'},{itemKey:'all'},{createTask:'yes'},{action:'restore',reason:''}]) assert.throws(()=>ui.buildDeferralAction({...base,...values}),/reason|date|task|Refresh/);
+});
+
+test('Review Requirements starts only after Start Review and renders per-item deferrals honestly', async t => {
+  let stage='submitted';
+  const {ui,calls}=installUi(t,{responsePayload:call=>{
+    if(call.url.includes('talent-review-deferrals'))return requirementsPayload();
+    return queuePayload('admin',[applicant({stage})]);
+  }});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(setImmediate);
+  assert.equal(ui.openRequirements(applicantId),false);
+  assert.doesNotMatch(target.innerHTML,/data-review-requirements=/);
+  stage='in_review';await ui.refresh();
+  assert.match(target.innerHTML,/Review Requirements/);
+  assert.equal(ui.openRequirements(applicantId),true);await new Promise(setImmediate);
+  assert.equal(calls.at(-1).url,`/.netlify/functions/talent-review-deferrals?applicantId=${applicantId}`);
+  assert.equal((target.innerHTML.match(/data-requirement-form=/g)||[]).length,11);
+  assert.match(target.innerHTML,/does not change the review stage/);
+  assert.match(target.innerHTML,/assigned to me/);
+  assert.doesNotMatch(target.innerHTML,/talent-requirement-row is-complete/);
+});
+
+test('individual deferrals permit Bench Ready without increasing received or verified counts', async t => {
+  let items=requirementsPayload().items;
+  const row=()=>applicant({stage:'in_review',allowedActions:['mark_bench_ready'],checklist:items.filter(item=>!['interview','references'].includes(item.key)).map(item=>({key:item.key,label:item.label,state:'missing',...(item.deferral?{deferral:item.deferral}:{}),...(['english','disc','enneagram','mbti','internet','equipment'].includes(item.key)?{resultRecorded:false,evidenceState:'missing'}:{}),...(item.key==='skills'?{verifiedSkillsCount:0}:{})}))});
+  const {ui,calls}=installUi(t,{responsePayload:call=>{
+    if(call.url.includes('talent-review-deferrals')) {
+      if(call.options.method==='GET')return requirementsPayload({items});
+      const action=JSON.parse(call.options.body);
+      items=items.map(item=>item.key===action.itemKey?{...item,status:'deferred',deferral:deferralRecord}:item);
+    }
+    return queuePayload('admin',[row()]);
+  }});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(setImmediate);
+  ui.openRequirements(applicantId);await new Promise(setImmediate);
+  for(const itemKey of requirementKeys) await ui.changeRequirement({applicantId,itemKey,action:'defer',reason:'Confirm during onboarding.',createTask:false});
+  ui.closeRequirements();
+  assert.match(target.innerHTML,/0 of 9 Items Received/);
+  assert.match(target.innerHTML,/0 of 6 Results Recorded · 0 Skills Verified/);
+  assert.doesNotMatch(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
+  assert.doesNotMatch(target.innerHTML,/talent-review-progress-item is-recorded/);
+  assert.match(target.innerHTML,/talent-review-deferral-badge/);
+  assert.equal(ui.currentQueue().applicants[0].stage,'in_review');
+  const posted=JSON.parse(calls.find(call=>call.options.method==='POST').options.body);
+  assert.deepEqual(Object.keys(posted).sort(),['requestId','applicantId','expectedUpdatedAt','itemKey','action','reason','dueDate','createTask'].sort());
+  assert.equal(posted.dueDate,null);
+});
+
+test('saving a requirement blocks duplicate submits, close, and stage changes until completion', async t => {
+  let finish;
+  const {ui,calls}=installUi(t,{responsePayload:call=>{
+    if(call.url.includes('talent-review-deferrals'))return call.options.method==='POST'?new Promise(resolve=>{finish=resolve;}):requirementsPayload();
+    return queuePayload('admin',[applicant({stage:'in_review',allowedActions:['mark_bench_ready']})]);
+  }});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(setImmediate);ui.openRequirements(applicantId);await new Promise(setImmediate);
+  const values={applicantId,itemKey:'resume',action:'defer',reason:'Confirm later.',createTask:false};
+  const save=ui.changeRequirement(values);await new Promise(setImmediate);
+  await assert.rejects(()=>ui.changeRequirement(values),/wait/);
+  await assert.rejects(()=>ui.changeApplicant({applicantId,expectedUpdatedAt:updatedAt,action:'mark_bench_ready'}),/wait/);
+  assert.equal(ui.closeRequirements(),false);
+  assert.equal(calls.filter(call=>call.options.method==='POST').length,1);
+  finish(queuePayload('admin',[applicant({stage:'in_review'})]));await save;
+  assert.equal(ui.closeRequirements(),true);
+});
+
+test('restoring an unresolved Bench Ready requirement warns about In Review and preserves the follow-up task status', async t => {
+  const items=requirementsPayload().items.map(item=>item.key==='resume'?{...item,status:'deferred',deferral:{...deferralRecord,taskId:ownerId,dueDate:'2026-09-20'}}:item);
+  const {ui}=installUi(t,{responsePayload:call=>call.url.includes('talent-review-deferrals')?requirementsPayload({items}):queuePayload('admin',[applicant({stage:'bench_ready'})])});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(setImmediate);ui.openRequirements(applicantId);await new Promise(setImmediate);
+  assert.match(target.innerHTML,/will return to In Review/);
+  assert.match(target.innerHTML,/follow-up task will be kept with its current status/);
+  assert.doesNotMatch(target.innerHTML,/follow-up task will remain open/);
+  assert.match(target.innerHTML,/Reason for restoring/);
+  assert.match(target.innerHTML,/data-requirement-open-task=/);
+  assert.match(target.innerHTML,/Restore Requirement/);
 });

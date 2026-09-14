@@ -313,9 +313,17 @@
       selfView: typeof isTalentSelfProfileView === 'function' && isTalentSelfProfileView(),
       benefitsAvailable: !!benefitsAvailable
     });
-    if (dreamMarkup) profilePanel.insertAdjacentHTML('beforeend', dreamMarkup);
-    if(dreamMarkup)profilePanel.querySelector('.talent-dream-main')?.insertAdjacentHTML('beforeend','<div data-dream-inspiration></div>');
-    if(dreamMarkup&&benefitsAvailable)profilePanel.querySelector('.talent-dream-summary')?.insertAdjacentHTML('beforeend','<div data-dream-pathway-summary></div>');
+    if (dreamMarkup) {
+      const dreamColumn = document.createElement('div');
+      dreamColumn.className = 'profile-dream-column';
+      dreamColumn.insertAdjacentHTML('beforeend', dreamMarkup);
+      dreamColumn.querySelector('.talent-dream-main')?.insertAdjacentHTML('beforeend', '<div data-dream-inspiration></div>');
+      if (benefitsAvailable) dreamColumn.querySelector('.talent-dream-summary')?.insertAdjacentHTML('beforeend', '<div data-dream-pathway-summary></div>');
+      const skills = layout.querySelector('.profile-skill-review, .profile-skills-experience-section');
+      if (skills) dreamColumn.append(skills);
+      layout.append(dreamColumn);
+      layout.classList.add('talent-profile-home-layout--dream');
+    }
     // The private aspiration now has one dedicated home, or is hidden for this role.
     details.querySelectorAll('.profile-details > div').forEach(row => {
       if (/^Dream\s*\/\s*goal$/i.test(row.querySelector('dt')?.textContent.trim() || '')) row.remove();

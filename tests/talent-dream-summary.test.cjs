@@ -3,6 +3,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
 const dream = require('../operations/talent-dream-summary.js');
 const applicant = { id: 'talent-1', auth_user_id: 'talent-user', organization_id: 'soro', greatest_dream: 'Finish my education and support my family.' };
 const access = role => ({ user_id: role === 'virtual_assistant' ? 'talent-user' : 'staff-user', organization_id: 'soro', role });
@@ -68,9 +69,63 @@ test('shared renderer has one aspiration home with defensive Sales cleanup and o
   const index = read('index.html');
   assert.ok(index.indexOf('talent-dream-summary.js') < index.indexOf('talent-file-tabs.js'));
   assert.ok(index.indexOf('talent-profile-theme.css') > index.indexOf('talent-file-tabs.css'));
-  assert.match(tabs, /profilePanel\.insertAdjacentHTML\('beforeend', dreamMarkup\)/);
+  assert.match(tabs, /dreamColumn\.insertAdjacentHTML\('beforeend', dreamMarkup\)/);
+  assert.doesNotMatch(tabs, /profilePanel\.insertAdjacentHTML\('beforeend', dreamMarkup\)/);
+  assert.match(tabs, /summaryColumn\.append\(details\)/);
+  assert.match(tabs, /if \(screening\) summaryColumn\.append\(screening\)/);
   assert.match(tabs, /details\.querySelectorAll\('\.profile-details > div'\)/);
   assert.match(tabs, /activateTab\('benefits', shell\)/);
   assert.match(read('read-only-talent-profile.js'), /'\.talent-dream-summary'/);
   assert.doesNotMatch(read('talent-profile-theme.css'), /talent-headshot|talent-paperclip|talent-folder/);
+});
+
+function placeDreamColumn(role, { skillClass = 'profile-skills-experience-section', benefitsAvailable = true, renderer = dream } = {}) {
+  const tabs = fs.readFileSync(path.join(__dirname, '../operations/talent-file-tabs.js'), 'utf8');
+  const start = tabs.indexOf('    const dreamMarkup =');
+  const end = tabs.indexOf('    // The private aspiration', start);
+  assert.ok(start >= 0 && end > start, 'The shared Dream placement block must be available.');
+  const skills = { className: skillClass }, children = [], mounts = [], columns = [], classes = [];
+  let created = 0, skillsRead = 0;
+  const column = {
+    insertAdjacentHTML(position, markup) { assert.equal(position, 'beforeend'); children.push(markup); },
+    querySelector(selector) { return { insertAdjacentHTML(position, markup) { mounts.push({ selector, markup }); } }; },
+    append(node) { children.push(node); }
+  };
+  vm.runInNewContext(tabs.slice(start, end), {
+    window: { SoroTalentDreamSummary: renderer, soroCurrentAccess: access(role) }, applicant,
+    effectiveProfileRole: () => role, isTalentSelfProfileView: () => role === 'virtual_assistant', benefitsAvailable,
+    document: { createElement(tag) { assert.equal(tag, 'div'); created++; return column; } },
+    layout: {
+      querySelector(selector) { skillsRead++; return selector.split(',').map(value => value.trim()).includes('.' + skillClass) ? skills : null; },
+      append(node) { columns.push(node); }, classList: { add(name) { classes.push(name); } }
+    }
+  });
+  return { skills, children, mounts, columns, classes, column, created, skillsRead };
+}
+
+test('shared placement keeps Dream before both original and enhanced Skills sections for authorized views', () => {
+  for (const role of ['admin', 'talent_management', 'virtual_assistant']) {
+    for (const skillClass of ['profile-skills-experience-section', 'profile-skill-review']) {
+      const placed = placeDreamColumn(role, { skillClass });
+      assert.equal(placed.created, 1);
+      assert.equal(placed.column.className, 'profile-dream-column');
+      assert.deepEqual(placed.columns, [placed.column]);
+      assert.equal(placed.children.length, 2);
+      assert.match(placed.children[0], /Finish my education and support my family\./);
+      assert.equal(placed.children[1], placed.skills, 'The existing Skills section must follow Dream without being recreated.');
+      assert.deepEqual(placed.classes, ['talent-profile-home-layout--dream']);
+      assert.equal(placed.mounts.length, 2, 'Photo and pathway mounts remain inside the private Dream column.');
+    }
+  }
+});
+
+test('unauthorized or unavailable Dream rendering leaves the existing Skills layout untouched', () => {
+  for (const role of ['sales', 'sales_management', 'client_admin', 'client_reviewer', 'client_billing', 'billing', '', 'founder']) {
+    const placed = placeDreamColumn(role);
+    assert.equal(placed.created, 0, role);
+    assert.equal(placed.skillsRead, 0, role);
+    assert.deepEqual(placed.classes, [], role);
+  }
+  assert.equal(placeDreamColumn('admin', { renderer: null }).created, 0);
+  assert.equal(placeDreamColumn('admin', { benefitsAvailable: false }).mounts.length, 1);
 });
