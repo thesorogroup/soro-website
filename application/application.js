@@ -19,20 +19,34 @@
   const phoneVideoStatus = document.querySelector('#phone-video-status');
   const videoMethodOptions = Array.from(form.querySelectorAll('input[name="videoMethod"]'));
   const videoMethodPanels = Array.from(form.querySelectorAll('[data-video-method-panel]'));
+  // A public tour of the current form, never a draft or an application session.
+  const readOnlyPreview = new URLSearchParams(location.search).get('preview') === '1';
+  const previewNotice = 'Application preview only. Nothing is saved or sent; uploads and submission are disabled.';
   const state = {
     step: 1,
     maxVisitedStep: 1,
-    resumeToken: new URLSearchParams(location.search).get('resume') || new URLSearchParams(location.hash.slice(1)).get('resume'),
-    mobileUploadToken: new URLSearchParams(location.search).get('uploadToken'),
+    resumeToken: readOnlyPreview ? null : new URLSearchParams(location.search).get('resume') || new URLSearchParams(location.hash.slice(1)).get('resume'),
+    mobileUploadToken: readOnlyPreview ? null : new URLSearchParams(location.search).get('uploadToken'),
     uploads: {},
     uploadIds: {},
     mobileDraftReady: false
   };
-  const mobileVideoMode = new URLSearchParams(location.search).has('mobileVideo');
+  const mobileVideoMode = !readOnlyPreview && new URLSearchParams(location.search).has('mobileVideo');
   const localPreview = location.protocol === 'file:' || ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
   // Local preview origins let Soro review layout freely without sending data.
   // The deployed applicant experience remains a guided, validated step-by-step flow.
-  const reviewMode = localPreview;
+  const reviewMode = localPreview || readOnlyPreview;
+  if (readOnlyPreview) {
+    document.body.classList.add('application-preview');
+    document.querySelector('#application-preview-notice').hidden = false;
+    document.title = 'Application Preview | Soro Group';
+    save.hidden = true;
+    submit.disabled = true;
+    form.querySelectorAll('input[type="file"]').forEach(input => { input.disabled = true; });
+    if (phoneUploadButton) phoneUploadButton.disabled = true;
+    // Discard draft tokens from the visible link as well as from application state.
+    if (history.replaceState) history.replaceState(null, '', `${location.pathname}?preview=1`);
+  }
   if (mobileVideoMode) {
     document.body.classList.add('mobile-video-upload');
     if (prepNote) prepNote.hidden = true;
@@ -137,6 +151,7 @@
 
   const setBusy = (isBusy, label) => {
     [save, previous, next, submit].forEach(button => { button.disabled = isBusy; });
+    if (readOnlyPreview) { save.disabled = true; submit.disabled = true; }
     if (isBusy && label) submit.textContent = label;
     if (!isBusy) submit.textContent = 'Submit application';
   };
@@ -149,6 +164,44 @@ const message = (text, kind = 'error', options = {}) => {
   if (hasMessage && options.scroll !== false) alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 };
   const namedControls = name => [...form.querySelectorAll('[name]')].filter(control => control.name === name);
+  const referenceList = document.querySelector('#application-reference-list');
+  const addReferenceButton = document.querySelector('#add-application-reference');
+  let referenceSequence = 0;
+  const referenceValues = () => [...referenceList.querySelectorAll('[data-application-reference]')].map(card =>
+    Object.fromEntries([...card.querySelectorAll('[data-reference-field]')].map(field => [field.dataset.referenceField, field.value.trim()]))
+  ).filter(reference => Object.values(reference).some(Boolean));
+  const updateReferencePermission = () => {
+    const hasReferences = referenceValues().length > 0;
+    document.querySelector('#reference-contact-permission').hidden = !hasReferences;
+    form.elements.referenceContactConsent.required = hasReferences;
+    if (!hasReferences) form.elements.referenceContactConsent.checked = false;
+    addReferenceButton.disabled = referenceList.children.length >= 3;
+    [...referenceList.children].forEach((card, index) => { card.querySelector('legend').textContent = `Reference ${index + 1}`; });
+  };
+  const addApplicationReference = (values = {}, focus = false) => {
+    if (referenceList.children.length >= 3) return;
+    const card = document.createElement('fieldset');
+    card.className = 'application-reference-card';
+    card.dataset.applicationReference = String(++referenceSequence);
+    card.innerHTML = `<legend>Reference</legend><div class="field-grid">
+      <label class="field">Name <small>Optional</small><input data-reference-field="name" maxlength="160" autocomplete="off"></label>
+      <label class="field">Relationship to Applicant <small>Optional</small><input data-reference-field="relationship" maxlength="120" placeholder="Previous supervisor, mentor, teacher…" autocomplete="off"></label>
+      <label class="field">Email <small>Optional</small><input data-reference-field="email" type="email" maxlength="254" autocomplete="off"></label>
+      <label class="field">Phone <small>Optional</small><input data-reference-field="phone" type="tel" maxlength="60" autocomplete="off"></label>
+      </div><button type="button" class="remove-reference">Remove Reference</button>`;
+    card.querySelectorAll('[data-reference-field]').forEach(field => {
+      field.name = `reference-${referenceSequence}-${field.dataset.referenceField}`;
+      field.value = typeof values[field.dataset.referenceField] === 'string' ? values[field.dataset.referenceField] : '';
+      field.addEventListener('input', () => { form.elements.referenceContactConsent.checked = false; updateReferencePermission(); });
+    });
+    card.querySelector('.remove-reference').addEventListener('click', () => {
+      card.remove(); form.elements.referenceContactConsent.checked = false; updateReferencePermission(); addReferenceButton.focus();
+    });
+    referenceList.append(card);
+    updateReferencePermission();
+    if (focus) card.querySelector('input').focus();
+  };
+  addReferenceButton.addEventListener('click', () => addApplicationReference({}, true));
   const selectedExperienceAreas = () => namedControls('experienceAreas').filter(input => input.checked && !input.disabled).map(input => input.value);
   const selectedSkillIds = () => namedControls('skillsByCategory').filter(input => input.checked && !input.disabled).map(input => input.value);
 
@@ -343,7 +396,7 @@ const message = (text, kind = 'error', options = {}) => {
     const names = [...new Set([...form.querySelectorAll('[name]')].map(control => control.name).filter(Boolean))];
     names.forEach(name => {
       const controls = namedControls(name);
-      if (!controls.length || controls[0].type === 'file') return;
+      if (!controls.length || controls[0].type === 'file' || controls[0].hasAttribute('data-reference-field')) return;
       if (arrayFieldNames.has(name)) {
         value[name] = data.getAll(name).map(String);
       } else if (controls.every(control => control.type === 'checkbox')) {
@@ -361,10 +414,13 @@ const message = (text, kind = 'error', options = {}) => {
     value.expectedRateText = updateExpectedRatePreview();
     // Keep the existing profile field populated while the more structured range is adopted.
     value.expectedRate = value.expectedRateText;
+    value.references = referenceValues();
+    value.referenceContactConsent = form.elements.referenceContactConsent.checked;
     ['confirmAccurate', 'confirmPrivacy', 'confirmContact'].forEach(key => { if (form.elements[key]) value[key] = form.elements[key].checked; });
     return value;
   };
   const call = async (action, body = {}) => {
+    if (readOnlyPreview) throw new Error(previewNotice);
     const response = await fetch('/.netlify/functions/talent-application', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, resumeToken: state.resumeToken, mobileUploadToken: state.mobileUploadToken, ...body }) });
     const json = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(json.error || 'We could not complete that request. Please try again.');
@@ -393,7 +449,7 @@ const message = (text, kind = 'error', options = {}) => {
     if (prepNote) prepNote.hidden = state.step !== 1;
     previous.hidden = state.step === 1;
     next.hidden = state.step === steps.length;
-    submit.hidden = state.step !== steps.length;
+    submit.hidden = readOnlyPreview || state.step !== steps.length;
     message('');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     if (focusHeading) {
@@ -432,6 +488,7 @@ const message = (text, kind = 'error', options = {}) => {
     return true;
   };
   const saveDraft = async (announce = true) => {
+    if (readOnlyPreview) { if (announce) message(previewNotice, 'success'); return { preview: true }; }
     if (form.elements.website.value) throw new Error('Unable to save this application.');
     if (localPreview) {
       const previewData = formData();
@@ -510,7 +567,7 @@ const updateVideoMethod = () => {
     panel.hidden = !isActive;
     panel.setAttribute('aria-hidden', String(!isActive));
     panel.querySelectorAll('input, button, select, textarea').forEach((control) => {
-      control.disabled = !isActive;
+      control.disabled = !isActive || (readOnlyPreview && (control.type === 'file' || control === phoneUploadButton));
     });
   });
   videoMethodOptions.forEach((input) => {
@@ -610,6 +667,7 @@ updateVideoMethod();
   };
 
   const uploadFile = async (input, selectedFile = input.files[0]) => {
+    if (readOnlyPreview) throw new Error(previewNotice);
     const documentType = input.dataset.document;
     const file = selectedFile;
     if (!file) return;
@@ -711,6 +769,7 @@ updateVideoMethod();
   }
 
   function clearPhoneUploadWatch() {
+    if (readOnlyPreview) return;
     stopPhoneUploadPolling();
     phonePollExpiresAt = 0;
     phonePollStartedAt = 0;
@@ -718,6 +777,7 @@ updateVideoMethod();
   }
 
   function savePhoneUploadWatch(previousVideoUploadedAt, expiresAt) {
+    if (readOnlyPreview) return;
     phonePollExpiresAt = expiresAt;
     phonePollStartedAt = Date.now();
     try {
@@ -731,6 +791,7 @@ updateVideoMethod();
   }
 
   function restorePhoneUploadWatch() {
+    if (readOnlyPreview) return null;
     try {
       const saved = JSON.parse(sessionStorage.getItem(phoneUploadWatchKey) || '{}');
       if (saved.resumeToken !== state.resumeToken || !Number.isFinite(saved.expiresAt) || saved.expiresAt <= Date.now()) {
@@ -746,6 +807,7 @@ updateVideoMethod();
   }
 
   function startPhoneUploadPolling(previousVideoUploadedAt = '') {
+    if (readOnlyPreview) return;
     stopPhoneUploadPolling();
     if (localPreview || mobileVideoMode || applicationSubmitted || !state.resumeToken || phonePollExpiresAt <= Date.now() || form.elements.videoMethod?.value !== 'phone' || (state.uploads.introduction_video && !previousVideoUploadedAt)) return;
     const version = phonePollVersion;
@@ -783,6 +845,7 @@ updateVideoMethod();
     poll();
   }
   const loadDraft = async () => {
+    if (readOnlyPreview) return false;
     if (!state.resumeToken && !state.mobileUploadToken && !localPreview) return false;
     try {
       let result;
@@ -797,6 +860,7 @@ updateVideoMethod();
       } else {
         result = await call('load_draft');
       }
+      if (!mobileVideoMode && Array.isArray(result.data?.references)) result.data.references.slice(0, 3).forEach(reference => addApplicationReference(reference));
       if (!mobileVideoMode) Object.entries(result.data || {}).forEach(([name, value]) => {
         const controls = namedControls(name);
         if (!controls.length) return;
@@ -839,6 +903,7 @@ updateVideoMethod();
   };
 
   next.addEventListener('click', async () => {
+    if (readOnlyPreview) { showStep(Math.min(steps.length, state.step + 1)); return; }
     try {
       setBusy(true);
       await waitForPendingUploads();
@@ -851,6 +916,7 @@ updateVideoMethod();
   save.addEventListener('click', async () => { try { setBusy(true); await waitForPendingUploads(); await saveDraft(true); } catch (error) { message(error.message); } finally { setBusy(false); } });
   form.addEventListener('submit', async event => {
     event.preventDefault();
+    if (readOnlyPreview) { message(previewNotice, 'success'); return; }
     try {
       setBusy(true, 'Uploading files…');
       await waitForPendingUploads();
@@ -889,6 +955,7 @@ updateVideoMethod();
     } catch (error) { message(error.message); } finally { setBusy(false); }
   });
   fileInputs.forEach(input => input.addEventListener('change', async () => {
+    if (readOnlyPreview) { input.value = ''; message(previewNotice, 'success'); return; }
     const file = input.files[0];
     if (!file) return;
     const picker = input.closest('.upload-field')?.querySelector(`label[for="${input.id}"]`);
@@ -904,6 +971,7 @@ updateVideoMethod();
     enqueueFileUpload(input, file);
   }));
   phoneUploadButton?.addEventListener('click', async () => {
+    if (readOnlyPreview) { message(previewNotice, 'success'); return; }
     try {
       resetPhoneUploadQr();
       if (phoneVideoStatus) phoneVideoStatus.hidden = true;

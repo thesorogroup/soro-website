@@ -72,6 +72,8 @@
   let requirementsController = null;
   let pendingRequirementAction = null;
   const verificationGateCache = new Map();
+  const readinessCache = new Map();
+  const REQUIREMENT_LABELS = Object.freeze({ core_profile: 'Core Profile', resume: 'Résumé', english: 'English', disc: 'DISC', enneagram: 'Enneagram', mbti: 'Four-Letter Personality', internet: 'Internet Speed', equipment: 'Computer', skills: 'Skills', interview: 'Interview', references: 'References' });
   let feedback = Object.freeze({ type: '', message: '' });
 
   function text(value, max = 200) {
@@ -269,7 +271,11 @@
     const allowedActions = normalizeAllowedActions(source.allowedActions);
     const resume = normalizeResume(source.resume);
     const email = text(source.email, 254);
+    const readiness = source.readiness === undefined ? null : normalizeReadiness(source.readiness);
+    if (source.hasNativeSubmission !== undefined && typeof source.hasNativeSubmission !== 'boolean') return null;
+    if (source.readiness !== undefined && !readiness) return null;
     if (!applicantId || !fullName || !STAGE_SET.has(stage) || !updatedAt || !owner || !checklist || !allowedActions || !resume) return null;
+    if (readiness && checklist.some(item => readiness.find(r => r.key === item.key).status !== (item.state === 'complete' ? 'complete' : item.deferral ? 'deferred' : 'pending'))) return null;
     if (source.applicationReceivedAt && !applicationReceivedAt) return null;
     if (typeof source.archived !== 'boolean') return null;
     if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return null;
@@ -284,9 +290,18 @@
       archived: source.archived,
       owner,
       checklist,
+      hasNativeSubmission: source.hasNativeSubmission === true,
+      ...(readiness ? { readiness } : {}),
       allowedActions,
       resume
     });
+  }
+
+  function normalizeReadiness(source) {
+    if (!Array.isArray(source) || source.length !== REQUIREMENT_KEYS.length
+      || new Set(source.map(item => item?.key)).size !== REQUIREMENT_KEYS.length
+      || source.some(item => !REQUIREMENT_KEYS.includes(item?.key) || !['complete', 'pending', 'deferred'].includes(item?.status))) return null;
+    return Object.freeze(source.map(({key, status}) => Object.freeze({key, status})));
   }
 
   function normalizePayload(payload, expectedRole = actualRole()) {
@@ -358,6 +373,7 @@
       interviewAddressed: source.interviewAddressed,
       referencesAddressed: source.referencesAddressed,
       benchReadyEligible: source.benchReadyEligible,
+      deferrals: Object.freeze({ interview: source.deferrals?.interview ? normalizeDeferral(source.deferrals.interview) : null, references: source.deferrals?.references ? normalizeDeferral(source.deferrals.references) : null }),
       blockers: Object.freeze(blockers)
     });
   }
@@ -464,6 +480,22 @@
     });
   }
 
+  function normalizeApplicationReferences(source) {
+    if (source == null) return null;
+    if (!Array.isArray(source.items) || source.items.length > 3 || typeof source.contactConsent !== 'boolean' || !validTimestamp(source.submittedAt)) throw new Error('Application references could not be verified.');
+    const items = source.items.map(item => {
+      if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error('Invalid application reference.');
+      const result = {};
+      for (const [key, maximum] of Object.entries({ name: 160, relationship: 120, email: 254, phone: 60 })) {
+        if (typeof item[key] !== 'string' || item[key].length > maximum) throw new Error('Invalid application reference details.');
+        result[key] = text(item[key], maximum);
+      }
+      if (result.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(result.email)) throw new Error('Invalid reference email.');
+      return Object.freeze(result);
+    }).filter(item => Object.values(item).some(Boolean));
+    return Object.freeze({ items: Object.freeze(items), contactConsent: source.contactConsent, submittedAt: source.submittedAt });
+  }
+
   function normalizeVerificationPayload(payload, expectedApplicantId, expectedRole = actualRole()) {
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw new Error('The verification service returned an invalid response.');
     const generatedAt = validTimestamp(payload.generatedAt);
@@ -484,7 +516,7 @@
     if (references.some(item => !item) || new Set(references.map(item => item.referenceId)).size !== references.length) throw new Error('The verification response contained an invalid reference record.');
     const interviewHistory = (Array.isArray(payload.interviewHistory) ? payload.interviewHistory : []).map(normalizeInterview);
     if (interviewHistory.some(item => !item)) throw new Error('Interview history could not be verified.');
-    return Object.freeze({ generatedAt, viewerRole, applicant, gate, interview, interviewHistory: Object.freeze(interviewHistory), references: Object.freeze(references), interviewers, availableAttendees, calendarIntegration });
+    return Object.freeze({ generatedAt, viewerRole, applicant, gate, interview, interviewHistory: Object.freeze(interviewHistory), references: Object.freeze(references), applicationReferences: normalizeApplicationReferences(payload.applicationReferences), interviewers, availableAttendees, calendarIntegration });
   }
 
   function currentQueue() {
@@ -592,6 +624,7 @@
   }
 
   function cacheRequirementsGate(data) {
+    readinessCache.set(data.applicantId, normalizeReadiness(data.items));
     const interview = data.items.find(item => item.key === 'interview');
     const references = data.items.find(item => item.key === 'references');
     verificationGateCache.set(data.applicantId, Object.freeze({
@@ -602,42 +635,52 @@
     }));
   }
 
-  async function loadRequirements(applicantId) {
+  function cacheVerification(data) {
+    const current = findApplicant(data.applicant.applicantId);
+    const items = current ? readinessItems(current).filter(item => !['interview', 'references'].includes(item.key)).map(({key, status}) => ({key, status})) : [];
+    for (const key of ['interview', 'references']) items.push({key, status: data.gate[`${key}Addressed`] ? 'complete' : data.gate.deferrals?.[key] ? 'deferred' : 'pending'});
+    const snapshot = normalizeReadiness(items);
+    if (snapshot) readinessCache.set(data.applicant.applicantId, snapshot);
+    verificationGateCache.set(data.applicant.applicantId, data.gate);
+  }
+
+  async function loadRequirements(applicantId, itemKey = '') {
     const version = ++requirementsVersion;
-    requirementsContext = { applicantId, phase: 'loading', data: null, message: '', error: false };
+    requirementsContext = { applicantId, itemKey, phase: 'loading', data: null, message: '', error: false };
     render();
     try {
       const data = await requestRequirements(applicantId);
       if (version !== requirementsVersion || !canOpenForRole()) return false;
       cacheRequirementsGate(data);
-      requirementsContext = { applicantId, phase: 'ready', data, message: '', error: false };
+      requirementsContext = { applicantId, itemKey, phase: 'ready', data, message: '', error: false };
       render();
       return true;
     } catch (error) {
       if (version !== requirementsVersion) return false;
-      requirementsContext = { applicantId, phase: 'error', data: null, message: error.message, error: true };
+      requirementsContext = { applicantId, itemKey, phase: 'error', data: null, message: error.message, error: true };
       render();
       return false;
     }
   }
 
-  function openRequirements(applicantId) {
+  function openRequirements(applicantId, itemKey = '') {
     const applicant = findApplicant(applicantId);
     if (!mountedRoot || !canOpenForRole() || !applicant || applicant.stage === 'submitted' || applicant.archived || applicant.stage === 'declined' || pendingStageAction || pendingVerificationAction || pendingRequirementAction) return false;
     holdReview(applicant.applicantId);
-    loadRequirements(applicant.applicantId);
+    loadRequirements(applicant.applicantId, REQUIREMENT_KEYS.includes(itemKey) ? itemKey : '');
     return true;
   }
 
   function closeRequirements() {
     if (pendingRequirementAction) return false;
     const applicantId = requirementsContext?.applicantId;
+    const itemKey = requirementsContext?.itemKey;
     requirementsVersion += 1;
     requirementsController?.abort?.();
     requirementsController = null;
     requirementsContext = null;
     render();
-    mountedRoot?.querySelector?.(`[data-review-requirements="${applicantId}"]`)?.focus?.({ preventScroll: true });
+    mountedRoot?.querySelector?.(`[data-review-requirements="${applicantId}"]${itemKey ? `[data-review-item="${itemKey}"]` : ''}`)?.focus?.({ preventScroll: true });
     return true;
   }
 
@@ -664,14 +707,13 @@
     try {
       const next = await requestRequirements(context.applicantId, request);
       if (version !== requirementsVersion || !canOpenForRole()) return false;
-      queue = next;
+      replaceQueue(next);
       syncNavigationBadge(queue);
       dispatchUpdated();
-      verificationGateCache.delete(context.applicantId);
       const data = await requestRequirements(context.applicantId);
       if (version !== requirementsVersion || !canOpenForRole()) return false;
       cacheRequirementsGate(data);
-      requirementsContext = { applicantId: context.applicantId, phase: 'ready', data, error: false,
+      requirementsContext = { applicantId: context.applicantId, itemKey: context.itemKey, phase: 'ready', data, error: false,
         message: values.action === 'defer' ? `${item.label} is set to Verify Later.${request.createTask ? ' A follow-up task was created.' : ''} The review stage has not changed.` : `${item.label} is required again.${previousStage === 'bench_ready' && findApplicant(context.applicantId)?.stage === 'in_review' ? ' This Talent returned to In Review.' : ''}${item.deferral?.taskId ? ' Its follow-up task is kept with its current status.' : ''}` };
       render();
       return next;
@@ -878,8 +920,17 @@
     root.dispatchEvent(new root.CustomEvent('soro:talent-review-queue-updated', { detail: { queue } }));
   }
 
-  function setQueue(value) {
+  function replaceQueue(value) {
+    readinessCache.clear();
+    verificationGateCache.clear();
+    value.applicants.forEach(applicant => {
+      if (applicant.readiness) cacheRequirementsGate({applicantId: applicant.applicantId, items: applicant.readiness});
+    });
     queue = value;
+  }
+
+  function setQueue(value) {
+    replaceQueue(value);
     if (activeReview && !findApplicant(activeReview.applicantId)) activeReview.applicantId = '';
     syncNavigationBadge(queue);
     dispatchUpdated();
@@ -994,39 +1045,60 @@
     </div>`;
   }
 
+  function readinessItems(applicant) {
+    const snapshot = readinessCache.get(applicant.applicantId) || applicant.readiness;
+    return REQUIREMENT_KEYS.map(key => {
+      const source = applicant.checklist.find(item => item.key === key);
+      const status = snapshot?.find(item => item.key === key)?.status
+        || (source ? source.state === 'complete' ? 'complete' : source.deferral ? 'deferred' : 'pending' : 'unknown');
+      return { key, label: REQUIREMENT_LABELS[key], status, source };
+    });
+  }
+
+  function readinessSummary(applicant) {
+    const items = readinessItems(applicant);
+    const pending = items.filter(item => item.status === 'pending');
+    const deferred = items.filter(item => item.status === 'deferred');
+    const unknown = items.some(item => item.status === 'unknown');
+    return {items, pending, deferred, unknown, eligible: !unknown && !pending.length};
+  }
+
   function checklistMarkup(applicant) {
-    const submissionOpen = mountedRoot?.querySelector?.(`[data-review-submission="${applicant.applicantId}"]`)?.open === true;
-    const received = applicant.checklist.filter(item => item.state === 'complete').length;
-    const screening = applicant.checklist.filter(item => ['english', 'disc', 'enneagram', 'mbti', 'internet', 'equipment'].includes(item.key));
-    const recorded = screening.filter(item => item.resultRecorded === true).length;
-    const resultsSummary = screening.every(item => typeof item.resultRecorded === 'boolean')
-      ? `${recorded} of ${screening.length} Results Recorded` : 'Recording Status Not Loaded';
-    const skills = applicant.checklist.find(item => item.key === 'skills');
-    const skillsCount = skills?.verifiedSkillsCount;
-    const skillsSummary = Number.isSafeInteger(skillsCount) ? `${skillsCount} ${skillsCount === 1 ? 'Skill' : 'Skills'} Verified` : 'Skill Verification Not Loaded';
-    const sourceLabel = item => item.evidenceState === 'unclassified_available' ? 'Check File Category'
-      : item.state === 'complete' ? 'File Received' : 'File Missing';
-    const reviewItems = screening.concat(skills ? [skills] : []);
+    const {items, pending, deferred, unknown, eligible} = readinessSummary(applicant);
+    const editable = applicant.stage !== 'submitted' && !applicant.archived && applicant.stage !== 'declined';
+    const summary = unknown ? 'Check Requirements' : pending.length ? `${pending.length} Remaining` : 'Ready for Bench';
+    const next = unknown ? 'Open the checklist to load the latest requirements.'
+      : pending.length > 3 ? 'Review the remaining items below.' : pending.length ? `Still needed: ${pending.map(item => item.label).join(', ')}.`
+      : deferred.length ? 'All requirements are met or set to Verify Later.' : 'All requirements are met.';
     return `<div class="talent-review-checklist">
-      <div class="talent-review-checklist-heading"><strong>Team Review</strong><span>${resultsSummary}${skills ? ` · ${skillsSummary}` : ''}</span></div>
-      <ul class="talent-review-progress">${reviewItems.map(item => {
-        const isSkills = item.key === 'skills';
-        const done = isSkills ? skillsCount > 0 : item.resultRecorded === true;
-        const status = isSkills ? (skillsCount === 0 ? 'No Skills Verified' : skillsSummary)
-          : done ? 'Verified · Result Recorded' : item.resultRecorded === false ? 'Awaiting Result' : 'Recording Status Not Loaded';
-        const receipt = isSkills ? (item.state === 'complete' ? 'Skills Reported' : 'No Skills Reported') : sourceLabel(item);
-        const label = isSkills ? 'Skills Verification' : item.label;
-        return `<li class="talent-review-progress-item ${done ? 'is-recorded' : item.deferral ? 'is-deferred' : 'is-pending'}" data-review-progress="${escapeHtml(item.key)}">
-          <strong>${escapeHtml(label)}</strong>
-          <span class="talent-review-progress-status"><b aria-hidden="true">${done ? '✓' : '○'}</b>${escapeHtml(status)}</span>
-          <span class="talent-review-receipt ${item.state === 'complete' ? 'is-received' : 'is-source-missing'}">${escapeHtml(receipt)}</span>
-          ${item.deferral ? `<span class="talent-review-deferral-badge">${done && !isSkills ? 'Source File Deferred' : 'Verify Later'}</span>` : ''}
-        </li>`;
+      <div class="talent-review-checklist-heading"><strong>Bench Ready Checklist</strong><span class="talent-review-completion ${eligible ? 'is-ready' : ''}">${escapeHtml(summary)}${deferred.length ? ` <small>· ${deferred.length} Verify Later</small>` : ''}</span></div>
+      <p class="talent-review-next-step">${escapeHtml(next)}${editable && !eligible ? ' Select an item to review or defer it.' : ''}</p>
+      <ul class="talent-review-progress">${items.map(item => {
+        const source = item.source, result = source?.resultRecorded, skillsCount = source?.verifiedSkillsCount;
+        const recorded = result === true || skillsCount > 0;
+        const isAssessment = ['english', 'disc', 'enneagram', 'mbti', 'internet', 'equipment'].includes(item.key);
+        const receivedOnly = item.status === 'complete' && (isAssessment && result !== true || item.key === 'skills' && !skillsCount);
+        const state = item.status === 'deferred' ? 'is-deferred' : item.status === 'complete' ? receivedOnly ? 'is-received' : 'is-recorded' : 'is-pending';
+        const status = item.status === 'deferred' ? 'Verify Later' : item.status === 'unknown' ? 'Check Status'
+          : item.status === 'pending' ? source?.evidenceState === 'unclassified_available' ? 'Check File Category' : source && recorded ? 'File Needed' : 'Needs Review'
+          : receivedOnly ? item.key === 'skills' ? 'Skills Reported' : result === false ? 'Result Not Recorded' : 'File on Record' : recorded ? skillsCount > 0 ? `${skillsCount} Skills Verified` : 'Result Recorded' : 'Complete';
+        let detail = result === true && item.status !== 'complete' ? 'Result Recorded'
+          : isAssessment && source && result === undefined ? 'Recording Status Not Loaded'
+          : result === false ? 'Result Not Recorded' : item.key === 'skills' && skillsCount === undefined ? 'Skill Verification Not Loaded' : item.key === 'skills' && !skillsCount ? 'No Skills Verified' : '';
+        // Current applications require these uploads. Show receipt details for
+        // older/unknown records and source exceptions, not as another checklist.
+        const receipt = source?.evidenceState === 'available' ? 'File on Record'
+          : source?.evidenceState === 'missing' ? 'No File on Record'
+          : source?.evidenceState === 'unclassified_available' ? 'Check File Category' : '';
+        if (isAssessment && receipt && (!applicant.hasNativeSubmission || source.evidenceState !== 'available')) {
+          detail = [detail, receipt].filter(value => value && value !== status).join(' · ');
+        }
+        if (detail === status) detail = '';
+        const tag = editable ? 'button' : 'div';
+        return `<li class="talent-review-progress-item ${state}" data-review-progress="${item.key}"><${tag}${editable ? ` type="button" data-review-requirements="${applicant.applicantId}" data-review-item="${item.key}" aria-label="${escapeHtml(item.label)}: ${escapeHtml(status)}. Review requirement"` : ''} class="talent-review-requirement-target">
+          <strong>${escapeHtml(item.label)}</strong><span class="talent-review-progress-status"><b aria-hidden="true">${item.status === 'complete' ? receivedOnly ? '↓' : '✓' : item.status === 'deferred' ? '◷' : '○'}</b>${escapeHtml(status)}</span>${detail ? `<small${recorded ? ' class="talent-review-recorded-detail"' : ''}>${escapeHtml(detail)}</small>` : ''}
+        </${tag}></li>`;
       }).join('')}</ul>
-      <p class="talent-review-checklist-note">Green means the assessment result is recorded or the skill is verified. File receipt and categorization are separate checks; they do not undo a recorded result.</p>
-      <details class="talent-review-submission" data-review-submission="${applicant.applicantId}"${submissionOpen ? ' open' : ''}><summary><strong>Applicant Submission</strong><span>${received} of ${applicant.checklist.length} Items Received</span></summary>
-        <ul>${applicant.checklist.map(item => `<li class="${item.state === 'complete' ? 'is-received' : 'is-source-missing'}"><strong>${escapeHtml(item.label)}</strong><span>${item.state === 'complete' ? 'Received' : item.evidenceState === 'unclassified_available' ? 'Check File Category' : 'Missing'}</span>${item.deferral ? '<span class="talent-review-deferral-badge">Verify Later</span>' : ''}</li>`).join('')}</ul>
-      </details>
     </div>`;
   }
 
@@ -1034,14 +1106,10 @@
     const primary = ['begin_review', 'mark_bench_ready'].includes(action);
     const guarded = ['decline', 'archive'].includes(action);
     const restore = action === 'restore';
-    const checklistIncomplete = action === 'mark_bench_ready' && applicant.checklist.some(item => item.state !== 'complete' && !item.deferral);
-    const verificationGate = verificationGateCache.get(applicant.applicantId);
-    const verificationIncomplete = action === 'mark_bench_ready' && !verificationGate?.benchReadyEligible;
-    const disabledReason = checklistIncomplete
-      ? 'Complete or individually defer each pending review requirement first'
-      : verificationIncomplete
-        ? verificationGate ? 'Resolve or individually defer the interview and reference requirements first' : 'Open Review Requirements or Verification to confirm Bench Ready eligibility'
-        : '';
+    const readiness = readinessSummary(applicant);
+    const disabledReason = action !== 'mark_bench_ready' || readiness.eligible ? '' : readiness.unknown
+      ? 'Open a checklist item to check the latest requirements'
+      : `Still needed: ${readiness.pending.map(item => item.label).join(', ')}. Complete or choose Verify Later.`;
     return `<button type="button" class="button talent-review-action${primary ? ' primary' : ''}${guarded ? ' talent-review-action--guarded' : ''}${restore ? ' talent-review-action--restore' : ''}" data-review-action="${escapeHtml(action)}"${disabledReason ? ` disabled title="${escapeHtml(disabledReason)}"` : ''}>${escapeHtml(ACTION_LABELS[action])}</button>`;
   }
 
@@ -1058,7 +1126,7 @@
 
   function interviewButtonMarkup(applicant) {
     const complete = verificationGateCache.get(applicant.applicantId)?.interviewAddressed === true;
-    return `<button type="button" class="button talent-review-verification" data-review-interview="${escapeHtml(applicant.applicantId)}" aria-label="Schedule interview for ${escapeHtml(applicant.fullName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM8 2v6m8-6v6M4 10h16"/></svg><span><strong>Schedule Interview</strong>${complete ? '<small class="talent-review-interview-complete">✓ Interview Complete</small>' : '<small>Appointment &amp; outcome</small>'}</span></button>`;
+    return `<button type="button" class="button talent-review-verification" data-review-interview="${escapeHtml(applicant.applicantId)}" aria-label="Schedule or record interview for ${escapeHtml(applicant.fullName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM8 2v6m8-6v6M4 10h16"/></svg><span><strong>Schedule / Record Interview</strong>${complete ? '<small class="talent-review-interview-complete">✓ Interview Complete</small>' : '<small>Upcoming or Previous</small>'}</span></button>`;
   }
 
   function requirementsButtonMarkup(applicant) {
@@ -1088,9 +1156,8 @@
         <span><small>Last updated</small><strong>${escapeHtml(formatDate(applicant.updatedAt))}</strong></span>
       </div>
       ${checklistMarkup(applicant)}
-      ${!notStarted && gate ? `<div class="talent-review-readiness"><strong>Bench readiness</strong><span>${gate.benchReadyEligible ? 'Interview and reference requirements are complete or set to Verify Later. Complete or individually defer the remaining checklist items before moving to Bench Ready.' : gate.blockers.map(escapeHtml).join(' · ')}</span></div>` : ''}
       <footer class="talent-review-card-actions">
-        <div class="talent-review-card-main-actions">${notStarted ? (applicant.allowedActions.includes('begin_review') ? actionButtonMarkup('begin_review', applicant) : '') : `${resumeButtonMarkup(applicant)}${verificationButtonMarkup(applicant)}${interviewButtonMarkup(applicant)}${requirementsButtonMarkup(applicant)}<span class="talent-review-action-divider" aria-hidden="true"></span>${primaryActions.length ? primaryActions.map(action => actionButtonMarkup(action, applicant)).join('') : '<span class="talent-review-no-actions">No stage action needed</span>'}`}</div>
+        <div class="talent-review-card-main-actions">${notStarted ? (applicant.allowedActions.includes('begin_review') ? actionButtonMarkup('begin_review', applicant) : '') : `${resumeButtonMarkup(applicant)}${verificationButtonMarkup(applicant)}${interviewButtonMarkup(applicant)}<span class="talent-review-action-divider" aria-hidden="true"></span>${primaryActions.length ? primaryActions.map(action => actionButtonMarkup(action, applicant)).join('') : '<span class="talent-review-no-actions">No stage action needed</span>'}`}</div>
         ${!notStarted && guardedActions.length ? `<details class="talent-review-secondary"><summary>More actions</summary><div>${guardedActions.map(action => actionButtonMarkup(action, applicant)).join('')}</div></details>` : ''}
       </footer>
     </article>`;
@@ -1290,8 +1357,19 @@
     </article>`;
   }
 
+  function submittedReferencesMarkup(data) {
+    const supplied = data.applicationReferences;
+    if (!supplied?.items.length) return '';
+    return `<div class="talent-verification-submitted-references"><h4>Provided With Application</h4><p>${supplied.contactConsent ? 'Permission to contact these references was given with the application.' : 'Contact permission is not recorded. Obtain permission before contacting these references.'} These details are not yet verified.</p>
+      ${supplied.items.map((item, index) => {
+        const added = data.references.some(reference => ['name', 'relationship', 'email', 'phone'].every(key => (reference[key] || '') === item[key]));
+        return `<article class="talent-verification-reference"><header><div><h4>${escapeHtml(item.name || 'Name Not Provided')}</h4><p>${escapeHtml(item.relationship || 'Relationship Not Provided')}</p></div></header><div class="talent-verification-reference-contact"><span><small>Email</small>${escapeHtml(item.email || 'Not Provided')}</span><span><small>Phone</small>${escapeHtml(item.phone || 'Not Provided')}</span></div><button class="button" type="button" data-use-application-reference="${index}"${!supplied.contactConsent || added ? ' disabled' : ''}>${added ? 'Added to Verification' : 'Use for Verification'}</button></article>`;
+      }).join('')}</div>`;
+  }
+
   function referencesMarkup(data) {
     return `<section class="talent-verification-section"><div class="talent-verification-section-heading"><div><p class="eyebrow">Employment references</p><h3>${data.references.length ? `${data.references.length} reference${data.references.length === 1 ? '' : 's'}` : 'No references recorded'}</h3></div><span class="talent-verification-state ${data.gate.referencesAddressed ? 'is-completed' : 'is-open'}">${data.gate.referencesAddressed ? 'Addressed' : 'Action needed'}</span></div>
+      ${submittedReferencesMarkup(data)}
       <div class="talent-verification-reference-list">${data.references.map(referenceMarkup).join('')}</div>
       <details class="talent-verification-add-reference"><summary>Add employment reference</summary><form class="talent-verification-form" data-verification-form="save_reference"><div class="talent-verification-form-grid"><label><span>Name</span><input name="name" maxlength="160" required></label><label><span>Company</span><input name="company" maxlength="160"></label><label><span>Relationship</span><input name="relationship" maxlength="120"></label><label><span>Phone</span><input name="phone" maxlength="80"></label><label class="talent-verification-field-wide"><span>Email</span><input type="email" name="email" maxlength="254"></label></div><button type="submit" class="button primary">Add reference</button></form></details>
     </section>`;
@@ -1312,7 +1390,7 @@
     if (verificationContext.phase === 'loading') content = `<div class="talent-verification-loading" role="status">Loading ${interviewMode ? 'interview details' : 'skills and reference verification'}…</div>`;
     else if (verificationContext.phase === 'error') content = `<div class="talent-verification-error" role="alert"><strong>Verification unavailable</strong><p>${escapeHtml(verificationContext.error)}</p><button type="button" class="button" data-verification-retry>Try again</button></div>`;
     else if (verificationContext.data) content = `${verificationContext.status ? `<div class="talent-verification-feedback ${verificationContext.statusType === 'error' ? 'is-error' : ''}" role="status">${escapeHtml(verificationContext.status)}</div>` : ''}${interviewMode ? interviewMarkup(verificationContext.data) : `<section class="talent-verification-section"><div class="talent-verification-section-heading"><div><p class="eyebrow">Full Skill Library</p><h3>Add, edit &amp; verify skills</h3></div></div><div data-review-skills-panel>${root.soroTalentReviewEvidence?.skillsMarkup(evidence.skills) || '<p>Skill review is unavailable. Refresh the page.</p>'}</div></section>${referencesMarkup(verificationContext.data)}`}`;
-    return `<dialog class="talent-verification-dialog${interviewMode ? '' : ' has-resume'}" data-verification-dialog data-verification-owner="${escapeHtml(verificationContext.applicantId)}" data-verification-mode="${interviewMode ? 'interview' : 'verification'}" aria-labelledby="talent-verification-title"><div class="talent-verification-shell"><header class="talent-verification-header"><div><p class="eyebrow">${interviewMode ? 'Schedule Interview' : 'Skills &amp; reference verification'}</p><h2 id="talent-verification-title">${escapeHtml(name)}</h2><p>${interviewMode ? 'Schedule or manage the appointment and record the interview outcome.' : 'Review the résumé alongside the reported skills and employment references.'}</p></div><button type="button" data-verification-close aria-label="Close verification">×</button></header><div class="talent-verification-workspace">${interviewMode ? '' : `<aside class="review-evidence-resume" data-review-resume-panel>${root.soroTalentReviewEvidence?.resumeMarkup(evidence.resume) || '<p>Résumé preview is unavailable.</p>'}</aside>`}<div class="talent-verification-body">${content}</div></div></div></dialog>`;
+    return `<dialog class="talent-verification-dialog${interviewMode ? '' : ' has-resume'}" data-verification-dialog data-verification-owner="${escapeHtml(verificationContext.applicantId)}" data-verification-mode="${interviewMode ? 'interview' : 'verification'}" aria-labelledby="talent-verification-title"><div class="talent-verification-shell"><header class="talent-verification-header"><div><p class="eyebrow">${interviewMode ? 'Schedule / Record Interview' : 'Skills &amp; reference verification'}</p><h2 id="talent-verification-title">${escapeHtml(name)}</h2><p>${interviewMode ? 'Schedule or manage the appointment and record the interview outcome.' : 'Review the résumé alongside the reported skills and employment references.'}</p></div><button type="button" data-verification-close aria-label="Close verification">×</button></header><div class="talent-verification-workspace">${interviewMode ? '' : `<aside class="review-evidence-resume" data-review-resume-panel>${root.soroTalentReviewEvidence?.resumeMarkup(evidence.resume) || '<p>Résumé preview is unavailable.</p>'}</aside>`}<div class="talent-verification-body">${content}</div></div></div></dialog>`;
   }
 
   function actionDialogMarkup() {
@@ -1352,16 +1430,16 @@
   function requirementsDialogMarkup() {
     if (!requirementsContext) return '';
     const context = requirementsContext, applicant = findApplicant(context.applicantId);
-    const items = context.data?.items || [];
+    const items = (context.data?.items || []).filter(item => !context.itemKey || context.itemKey === item.key);
     const pending = items.filter(item => item.status === 'pending').length;
     const deferred = items.filter(item => item.status === 'deferred').length;
     const completed = items.filter(item => item.status === 'complete').length;
     return `<dialog class="talent-requirements-dialog" data-requirements-dialog aria-labelledby="talent-requirements-title">
-      <header><div><p class="eyebrow">${escapeHtml(applicant?.fullName || 'Talent review')}</p><h2 id="talent-requirements-title">Review Requirements</h2></div><button type="button" data-requirements-close aria-label="Close review requirements">×</button></header>
+      <header><div><p class="eyebrow">${escapeHtml(applicant?.fullName || 'Talent review')}</p><h2 id="talent-requirements-title">${escapeHtml(REQUIREMENT_LABELS[context.itemKey] || 'Review Requirements')}</h2></div><button type="button" data-requirements-close aria-label="Close review requirements">×</button></header>
       <div class="talent-requirements-body">
-        <p class="talent-requirements-intro">Choose <strong>Verify Later</strong> for any pending requirement, with a reason and an optional follow-up task. Individual deferrals allow Bench Ready while those checks remain pending. Saving a deferral does not change the review stage.</p>
+        <p class="talent-requirements-intro">Complete this requirement, or choose <strong>Verify Later</strong> with a reason. You can add a follow-up task. Verify Later clears the requirement for Bench Ready without marking it complete.</p>
         <div class="talent-requirements-status${context.error ? ' is-error' : ''}" data-requirements-status role="status" aria-live="polite">${escapeHtml(context.message || '')}</div>
-        ${context.phase === 'loading' ? '<p class="talent-requirements-loading" role="status">Loading review requirements…</p>' : context.phase === 'error' ? '<button type="button" class="button" data-requirements-retry>Retry requirements</button>' : `<div class="talent-requirements-totals"><span><strong>${completed}</strong> requirements met</span><span><strong>${pending}</strong> pending</span><span class="is-deferred"><strong>${deferred}</strong> Verify Later</span></div><ul class="talent-requirements-list">${items.map(item => requirementRowMarkup(item, applicant)).join('')}</ul>`}
+        ${context.phase === 'loading' ? '<p class="talent-requirements-loading" role="status">Loading review requirements…</p>' : context.phase === 'error' ? '<button type="button" class="button" data-requirements-retry>Retry requirements</button>' : `${context.itemKey ? '' : `<div class="talent-requirements-totals"><span><strong>${completed}</strong> requirements met</span><span><strong>${pending}</strong> pending</span><span class="is-deferred"><strong>${deferred}</strong> Verify Later</span></div>`}<ul class="talent-requirements-list">${items.map(item => requirementRowMarkup(item, applicant)).join('')}</ul>`}
       </div>
       <footer><span>Recorded results and received files keep their original status.</span><button type="button" class="button" data-requirements-close>Done</button></footer>
     </dialog>`;
@@ -1371,7 +1449,10 @@
     const deferral = item.deferral, restore = item.status === 'deferred';
     const title = restore ? 'Restore Requirement' : 'Verify Later';
     const key = escapeHtml(item.key);
+    const nextAction = item.key === 'interview' ? 'Record or Schedule Interview' : item.key === 'references' ? 'Review References' : item.key === 'skills' ? 'Edit & Verify Skills' : item.key === 'core_profile' ? 'Edit Core Profile' : 'Open Talent Profile';
     return `<li class="talent-requirement-row is-${item.status}"><div class="talent-requirement-heading"><strong>${escapeHtml(item.label)}</strong><span class="talent-requirement-state">${item.status === 'complete' ? 'Requirement met' : restore ? 'Verify Later' : 'Pending'}</span></div>
+      <button type="button" class="button talent-requirement-next" data-requirement-next="${key}">${nextAction}</button>
+      ${item.key === 'resume' ? '<p class="talent-requirement-guidance">Use the profile’s Documents tab to review or add the résumé.</p>' : ['english','disc','enneagram','mbti','internet','equipment'].includes(item.key) ? '<p class="talent-requirement-guidance">Record scores under Screening Results. Use Documents to review files or change their assessment type.</p>' : ''}
       ${restore ? `<div class="talent-requirement-deferral"><p>${escapeHtml(deferral.reason)}</p><small>Saved by ${escapeHtml(deferral.createdByName)} · ${escapeHtml(formatDate(deferral.createdAt))}${deferral.taskId ? ` · Follow-up task${deferral.dueDate ? ` due ${escapeHtml(deferral.dueDate)}` : ''}` : ' · No follow-up task'}</small>${deferral.taskId ? `<button type="button" class="talent-requirement-task-link" data-requirement-open-task="${deferral.taskId}">Open Task</button>` : ''}</div>` : ''}
       ${item.status === 'complete' ? '' : `<details class="talent-requirement-edit" name="talent-requirement-editor"><summary>${title}</summary><form data-requirement-form="${key}" data-requirement-action="${restore ? 'restore' : 'defer'}">
         ${restore ? `<p class="talent-requirement-warning">This item will be required again.${applicant?.stage === 'bench_ready' ? ' This Talent will return to In Review because this requirement is still pending.' : ''}${deferral.taskId ? ' The existing follow-up task will be kept with its current status.' : ''}</p>` : ''}
@@ -1506,7 +1587,7 @@
     try {
       const data = await requestVerification(applicant.applicantId);
       if (version !== verificationRequestVersion || verificationContext?.applicantId !== applicant.applicantId || !canOpenForRole()) return false;
-      verificationGateCache.set(applicant.applicantId, data.gate);
+      cacheVerification(data);
       verificationContext = Object.freeze({ applicantId: applicant.applicantId, mode, phase: 'ready', data, error: '', status: '', statusType: '' });
       render();
       return true;
@@ -1666,7 +1747,7 @@
     try {
     const data = await requestVerification(context.applicantId, { body });
     if (version !== verificationRequestVersion || verificationContext?.applicantId !== context.applicantId || !canOpenForRole()) return data;
-    verificationGateCache.set(verificationContext.applicantId, data.gate);
+    cacheVerification(data);
     verificationContext = Object.freeze({
       applicantId: context.applicantId, mode: context.mode, phase: 'ready', data, error: '',
       status: body.action === 'record_previous_interview' ? 'Previous interview saved. The interview requirement is now complete. Other review requirements remain unchanged.' : context.mode === 'interview' ? 'Interview saved.' : 'Reference verification saved.', statusType: 'success'
@@ -1732,7 +1813,7 @@
     } finally { if (pendingStageAction === version) pendingStageAction = false; }
     if (version !== requestVersion) return currentQueue();
     if (mountedRoot) return setQueue(next);
-    queue = next;
+    replaceQueue(next);
     syncNavigationBadge(queue);
     dispatchUpdated();
     return queue;
@@ -1783,9 +1864,20 @@
     const coreProfileButton = event.target.closest?.('[data-review-core-profile]');
     if (coreProfileButton) { event.preventDefault(); openCoreProfile(coreProfileButton.dataset.reviewCoreProfile); return; }
     const requirementsButton = event.target.closest?.('[data-review-requirements]');
-    if (requirementsButton) { event.preventDefault(); openRequirements(requirementsButton.dataset.reviewRequirements); return; }
+    if (requirementsButton) { event.preventDefault(); openRequirements(requirementsButton.dataset.reviewRequirements, requirementsButton.dataset.reviewItem); return; }
     if (event.target.closest?.('[data-requirements-close]')) { event.preventDefault(); closeRequirements(); return; }
-    if (event.target.closest?.('[data-requirements-retry]')) { event.preventDefault(); loadRequirements(requirementsContext?.applicantId); return; }
+    if (event.target.closest?.('[data-requirements-retry]')) { event.preventDefault(); loadRequirements(requirementsContext?.applicantId, requirementsContext?.itemKey); return; }
+    const requirementNext = event.target.closest?.('[data-requirement-next]');
+    if (requirementNext) {
+      event.preventDefault();
+      const applicantId = requirementsContext?.applicantId, key = requirementNext.dataset.requirementNext;
+      if (!applicantId || !REQUIREMENT_KEYS.includes(key) || !closeRequirements()) return;
+      if (key === 'core_profile') openCoreProfile(applicantId);
+      else if (key === 'interview') openVerification(applicantId, 'interview');
+      else if (['skills', 'references'].includes(key)) openVerification(applicantId);
+      else openProfile(applicantId);
+      return;
+    }
     const requirementTask = event.target.closest?.('[data-requirement-open-task]');
     if (requirementTask) {
       event.preventDefault();
@@ -1840,6 +1932,21 @@
       return;
     }
     const removeReference = event.target.closest?.('[data-verification-remove-reference]');
+    const useApplicationReference = event.target.closest?.('[data-use-application-reference]');
+    if (useApplicationReference && verificationContext?.data?.applicationReferences?.contactConsent) {
+      event.preventDefault();
+      const supplied = verificationContext.data.applicationReferences.items[Number(useApplicationReference.dataset.useApplicationReference)];
+      const details = useApplicationReference.closest('.talent-verification-section')?.querySelector('.talent-verification-add-reference');
+      const form = details?.querySelector('form');
+      if (supplied && form) {
+        details.open = true;
+        ['name', 'relationship', 'email', 'phone'].forEach(key => { form.elements[key].value = supplied[key]; });
+        form.elements.company.value = '';
+        form.elements.name.focus();
+        form.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+      return;
+    }
     if (removeReference && verificationContext?.data) {
       event.preventDefault();
       const referenceId = removeReference.closest?.('[data-verification-reference]')?.dataset.verificationReference;
@@ -2108,6 +2215,7 @@
     actionContext = null;
     verificationContext = null;
     verificationGateCache.clear();
+    readinessCache.clear();
     if (queue.phase === 'loading') {
       queue = emptyQueue();
       syncNavigationBadge(queue);

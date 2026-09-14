@@ -188,6 +188,29 @@ body.mobile-upload-complete .application-shell { margin-top: 36px; }
 
 @media (max-width: 440px) { .identity-choice-grid { grid-template-columns: 1fr; } }
 
+.application-references { margin-bottom: 28px; padding: 24px; border: 1px solid #c9dae8; border-radius: 16px; background: #f5f9fd; }
+.application-preview-notice { padding: 20px 28px; background: #0c2b51; color: #fff; }
+.application-preview-notice[hidden] { display: none; }
+.application-preview-notice strong { font-size: 18px; }
+.application-preview-notice p { margin: 7px 0 0; font-size: 14px; line-height: 1.6; color: #dfebf7; }
+.application-preview #save-draft, .application-preview #submit-application { display: none; }
+.application-preview .file-picker-label { opacity: .55; cursor: not-allowed; }
+@media (max-width: 640px) {
+  .application-preview-notice { padding: 18px; }
+  .application-preview .application-steps button { flex-direction: column; gap: 6px; }
+  .application-preview .application-steps button b { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; font-size: 12px; }
+}
+.application-references-heading h3 { color: #0c2b51; margin: 0 0 12px; }
+.application-references-heading h3 small { display: inline-block; margin-left: 8px; font: 600 12px/1.5 system-ui, sans-serif; color: #516980; }
+.application-references-heading p { color: #516980; font-size: 14px; line-height: 1.6; }
+.application-reference-card { min-width: 0; margin: 18px 0; padding: 18px; border: 1px solid #d4e0ec; border-radius: 12px; background: white; }
+.application-reference-card legend { padding: 0 6px; color: #0c2b51; font-weight: 700; }
+.application-reference-card .remove-reference { display: block; margin: 14px 0 0 auto; border: 0; background: transparent; color: #93452f; text-decoration: underline; cursor: pointer; }
+.application-references .consent-list { margin-bottom: 0; }
+.application-references .consent-list[hidden] { display: none; }
+.application-references .consent-list small { color: #516980; line-height: 1.6; }
+@media (max-width: 640px) { .application-references { padding: 16px; }.application-reference-card { padding: 12px; } }
+
 body.mobile-video-upload .upload-grid > .upload-field:not(.video-upload),
 body.mobile-video-upload .video-methods,
 body.mobile-video-upload .application-steps,

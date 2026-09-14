@@ -1,4 +1,4 @@
-const { publicDeferral } = require('./lib/talent-review-deferral');
+const { publicDeferral, ITEM_KEYS } = require('./lib/talent-review-deferral');
 const configuredUrl = String(process.env.SUPABASE_URL || '').trim();
 const SUPABASE_URL = /^https:\/\/[^/]+\.supabase\.co\/?$/.test(configuredUrl)
   ? configuredUrl.replace(/\/$/, '')
@@ -318,6 +318,13 @@ function publicApplicant(value) {
   if (!Array.isArray(value.allowedActions) || value.allowedActions.some(action => !ACTIONS.has(action))) {
     throw httpError(502, 'review_service_error', 'The Talent review queue returned an invalid response.');
   }
+  const readiness = value.readiness === undefined ? null : publicReadiness(value.readiness);
+  if (value.hasNativeSubmission !== undefined && typeof value.hasNativeSubmission !== 'boolean') {
+    throw httpError(502, 'review_service_error', 'The Talent review queue returned invalid source details.');
+  }
+  if (readiness && checklist.some(item => readiness.find(r => r.key === item.key).status !== (item.state === 'complete' ? 'complete' : item.deferral ? 'deferred' : 'pending'))) {
+    throw httpError(502, 'review_service_error', 'The Talent review queue returned inconsistent readiness details.');
+  }
   return {
     applicantId: requiredUuid(value.applicantId),
     fullName: requiredText(value.fullName, 180),
@@ -333,8 +340,19 @@ function publicApplicant(value) {
     },
     resume: publicResumeReference(value.resume),
     checklist,
+    hasNativeSubmission: value.hasNativeSubmission === true,
+    ...(readiness ? { readiness } : {}),
     allowedActions: [...new Set(value.allowedActions)]
   };
+}
+
+function publicReadiness(value) {
+  if (!Array.isArray(value) || value.length !== ITEM_KEYS.length
+    || new Set(value.map(item => item?.key)).size !== ITEM_KEYS.length
+    || value.some(item => !ITEM_KEYS.includes(item?.key) || !['complete', 'pending', 'deferred'].includes(item?.status))) {
+    throw httpError(502, 'review_service_error', 'The Talent review queue returned invalid readiness details.');
+  }
+  return value.map(({key, status}) => ({key, status}));
 }
 
 function publicPayload(value) {

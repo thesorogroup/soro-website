@@ -16,6 +16,7 @@ const expectedUpdatedAt = '2026-08-30T23:00:00.000Z';
 
 const SUMMARY_KEYS = Object.freeze(['all', 'submitted', 'in_review', 'needs_more_info', 'bench_ready', 'closed']);
 const APPLICANT_KEYS = Object.freeze([
+  'hasNativeSubmission',
   'applicantId', 'fullName', 'preferredName', 'email', 'applicationReceivedAt',
   'updatedAt', 'stage', 'archived', 'owner', 'resume', 'checklist', 'allowedActions'
 ]);
@@ -65,6 +66,16 @@ function applicantRow(overrides = {}) {
     ...overrides
   };
 }
+
+test('readiness exposes all eleven safe statuses and rejects malformed or contradictory snapshots',()=>{
+  const keys=[...CHECKLIST_KEYS,'interview','references'];
+  const readiness=keys.map((key,i)=>({key,status:i<3?'complete':'pending',privateNote:'PRIVATE'}));
+  const payload={generatedAt:expectedUpdatedAt,viewerRole:'admin',summary:{all:1,submitted:1,in_review:0,needs_more_info:0,bench_ready:0,closed:0},applicants:[applicantRow({readiness})]};
+  const clean=backend.publicPayload(payload);
+  assert.equal(clean.applicants[0].readiness.length,11);
+  assert.doesNotMatch(JSON.stringify(clean),/PRIVATE/);
+  for(const bad of [[],readiness.slice(1),[readiness[0],...readiness.slice(0,-1)],readiness.map(item=>({...item,status:'verified'})),readiness.map(item=>({...item,status:'complete'}))])assert.throws(()=>backend.publicPayload({...payload,applicants:[applicantRow({readiness:bad})]}),/readiness/);
+});
 
 function queuePayload(overrides = {}) {
   return {

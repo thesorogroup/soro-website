@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../assets/styles.css">
-  <link rel="stylesheet" href="application.css?v=20260822-identity-preferences1">
+  <link rel="stylesheet" href="application.css?v=20260914-preview">
 </head>
 <body class="soro-application-page">
   <header class="application-header">
@@ -28,6 +28,10 @@
     </section>
 
     <section class="application-shell" aria-label="Talent application">
+      <div class="application-preview-notice" id="application-preview-notice" hidden>
+        <strong>Application Preview</strong>
+        <p>This is the current application. Select any step below—no answers are required. You can explore the fields, but nothing is saved or sent. Uploads and submission are disabled.</p>
+      </div>
       <ol class="application-steps" aria-label="Application progress">
         <li class="is-active"><button type="button" aria-current="step"><span>1</span><b>Basics</b></button></li>
         <li><button type="button"><span>2</span><b>Work profile</b></button></li>
@@ -289,6 +293,12 @@
 
         <section class="form-step" data-step="4">
           <div class="step-heading"><p class="eyebrow">Step 4 of 4</p><h2>Review and submit</h2><p>Use Back or select any completed step above to review your answers. Your information will stay in place.</p></div>
+          <section class="application-references" aria-labelledby="application-references-heading">
+            <div class="application-references-heading"><h3 id="application-references-heading">References <small>Optional · Up to 3</small></h3><p>Business references, such as a previous supervisor or manager, are preferred to help verify your employment and skills. If you do not have work experience, you may list a mentor, teacher, or another character reference.</p><p>You can skip this section. Every reference field is optional; please share the details you have and let your references know we may contact them.</p></div>
+            <div id="application-reference-list"></div>
+            <button type="button" class="button button-secondary" id="add-application-reference">+ Add Reference</button>
+            <div class="consent-list" id="reference-contact-permission" hidden><label><input name="referenceContactConsent" type="checkbox"> I give The Soro Group permission to contact the references I have provided to verify my employment, skills, or character.</label><small>Required only when you provide reference details. Reference contact details stay private with The Soro Group.</small></div>
+          </section>
           <div class="field-grid">
             <label class="field field-wide">How did you hear about Soro? <input name="referralSource" spellcheck="true" placeholder="Referral, social media, job board, etc."></label>
           </div>
@@ -309,6 +319,6 @@
   </main>
   <footer class="application-footer">© <span id="current-year"></span> Soro Group. Your application details are private.</footer>
   <script src="vendor/qrcode-generator.js?v=2.0.4-soro-20260822"></script>
-  <script src="application.js?v=20260822-identity-preferences1"></script>
+  <script src="application.js?v=20260914-preview"></script>
 </body>
 </html>

@@ -625,6 +625,15 @@ function publicAttempt(value) {
   };
 }
 
+function publicApplicationReferences(value) {
+  if (value == null) return null;
+  if (!Array.isArray(value.items) || typeof value.contactConsent !== 'boolean') throw httpError(502, 'verification_service_error', 'Invalid application reference permission.');
+  let items;
+  try { items = require('./lib/application-references').normalizeApplicationReferences(value.items, { validateEmail: true }); }
+  catch { throw httpError(502, 'verification_service_error', 'Invalid application references.'); }
+  return { items, contactConsent: value.contactConsent, submittedAt: requiredTimestamp(value.submittedAt) };
+}
+
 function publicReference(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || !Array.isArray(value.attempts) || value.attempts.length > MAX_ATTEMPTS) {
     throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid response.');
@@ -743,7 +752,8 @@ function publicPayload(value) {
       id: requiredUuid(interviewer.id),
       name: requiredText(interviewer.name, 180)
     })),
-    references: value.references.map(publicReference)
+    references: value.references.map(publicReference),
+    applicationReferences: publicApplicationReferences(value.applicationReferences)
   };
 }
 

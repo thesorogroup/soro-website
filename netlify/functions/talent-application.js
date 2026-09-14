@@ -6,6 +6,7 @@
  * and writes the final application only after the mandatory checklist passes.
  */
 const crypto = require('node:crypto');
+const { normalizeApplicationReferences, validateReferenceConsent } = require('./lib/application-references');
 const {renderEmail} = require('./lib/branded-email');
 const {TALENT_EMAIL, APPLICATION_CONFIRMATION_FROM, applicationConfirmationEmail} = require('./lib/application-confirmation-email');
 
@@ -22,7 +23,7 @@ const BUCKET = 'soro-private-documents';
 const MAX_FILE_BYTES = 95 * 1024 * 1024;
 const MOBILE_UPLOAD_TOKEN_TTL_MS = 2 * 60 * 60 * 1000;
 const MOBILE_UPLOAD_SIGNING_KEY = (process.env.MOBILE_UPLOAD_SECRET || SERVICE_KEY).trim();
-const FORM_VERSION = '2026-08-v3';
+const FORM_VERSION = '2026-09-v4-references';
 const REQUIRED_DOCUMENTS = ['resume', 'english_proof', 'disc_assessment', 'enneagram_assessment', 'mbti_assessment', 'internet_proof', 'equipment_proof'];
 const DOCUMENT_TYPES = new Set([...REQUIRED_DOCUMENTS, 'introduction_video']);
 const DOCUMENT_FILE_RULES = {
@@ -101,7 +102,7 @@ function compactFormValue(value) {
   return cleanText(value);
 }
 function compactFormData(data) {
-  return Object.fromEntries(Object.entries(data || {}).slice(0, 200).map(([key, value]) => [cleanText(key, 80), compactFormValue(value)]).filter(([key]) => key));
+  return Object.fromEntries(Object.entries(data || {}).slice(0, 200).map(([key, value]) => [cleanText(key, 80), key === 'references' ? normalizeApplicationReferences(value) : compactFormValue(value)]).filter(([key]) => key));
 }
 function isBirthDateAlias(key) {
   const normalized = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -536,6 +537,7 @@ exports.handler = async (event) => {
     const draft = await findDraft(request.resumeToken);
     if (!draft || draft.completed_at) return json(404, { error: 'Your saved application session is no longer available. Please use your saved link or start again.' });
     const data = compactFormData({ ...(draft.form_data || {}), ...(request.data || {}) });
+    data.references = validateReferenceConsent(data);
     const validation = validateApplication(data);
     const missing = [...validation.errors];
     if (!data.confirmAccurate || !data.confirmPrivacy || !data.confirmContact) missing.push('required acknowledgements');
@@ -649,9 +651,10 @@ exports.handler = async (event) => {
         : 'Your application has been received. Soro Talent Management will contact you if a next step is needed.'
     });
   } catch (error) {
+    if (error.statusCode === 400) return json(400, { error: error.message });
     console.error('Native talent application error', error);
     return json(500, { error: error.message || 'Soro could not save this application. Please try again.' });
   }
 };
 
-exports._test = Object.freeze({ isBirthDateAlias, sanitizeRawSubmission });
+exports._test = Object.freeze({ isBirthDateAlias, sanitizeRawSubmission, compactFormData });

@@ -20,10 +20,11 @@ test('review action row shares a flexible height without changing dropdown actio
   assert.match(css,/\.talent-review-action-divider \{ align-self: center/);
   assert.match(css,/\.talent-review-secondary\[open\] > summary::after/);
   assert.match(css,/@media \(max-width: 430px\)[\s\S]*\.talent-review-verification \{ flex: 1 1 100%; \}/);
-  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260914-core-profile/);
+  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260914-references/);
 });
 
 const APPLICANT_KEYS = Object.freeze([
+  'hasNativeSubmission',
   'applicantId', 'fullName', 'preferredName', 'email', 'applicationReceivedAt',
   'updatedAt', 'stage', 'archived', 'owner', 'resume', 'checklist', 'allowedActions'
 ]);
@@ -77,16 +78,15 @@ test('recorded results display separately from source completion and refresh aft
   const target = {innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
   ui.mount(target); await new Promise(resolve=>setImmediate(resolve));
   ui.setSearch('Mariel'); ui.setSort('oldest');
-  assert.match(target.innerHTML,/File Received/);
-  assert.match(target.innerHTML,/Awaiting Result/);
+  assert.match(target.innerHTML,/File on Record/);
+  assert.match(target.innerHTML,/Result Not Recorded/);
   recorded = true;
   listeners.get('soro:talent-screening-updated')();
   await new Promise(resolve=>setImmediate(resolve));
   assert.equal(calls.length,2);
   assert.match(target.innerHTML,/Check File Category/);
-  assert.match(target.innerHTML,/2 of 3 Results Recorded/);
-  assert.match(target.innerHTML,/2 of 3 Items Received/);
-  assert.equal((target.innerHTML.match(/talent-review-progress-item is-recorded/g)||[]).length,2);
+  assert.match(target.innerHTML,/talent-review-recorded-detail[^>]*>Result Recorded/);
+  assert.equal((target.innerHTML.match(/talent-review-progress-item is-recorded/g)||[]).length,1);
   assert.match(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
   assert.match(target.innerHTML,/value="Mariel"/);
   assert.match(target.innerHTML,/<option value="oldest" selected>/);
@@ -123,20 +123,36 @@ test('received submissions never turn staff review green; recorded results and v
   const {ui,listeners} = installUi(t,{responsePayload:()=>queuePayload('admin',[applicant({checklist:checklist()})])});
   const target = {innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(selector){return selector.startsWith('[data-review-submission=') ? {open:submissionOpen} : null;}};
   ui.mount(target); await new Promise(resolve=>setImmediate(resolve));
-  assert.match(target.innerHTML,/9 of 9 Items Received/);
-  assert.match(target.innerHTML,/0 of 6 Results Recorded · 0 Skills Verified/);
-  assert.equal((target.innerHTML.match(/Awaiting Result/g)||[]).length,6);
-  assert.doesNotMatch(target.innerHTML,/talent-review-progress-item is-recorded|9 of 9 complete/);
+  assert.equal((target.innerHTML.match(/Result Not Recorded/g)||[]).length,6);
+  assert.equal((target.innerHTML.match(/talent-review-progress-item is-received/g)||[]).length,7);
+  assert.equal((target.innerHTML.match(/talent-review-progress-item is-recorded/g)||[]).length,2,'only Core Profile and Resume are complete');
   saved = true;
   submissionOpen = true;
   ui.setSearch('Mariel'); ui.setSort('oldest');
   listeners.get('soro:talent-skills-updated')();
   await new Promise(resolve=>setImmediate(resolve));
-  assert.match(target.innerHTML,/2 of 6 Results Recorded · 3 Skills Verified/);
-  assert.equal((target.innerHTML.match(/talent-review-progress-item is-recorded/g)||[]).length,3);
+  assert.match(target.innerHTML,/3 Skills Verified/);
+  assert.equal((target.innerHTML.match(/talent-review-progress-item is-recorded/g)||[]).length,5);
   assert.match(target.innerHTML,/value="Mariel"/);
   assert.match(target.innerHTML,/<option value="oldest" selected>/);
-  assert.match(target.innerHTML,new RegExp(`data-review-submission="${applicantId}" open`));
+  assert.doesNotMatch(target.innerHTML,/data-review-submission=/,'no duplicate submission section');
+});
+
+test('receipt detail is compact for required native uploads and explicit for legacy or missing files', async t => {
+  let native = true, missing = false;
+  const {ui} = installUi(t,{responsePayload:()=>queuePayload('admin',[applicant({stage:'in_review',hasNativeSubmission:native,checklist:[
+    {key:'english',label:'English',state:missing?'missing':'complete',resultRecorded:false,evidenceState:missing?'missing':'available'}
+  ]})])});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(resolve=>setImmediate(resolve));
+  assert.match(target.innerHTML,/Result Not Recorded/);
+  assert.doesNotMatch(target.innerHTML,/File on Record/,'do not repeat normal mandatory receipt detail');
+  assert.match(target.innerHTML,/Schedule \/ Record Interview/);
+  native=false;await ui.refresh();
+  assert.match(target.innerHTML,/File on Record/);
+  native=true;missing=true;await ui.refresh();
+  assert.match(target.innerHTML,/No File on Record/,'source exceptions remain visible even for native submissions');
+  assert.throws(()=>ui.normalizePayload(queuePayload('admin',[applicant({hasNativeSubmission:'true'})]),'admin'),/invalid applicant/);
 });
 
 test('older payloads display unknown review state rather than inferring completion from uploads', async t => {
@@ -797,6 +813,46 @@ test('leaving the queue during its first load leaves retryable state rather than
 
 const requirementKeys = ['core_profile','resume','english','disc','enneagram','mbti','internet','equipment','skills','interview','references'];
 const deferralRecord = {id:requestId,reason:'Confirm during onboarding.',createdAt:updatedAt,createdByName:'Jordan Reed',dueDate:null,taskId:null};
+
+test('one checklist shows every Bench Ready blocker on first load and refreshes without hidden dialog gates', async t => {
+  let addressed=false;
+  const checklist=()=>requirementKeys.slice(0,9).map(key=>({key,label:key,state:key==='skills'?'missing':'complete',...(key==='skills'?{deferral:deferralRecord,verifiedSkillsCount:0}:{}),...(['english','disc','enneagram','mbti','internet','equipment'].includes(key)?{resultRecorded:true,evidenceState:'available'}:{})}));
+  const readiness=()=>requirementKeys.map(key=>({key,status:key==='skills'?'deferred':['interview','references'].includes(key)?addressed?'complete':'pending':'complete'}));
+  const {ui,calls}=installUi(t,{responsePayload:()=>queuePayload('admin',[applicant({stage:'in_review',checklist:checklist(),readiness:readiness(),allowedActions:['mark_bench_ready']})])});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(setImmediate);
+  assert.equal(calls.length,1,'one request contains all requirement statuses');
+  assert.match(target.innerHTML,/2 Remaining/);assert.match(target.innerHTML,/1 Verify Later/);
+  assert.match(target.innerHTML,/Still needed: Interview, References/);
+  assert.equal((target.innerHTML.match(/data-review-progress=/g)||[]).length,11);
+  assert.doesNotMatch(target.innerHTML,/Applicant Submission|Team Review|class="talent-review-readiness"/);
+  assert.match(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
+  addressed=true;await ui.refresh({silent:true});
+  assert.match(target.innerHTML,/Ready for Bench/);
+  assert.doesNotMatch(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
+  addressed=false;await ui.refresh({silent:true});
+  assert.match(target.innerHTML,/2 Remaining/);
+  assert.match(target.innerHTML,/data-review-action="mark_bench_ready" disabled/,'fresh queue replaces previously eligible cache even when timestamp is unchanged');
+});
+
+test('selecting a checklist item opens only that requirement with its direct next action',async t=>{
+  const {ui}=installUi(t,{responsePayload:call=>call.url.includes('talent-review-deferrals')?requirementsPayload():queuePayload('admin',[applicant({stage:'in_review'})])});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(setImmediate);ui.openRequirements(applicantId,'interview');await new Promise(setImmediate);
+  const dialog=target.innerHTML.slice(target.innerHTML.indexOf('<dialog'));
+  assert.match(dialog,/>Interview<\/h2>/);assert.match(dialog,/Record or Schedule Interview/);
+  assert.equal((dialog.match(/data-requirement-form=/g)||[]).length,1);
+  assert.match(dialog,/data-requirement-form="interview"/);
+  assert.doesNotMatch(dialog,/Employment references|data-requirement-form="skills"/);
+});
+
+test('readiness snapshots reject missing, duplicate, invalid and contradictory states',t=>{
+  const {ui}=installUi(t);
+  const readiness=requirementKeys.map(key=>({key,status:key==='resume'?'pending':'complete',privateNote:'PRIVATE'}));
+  const row=applicant({readiness});
+  assert.doesNotMatch(JSON.stringify(ui.normalizePayload(queuePayload('admin',[row]),'admin')),/PRIVATE/);
+  for(const bad of [[],readiness.slice(1),[readiness[0],...readiness.slice(0,-1)],readiness.map(i=>({...i,status:'invented'})),readiness.map(i=>({...i,status:'complete'}))])assert.throws(()=>ui.normalizePayload(queuePayload('admin',[{...row,readiness:bad}]),'admin'),/invalid applicant/);
+});
 test('recorded assessment stays green while missing-file follow-up remains separate', async t => {
   const checklist=[
     {key:'english',label:'English assessment',state:'needs_review',resultRecorded:true,evidenceState:'missing',deferral:deferralRecord},
@@ -806,13 +862,11 @@ test('recorded assessment stays green while missing-file follow-up remains separ
   const {ui}=installUi(t,{responsePayload:queuePayload('admin',[applicant({stage:'in_review',checklist,allowedActions:['mark_bench_ready']})])});
   const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
   ui.mount(target);await new Promise(setImmediate);
-  const english=target.innerHTML.match(/<li class="talent-review-progress-item is-recorded" data-review-progress="english">([\s\S]*?)<\/li>/)?.[1];
-  assert.ok(english);assert.match(english,/Verified · Result Recorded/);assert.match(english,/File Missing/);assert.match(english,/Source File Deferred/);
-  assert.ok(english.indexOf('Verified · Result Recorded')<english.indexOf('File Missing'));
-  assert.match(target.innerHTML,/is-recorded" data-review-progress="disc"/);
+  const english=target.innerHTML.match(/<li class="talent-review-progress-item is-deferred" data-review-progress="english">([\s\S]*?)<\/li>/)?.[1];
+  assert.ok(english);assert.match(english,/talent-review-recorded-detail[^>]*>Result Recorded/);assert.match(english,/Verify Later/);
+  assert.match(target.innerHTML,/is-pending" data-review-progress="disc"/);
   assert.match(target.innerHTML,/is-deferred" data-review-progress="mbti"/);
-  assert.match(target.innerHTML,/0 of 3 Items Received/);
-  assert.match(target.innerHTML,/2 of 3 Results Recorded/);
+  assert.equal((target.innerHTML.match(/class="talent-review-recorded-detail"/g)||[]).length,2);
   assert.match(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
 });
 test('queue embeds the shared full-catalog picker without changing applicant reports',()=>{
@@ -862,11 +916,11 @@ test('Review Requirements starts only after Start Review and renders per-item de
   assert.equal(ui.openRequirements(applicantId),false);
   assert.doesNotMatch(target.innerHTML,/data-review-requirements=/);
   stage='in_review';await ui.refresh();
-  assert.match(target.innerHTML,/Review Requirements/);
+  assert.match(target.innerHTML,/data-review-requirements=/);
   assert.equal(ui.openRequirements(applicantId),true);await new Promise(setImmediate);
   assert.equal(calls.at(-1).url,`/.netlify/functions/talent-review-deferrals?applicantId=${applicantId}`);
   assert.equal((target.innerHTML.match(/data-requirement-form=/g)||[]).length,11);
-  assert.match(target.innerHTML,/does not change the review stage/);
+  assert.match(target.innerHTML,/without marking it complete/);
   assert.match(target.innerHTML,/assigned to me/);
   assert.doesNotMatch(target.innerHTML,/talent-requirement-row is-complete/);
 });
@@ -887,11 +941,12 @@ test('individual deferrals permit Bench Ready without increasing received or ver
   ui.openRequirements(applicantId);await new Promise(setImmediate);
   for(const itemKey of requirementKeys) await ui.changeRequirement({applicantId,itemKey,action:'defer',reason:'Confirm during onboarding.',createTask:false});
   ui.closeRequirements();
-  assert.match(target.innerHTML,/0 of 9 Items Received/);
-  assert.match(target.innerHTML,/0 of 6 Results Recorded · 0 Skills Verified/);
+  assert.match(target.innerHTML,/Ready for Bench/);
+  assert.match(target.innerHTML,/11 Verify Later/);
+  assert.match(target.innerHTML,/No Skills Verified/);
   assert.doesNotMatch(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
   assert.doesNotMatch(target.innerHTML,/talent-review-progress-item is-recorded/);
-  assert.match(target.innerHTML,/talent-review-deferral-badge/);
+  assert.match(target.innerHTML,/is-deferred/);
   assert.equal(ui.currentQueue().applicants[0].stage,'in_review');
   const posted=JSON.parse(calls.find(call=>call.options.method==='POST').options.body);
   assert.deepEqual(Object.keys(posted).sort(),['requestId','applicantId','expectedUpdatedAt','itemKey','action','reason','dueDate','createTask'].sort());
@@ -927,4 +982,36 @@ test('restoring an unresolved Bench Ready requirement warns about In Review and 
   assert.match(target.innerHTML,/Reason for restoring/);
   assert.match(target.innerHTML,/data-requirement-open-task=/);
   assert.match(target.innerHTML,/Restore Requirement/);
+});
+
+test('a saved restore replaces cached readiness even when its follow-up request fails', async t => {
+  let restored=false;
+  const row=()=>applicant({stage:'in_review',allowedActions:['mark_bench_ready'],
+    checklist:requirementKeys.slice(0,9).map(key=>({key,label:key,state:key==='skills'?'missing':'complete',...(key==='skills'?{deferral:deferralRecord}: {})})),
+    readiness:requirementKeys.map(key=>({key,status:key==='skills'?'deferred':key==='interview'&&restored?'pending':'complete'}))});
+  const items=requirementKeys.map(key=>({key,label:key,status:key==='skills'?'deferred':'complete',deferral:key==='skills'?deferralRecord:null}));
+  // Initially Interview is deferred as well, so all eleven requirements are addressed.
+  items.find(item=>item.key==='interview').status='deferred';
+  items.find(item=>item.key==='interview').deferral=deferralRecord;
+  const {ui}=installUi(t,{responsePayload:call=>{
+    if(call.url.includes('talent-review-deferrals')) {
+      if(call.options.method==='POST'){restored=true;return queuePayload('admin',[row()]);}
+      if(restored)throw new Error('Follow-up reload failed');
+      return requirementsPayload({items});
+    }
+    const initial=row();initial.readiness.find(item=>item.key==='interview').status='deferred';
+    return queuePayload('admin',[initial]);
+  }});
+  let focusSelector='';
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(selector){return selector.startsWith('[data-review-requirements=')?{focus(options){focusSelector=selector;assert.equal(options.preventScroll,true);}}:null;}};
+  ui.mount(target);await new Promise(setImmediate);
+  assert.match(target.innerHTML,/Ready for Bench/);
+  ui.openRequirements(applicantId,'interview');await new Promise(setImmediate);
+  await assert.rejects(()=>ui.changeRequirement({applicantId,itemKey:'interview',action:'restore',reason:'Record the actual outcome.',createTask:false}),/Follow-up reload failed/);
+  ui.closeRequirements();
+  assert.match(target.innerHTML,/1 Remaining/);
+  assert.match(target.innerHTML,/Still needed: Interview/);
+  assert.match(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
+  assert.doesNotMatch(target.innerHTML,/Ready for Bench/);
+  assert.equal(focusSelector,`[data-review-requirements="${applicantId}"][data-review-item="interview"]`);
 });

@@ -22,6 +22,8 @@
     for(const a of store.applicants)Object.assign(a,{relevant_experience_years:a.experience_years,relevant_experience_summary:a.experience_summary,education_training_summary:'Business administration coursework and virtual assistance training.',self_reported_experience_areas:a.work_areas.slice(),availability_note:'Full time · Monday–Friday',address_line_1:'100 Sample Street',city:'Cebu City',province_state:'Cebu',postal_code:'6000',portal_access_status:a.auth_user_id?'active':'not_activated'});
     store.documents=[];store.uploads=[];store.reviewDeferrals={};store.reviewDeferralRequests={};store.reviewDeferralTaskIds={};store.taskNotifications=[];
     store.classificationRequests={};store.classificationAudit=[];
+    store.references=[];store.referenceRequests={};
+    store.applicationReferences={items:[{name:'Alex Example',relationship:'Previous Supervisor',email:'reference@example.test',phone:'555 0100'}],contactConsent:true,submittedAt:now()};
     // A private fictional legacy file makes classification reviewable without live data.
     store.documents.push({id:id(80),applicant_id:id(11),organization_id:id(90),file_name:'Sample personality assessment.svg',document_type:'assessment',status:'uploaded',storage_path:'samples/'+id(11)+'/personality-assessment.svg',external_url:null,created_at:now(),updated_at:now()});
     const sampleAssessmentUrl='data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="500"><rect width="600" height="500" fill="#f3f7fc"/><text x="40" y="65" font-family="sans-serif" font-size="22" fill="#12385c">FICTIONAL TEST FILE</text><text x="40" y="130" font-family="sans-serif" font-size="28" fill="#12385c">DISC Assessment</text><text x="40" y="190" font-family="sans-serif" font-size="20" fill="#12385c">Sample Talent: Riley Santos</text><text x="40" y="250" font-family="sans-serif" font-size="20" fill="#12385c">D: 24   I: 31   S: 27   C: 18</text><text x="40" y="335" font-family="sans-serif" font-size="16" fill="#486780">For testing file classification only.</text><text x="40" y="365" font-family="sans-serif" font-size="16" fill="#486780">Not a real assessment or score record.</text></svg>');
@@ -60,7 +62,7 @@
   for(const method of ['replaceState','pushState'])w.history[method]=(state,title,url)=>{routeState=state;const hash=String(url||'').includes('#')?'#'+String(url).split('#').slice(1).join('#'):'';nativeReplace(state,title,'about:srcdoc'+hash);};
   try{Object.defineProperty(w.history,'state',{get:()=>routeState});}catch{}
   function dashboard(){return{generatedAt:now(),viewerRole:personas[selected].role,companyName:store.companyName,contactName:store.contactName,salesContact:{name:'Jordan Lee',email:'jordan@example.test',phone:''},requests:[{requestId:id(20),roleTitle:'General Virtual Assistant',status:'filled',targetStartDate:day(),seatCount:1,candidateCount:0,pendingReviewCount:0,pendingDecisionCount:0,placementCount:1,activePlacementCount:1,onboardingCount:0}],interviews:[],talent:[{placementId:id(21),applicantId:id(10),fullName:'Jamie Cruz',preferredName:'Jamie',roleTitle:'General Virtual Assistant',status:'active',startDate:day(),scheduleSummary:'Monday–Friday · 9 AM–5 PM Philippine Time'}]};}
-  function queue(){
+  function queue(skipReadiness=false){
     const a=store.applicants[1],keys=['core_profile','resume','english','disc','enneagram','mbti','internet','equipment','skills'],labels=['Core profile','Resume','English assessment','DISC assessment','Enneagram assessment','Four-letter personality assessment','Internet speed proof','Computer specifications','Skills'];
     const personality=w.soroScreeningPresentation?.parsePersonalityResults(a.personality_profile_score)||{};
     const values={english:a.english_test_result,disc:personality.disc,enneagram:personality.enneagram,mbti:personality.mbti,internet:a.internet_speed,equipment:a.computer_specs};
@@ -76,10 +78,10 @@
       if(state==='complete')delete store.reviewDeferrals[key];
       return{key,label:labels[i],state,...(i>=2&&i<=7?{resultRecorded:Boolean(values[key]),evidenceState:fileAvailable?'available':unclassified?'unclassified_available':'missing'}:{}),...(key==='skills'?{verifiedSkillsCount:a.verified_skills.length}:{}),...(deferral?{deferral:clone(deferral)}:{})};
     });
-    return{generatedAt:now(),viewerRole:personas[selected].role,summary:{all:1,submitted:store.stage==='submitted'?1:0,in_review:store.stage==='in_review'?1:0,needs_more_info:store.stage==='needs_more_info'?1:0,bench_ready:store.stage==='bench_ready'?1:0,closed:0},applicants:[{applicantId:a.id,fullName:a.full_name,email:a.email,applicationReceivedAt:a.application_received_at,updatedAt:a.updated_at,stage:store.stage,archived:false,owner:{id:id(2),name:'Taylor Morgan'},resume:{available:false,label:'No sample résumé'},checklist,allowedActions:store.stage==='submitted'?['begin_review']:store.stage==='bench_ready'?['return_to_review']:['request_more_info','mark_bench_ready']}]};
+    return{generatedAt:now(),viewerRole:personas[selected].role,summary:{all:1,submitted:store.stage==='submitted'?1:0,in_review:store.stage==='in_review'?1:0,needs_more_info:store.stage==='needs_more_info'?1:0,bench_ready:store.stage==='bench_ready'?1:0,closed:0},applicants:[{applicantId:a.id,fullName:a.full_name,email:a.email,applicationReceivedAt:a.application_received_at,updatedAt:a.updated_at,stage:store.stage,archived:false,owner:{id:id(2),name:'Taylor Morgan'},resume:{available:false,label:'No sample résumé'},checklist,...(skipReadiness?{}:{readiness:reviewRequirements().items.map(({key,status})=>({key,status}))}),allowedActions:store.stage==='submitted'?['begin_review']:store.stage==='bench_ready'?['return_to_review']:['request_more_info','mark_bench_ready']}]};
   }
   function reviewRequirements(){
-    const a=queue().applicants[0];
+    const a=queue(true).applicants[0];
     if(interviewAddressed())delete store.reviewDeferrals.interview;
     return{applicantId:a.applicantId,updatedAt:a.updatedAt,items:[...a.checklist.map(item=>({key:item.key,label:item.label,status:item.deferral?'deferred':item.state==='complete'?'complete':'pending',deferral:item.deferral||null})),...['interview','references'].map(key=>({key,label:key==='interview'?'Interview':'Employment references',status:key==='interview'&&interviewAddressed()?'complete':store.reviewDeferrals[key]?'deferred':'pending',deferral:store.reviewDeferrals[key]||null}))]};
   }
@@ -88,7 +90,18 @@
     const items=reviewRequirements().items.filter(i=>['interview','references'].includes(i.key));
     return{interviewAddressed:interviewAddressed(),referencesAddressed:false,benchReadyEligible:items.every(i=>i.status!=='pending'),blockers:items.filter(i=>i.status==='pending').map(i=>i.label+' must be addressed'),deferrals:{interview:store.reviewDeferrals.interview||null,references:store.reviewDeferrals.references||null}};
   }
-  function verification(){return{generatedAt:now(),viewerRole:personas[selected].role,applicant:queue().applicants[0],gate:reviewGate(),interview:clone(store.interview),interviewHistory:clone(store.interviewHistory),references:[],interviewers:[{id:id(2),name:'Taylor Morgan'}],availableAttendees:[{id:id(3),name:'Jordan Lee'}],calendarIntegration:{configured:false,organizerLabel:'Disabled in Test Mode'}};}
+  function verification(){return{generatedAt:now(),viewerRole:personas[selected].role,applicant:queue().applicants[0],gate:reviewGate(),interview:clone(store.interview),interviewHistory:clone(store.interviewHistory),references:clone(store.references),applicationReferences:clone(store.applicationReferences),interviewers:[{id:id(2),name:'Taylor Morgan'}],availableAttendees:[{id:id(3),name:'Jordan Lee'}],calendarIntegration:{configured:false,organizerLabel:'Disabled in Test Mode'}};}
+  function saveSampleReference(body){
+    if(!['in_review','needs_more_info'].includes(store.stage)||body.action!=='save_reference'||!body.name?.trim()||!body.requestId)return null;
+    if(store.referenceRequests[body.requestId])return store.referenceRequests[body.requestId]===JSON.stringify(body)?verification():null;
+    const current=store.references.find(item=>item.referenceId===body.referenceId);
+    if(body.referenceId&&(!current||current.updatedAt!==body.expectedUpdatedAt)||!body.referenceId&&store.references.length>=20)return null;
+    const reference={referenceId:current?.referenceId||crypto.randomUUID(),name:body.name.trim(),company:body.company||'',relationship:body.relationship||'',email:body.email||'',phone:body.phone||'',outcome:'pending',outcomeNote:'',attempts:current?.attempts||[],updatedAt:now()};
+    if(current)store.references[store.references.indexOf(current)]=reference;else store.references.push(reference);
+    store.referenceRequests[body.requestId]=JSON.stringify(body);
+    notice('Sample reference saved for verification. No email or phone contact was made.');
+    return verification();
+  }
   function recordPreviousInterview(body){
     const keys=['action','requestId','applicantId','expectedUpdatedAt','interviewId','occurredOn','interviewerName','outcome','communicationScore','preparednessScore','roleFitScore','overallScore','note'];
     const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -295,7 +308,7 @@
     }
     else if(name==='talent-verification'){
       if(selected!=='talent'||!['admin','talent_management'].includes(personas[selected].role)||(method==='GET'?u.searchParams.get('applicantId'):body.applicantId)!==id(11))return new Response(JSON.stringify({message:'This sample interview is unavailable.'}),{status:403});
-      result=method==='GET'?verification():method==='POST'?recordPreviousInterview(body):null;
+      result=method==='GET'?verification():method==='POST'?(body.action==='save_reference'?saveSampleReference(body):recordPreviousInterview(body)):null;
       if(!result)return new Response(JSON.stringify({message:'This interview changed or required details are missing. Existing scheduled interviews cannot be overwritten. Refresh and check the fields.'}),{status:409});
     }
     else if(name==='talent-review-queue'&&method==='POST'&&body.action==='begin_review'&&selected==='talent'){store.stage='in_review';store.applicants[1].updated_at=now();result=queue();}

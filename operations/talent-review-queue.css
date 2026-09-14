@@ -1,4 +1,8 @@
 .talent-review-page { max-width: 1320px; }
+.talent-verification-submitted-references { padding: 18px; border: 1px solid #cadce9; border-radius: 14px; background: #f3f8fc; margin-bottom: 20px; }
+.talent-verification-submitted-references > h4 { margin: 0 0 8px; color: #0c2b51; }
+.talent-verification-submitted-references > p { color: #516980; font-size: 13px; line-height: 1.6; }
+.talent-verification-submitted-references .button { margin-top: 14px; }
 
 .talent-review-page-heading { align-items: center; }
 .talent-review-page-heading h1 { margin-bottom: 8px; }
@@ -187,10 +191,25 @@
 
 .talent-review-checklist { padding: 15px 18px; }
 .talent-review-checklist-heading { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 12px; margin-bottom: 12px; color: #53677e; font-size: 12px; }
-.talent-review-checklist-heading strong { color: var(--navy); font-size: 13px; }
+.talent-review-checklist-heading strong { color: var(--navy); font-size: 14px; }
 .talent-review-checklist ul { margin: 0; padding: 0; list-style: none; }
-.talent-review-progress { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 210px), 1fr)); gap: 8px; }
-.talent-review-progress-item { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; min-width: 0; padding: 12px; border: 1px solid #e7dfce; border-radius: 8px; background: #fffcf5; }
+.talent-review-progress { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 170px), 1fr)); gap: 8px; }
+.talent-review-progress-item { display: flex; min-width: 0; padding: 0; border: 1px solid #dbe4ee; border-radius: 9px; background: #fff; }
+.talent-review-requirement-target { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; width: 100%; min-height: 74px; padding: 11px 12px; border: 0; border-radius: inherit; background: transparent; color: var(--navy); font: inherit; text-align: left; }
+button.talent-review-requirement-target { cursor: pointer; }
+button.talent-review-requirement-target:hover { background: rgba(12,42,79,.045); box-shadow: inset 0 0 0 1px #7c9ebd; }
+button.talent-review-requirement-target:focus-visible { outline: 2px solid #2477b7; outline-offset: 2px; }
+.talent-review-requirement-target strong { font-size: 14px; line-height: 1.4; overflow-wrap: anywhere; }
+.talent-review-requirement-target small { color: #53677e; font-size: 12px; line-height: 1.4; }
+.talent-review-requirement-target .talent-review-recorded-detail { color: #17634f; background: #e4f5ec; border-radius: 4px; padding: 2px 5px; }
+.talent-review-progress-item.is-received { background: #eef6ff; border-color: #c7dbef; }
+.is-received .talent-review-progress-status { color: #245d91; }
+.talent-review-next-step { margin: -2px 0 13px; color: #53677e; font-size: 14px; line-height: 1.5; }
+.talent-review-completion { color: #85520d; font-size: 14px; font-weight: 700; }
+.talent-review-completion.is-ready { color: #17634f; }
+.talent-review-completion small { font-size: 13px; font-weight: 500; color: #6b5734; }
+.talent-requirement-next { margin: 12px 0 4px; }
+.talent-requirement-guidance { color: #53677e; font-size: 14px; line-height: 1.5; }
 .talent-review-progress-item > strong { color: var(--navy); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
 .talent-review-progress-item.is-recorded { background: #f0faf6; border-color: #cce7dc; }
 .talent-review-receipt { font-size: 11px; line-height: 1.4; }
