@@ -9,7 +9,7 @@ test('application preview is a separate current-live link, grouped immediately a
 });
 test('application preview link follows active Admin and Talent Management workspace visibility',()=>{
   const source=read('operations/operations.js'),start=source.indexOf("  const applicationPreview=document.getElementById('application-preview-nav');"),end=source.indexOf('  const supportNav=',start),guard=source.slice(start,end);
-  const visible=(access,accessRole=access?.role,sample=false)=>{const el={hidden:true};vm.runInNewContext(guard,{document:{getElementById:()=>el},window:{SoroTestSession:sample?{}:undefined},access,accessRole});return!el.hidden;};
+  const visible=(access,accessRole=access?.role,sample=false,currentAccess)=>{const el={hidden:true};vm.runInNewContext(guard,{document:{getElementById:()=>el},window:{SoroTestSession:sample?{}:undefined,soroCurrentAccess:currentAccess},access,accessRole});return!el.hidden;};
   for(const role of ['admin','talent_management','sales','sales_management','client_admin','virtual_assistant','billing']){
     const access={user_id:'sample',role,active:true,must_change_password:false};
     assert.equal(visible(access),['admin','talent_management'].includes(role));
@@ -19,6 +19,15 @@ test('application preview link follows active Admin and Talent Management worksp
   assert.equal(visible(null),false);
   assert.equal(visible({user_id:'founder',role:'admin',is_founder:true,active:true},'talent_management'),true);
   assert.equal(visible({user_id:'founder',role:'admin',is_founder:true,active:true},'client_admin'),false);
+  const verified={user_id:'founder',role:'admin',is_founder:true,active:true},authRow={role:'admin',is_founder:true,active:true};
+  assert.equal(visible(authRow,'admin',false,verified),true,'auth rows omit the session user ID');
+  assert.equal(visible(authRow,'talent_management',false,verified),true);
+  assert.equal(visible(authRow,'admin'),false,'no verified identity must remain hidden');
+  assert.equal(visible(null,'admin',false,verified),false,'signed-out event must remain hidden');
+  assert.equal(visible({...authRow,active:false},'admin',false,verified),false);
+  assert.equal(visible({...authRow,must_change_password:true},'admin',false,verified),false);
+  assert.equal(visible(authRow,'client_admin',false,verified),false);
+  assert.equal(visible(authRow,'admin',true,verified),false);
 });
 test('Founder Test Mode exposes the preview in the parent without loosening its sandbox',()=>{
   const source=read('operations/founder-test-mode.js');
