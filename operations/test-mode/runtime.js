@@ -21,6 +21,11 @@
     store.applicants.push({...clone(store.applicants[0]),id:id(11),auth_user_id:null,full_name:'Santos, Riley',first_name:'Riley',last_name:'Santos',preferred_name:'Riley',email:'riley@example.test',phone:'',verified_skills:[]});
     for(const a of store.applicants)Object.assign(a,{relevant_experience_years:a.experience_years,relevant_experience_summary:a.experience_summary,education_training_summary:'Business administration coursework and virtual assistance training.',self_reported_experience_areas:a.work_areas.slice(),availability_note:'Full time · Monday–Friday',address_line_1:'100 Sample Street',city:'Cebu City',province_state:'Cebu',postal_code:'6000',portal_access_status:a.auth_user_id?'active':'not_activated'});
     store.documents=[];store.uploads=[];store.reviewDeferrals={};store.reviewDeferralRequests={};store.reviewDeferralTaskIds={};store.taskNotifications=[];
+    store.classificationRequests={};store.classificationAudit=[];
+    // A private fictional legacy file makes classification reviewable without live data.
+    store.documents.push({id:id(80),applicant_id:id(11),organization_id:id(90),file_name:'Sample personality assessment.svg',document_type:'assessment',status:'uploaded',storage_path:'samples/'+id(11)+'/personality-assessment.svg',external_url:null,created_at:now(),updated_at:now()});
+    const sampleAssessmentUrl='data:image/svg+xml;charset=utf-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="500"><rect width="600" height="500" fill="#f3f7fc"/><text x="40" y="65" font-family="sans-serif" font-size="22" fill="#12385c">FICTIONAL TEST FILE</text><text x="40" y="130" font-family="sans-serif" font-size="28" fill="#12385c">DISC Assessment</text><text x="40" y="190" font-family="sans-serif" font-size="20" fill="#12385c">Sample Talent: Riley Santos</text><text x="40" y="250" font-family="sans-serif" font-size="20" fill="#12385c">D: 24   I: 31   S: 27   C: 18</text><text x="40" y="335" font-family="sans-serif" font-size="16" fill="#486780">For testing file classification only.</text><text x="40" y="365" font-family="sans-serif" font-size="16" fill="#486780">Not a real assessment or score record.</text></svg>');
+    localFiles.set(store.documents[0].storage_path,{url:sampleAssessmentUrl});
     store.interview=null;store.interviewHistory=[];store.interviewRequests={};store.interviewAudit=[];
     store.clients=[{id:id(50),company:{name:store.companyName,industry:'Professional services',website:'example.test',country:'United States'},primaryContact:{name:store.contactName,title:'Owner',email:'alex@example.test',phone:''},owner:{id:id(3),name:'Jordan Lee',current:true},lifecycleStage:'active',portal:{requested:true,status:'active',email:'alex@example.test'},hiringRequests:[{id:id(20),roleTitle:'General Virtual Assistant',vaType:'General',seats:1,skills:['Calendar management','Email management'],schedule:'Monday–Friday · Philippine Time',timeZone:'Asia/Manila',targetStartDate:day(),status:'filled',progressStep:'active',candidateCount:0}],activity:[{label:'Sample account',detail:'Fictional data for Test Mode.',timestamp:now()}]}];
     store.tasks=[{id:id(30),title:'Review your sample profile',details:'Check your details and let your Soro team know if anything needs updating. This is a fictional task.',kind:'manual',version:1,progress:'not_started',status:'open',priority:'normal',dueDate:day(),createdAt:now(),updatedAt:now(),relatedLabel:'Sample Talent Profile',isUnread:true,assignees:[{id:id(4),userId:id(4),name:'Jamie Cruz'}],assignedTo:{id:id(4),name:'Jamie Cruz'},createdBy:{id:id(2),name:'Taylor Morgan'},history:[]}];
@@ -62,10 +67,14 @@
     const nonblank=value=>typeof value==='string'&&!!value.trim();
     const coreComplete=['full_name','email','phone','timezone'].every(field=>nonblank(a[field]))&&(nonblank(a.location)||nonblank(a.country)&&nonblank(a.city));
     const checklist=keys.map((key,i)=>{
-      const state=key==='resume'||key==='core_profile'&&!coreComplete?'missing':key==='skills'&&![...(a.self_reported_skills||[]),...(a.self_reported_experience_areas||[]),...(a.verified_skills||[])].some(x=>String(x).trim())?'missing':'complete';
+      const evidenceTypes={english:'english_proof',disc:'disc_assessment',enneagram:'enneagram_assessment',mbti:'mbti_assessment',internet:'internet_proof',equipment:'equipment_proof'};
+      const files=store.documents.filter(d=>d.applicant_id===a.id&&d.status!=='rejected');
+      const fileAvailable=files.some(d=>d.document_type===evidenceTypes[key]);
+      const unclassified=['disc','enneagram','mbti'].includes(key)&&files.some(d=>d.document_type==='assessment');
+      const state=i>=2&&i<=7?(fileAvailable?'complete':values[key]?'needs_review':'missing'):key==='resume'||key==='core_profile'&&!coreComplete?'missing':key==='skills'&&![...(a.self_reported_skills||[]),...(a.self_reported_experience_areas||[]),...(a.verified_skills||[])].some(x=>String(x).trim())?'missing':'complete';
       const deferral=state!=='complete'?store.reviewDeferrals[key]:null;
       if(state==='complete')delete store.reviewDeferrals[key];
-      return{key,label:labels[i],state,...(i>=2&&i<=7?{resultRecorded:Boolean(values[key]),evidenceState:'available'}:{}),...(key==='skills'?{verifiedSkillsCount:a.verified_skills.length}:{}),...(deferral?{deferral:clone(deferral)}:{})};
+      return{key,label:labels[i],state,...(i>=2&&i<=7?{resultRecorded:Boolean(values[key]),evidenceState:fileAvailable?'available':unclassified?'unclassified_available':'missing'}:{}),...(key==='skills'?{verifiedSkillsCount:a.verified_skills.length}:{}),...(deferral?{deferral:clone(deferral)}:{})};
     });
     return{generatedAt:now(),viewerRole:personas[selected].role,summary:{all:1,submitted:store.stage==='submitted'?1:0,in_review:store.stage==='in_review'?1:0,needs_more_info:store.stage==='needs_more_info'?1:0,bench_ready:store.stage==='bench_ready'?1:0,closed:0},applicants:[{applicantId:a.id,fullName:a.full_name,email:a.email,applicationReceivedAt:a.application_received_at,updatedAt:a.updated_at,stage:store.stage,archived:false,owner:{id:id(2),name:'Taylor Morgan'},resume:{available:false,label:'No sample résumé'},checklist,allowedActions:store.stage==='submitted'?['begin_review']:store.stage==='bench_ready'?['return_to_review']:['request_more_info','mark_bench_ready']}]};
   }
@@ -189,6 +198,22 @@
   async function dispatch(url,options={}){
     const u=new URL(typeof url==='string'?url:url.url,'https://test.invalid'),name=u.pathname.split('/').pop();let body={};try{body=JSON.parse(options.body||'{}');}catch{}
     const method=options.method||'GET';let result;
+    if(name==='talent-assessment-classification'){
+      if(u.origin!=='https://test.invalid'||u.pathname!=='/.netlify/functions/talent-assessment-classification'||u.search)return new Response('{}',{status:403});
+      const allowed=['assessment','english_proof','disc_assessment','enneagram_assessment','mbti_assessment'];
+      const keys=['requestId','applicantId','documentId','expectedType','expectedUpdatedAt','documentType'];
+      if(Object.keys(body).length!==keys.length||keys.some(k=>!Object.hasOwn(body,k))||!/^[-0-9a-f]{36}$/i.test(body.requestId||'')||!allowed.includes(body.expectedType))return new Response('{}',{status:400});
+      const d=store.documents.find(d=>d.id===body.documentId&&d.applicant_id===body.applicantId&&d.organization_id===id(90));
+      if(selected!=='talent'||method!=='POST'||!d||d.status==='rejected'||!allowed.includes(d.document_type)||!allowed.includes(body.documentType))return new Response(JSON.stringify({message:'This assessment cannot be classified by this sample role.'}),{status:403});
+      const fingerprint=JSON.stringify(body),previous=store.classificationRequests[body.requestId];
+      if(previous?previous!==fingerprint||d.document_type!==body.documentType:d.document_type!==body.expectedType||d.updated_at!==body.expectedUpdatedAt)return new Response(JSON.stringify({message:'This file changed. Reopen Change Assessment Type.'}),{status:409});
+      if(!previous){
+        const before=d.document_type;d.document_type=body.documentType;d.updated_at=new Date(Math.max(Date.now(),Date.parse(d.updated_at)+1)).toISOString();
+        store.classificationRequests[body.requestId]=fingerprint;store.classificationAudit.push({documentId:d.id,actorId:personas[selected].id,before,after:d.document_type});
+        notice('Sample assessment type saved. No live files were changed.');
+      }
+      return new Response(JSON.stringify({documentId:d.id,applicantId:d.applicant_id,documentType:d.document_type,updatedAt:d.updated_at}),{headers:{'Content-Type':'application/json'}});
+    }
     // This fictional upload destination never reaches a network. The live upload
     // component still performs its normal prepare / PUT / complete sequence.
     if(u.origin==='https://test.invalid'&&u.pathname.startsWith('/storage/v1/object/upload/sign/soro-private-documents/')&&method==='PUT'){

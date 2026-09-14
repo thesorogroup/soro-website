@@ -2210,6 +2210,9 @@
     // Verification dialogs refresh on close; profile editors can refresh now.
     if (canOpenForRole()) refresh({ silent: true });
   });
+  root?.addEventListener?.('soro:assessment-file-classified', () => {
+    if (canOpenForRole()) refresh({ silent: true });
+  });
   if (root?.document) {
     root.addEventListener?.('focus', refreshWhenActive);
     root.document.addEventListener?.('visibilitychange', refreshWhenActive);

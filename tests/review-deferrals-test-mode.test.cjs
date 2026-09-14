@@ -17,7 +17,8 @@ test('sample deferrals stay pending, create one private task, and do not automat
  await call(c,'talent-review-queue',{action:'mark_bench_ready',applicantId,expectedUpdatedAt:requirements.updatedAt},409);
  await call(c,'task-detail',{action:'save',taskId:item.deferral.taskId,patch:{progress:'completed'}});
  assert.equal((await call(c,'talent-review-deferrals?applicantId='+applicantId)).items.find(i=>i.key==='resume').status,'deferred');
- for(const key of ['interview','references']){requirements=await call(c,'talent-review-deferrals?applicantId='+applicantId);await call(c,'talent-review-deferrals',{...body,requestId:c.crypto.randomUUID(),expectedUpdatedAt:requirements.updatedAt,itemKey:key,dueDate:null,createTask:false});}
+ // Sample assessment receipt now reflects actual sample files, not fabricated completion.
+ for(const key of ['english','disc','enneagram','mbti','internet','equipment','interview','references']){requirements=await call(c,'talent-review-deferrals?applicantId='+applicantId);await call(c,'talent-review-deferrals',{...body,requestId:c.crypto.randomUUID(),expectedUpdatedAt:requirements.updatedAt,itemKey:key,dueDate:null,createTask:false});}
  requirements=await call(c,'talent-review-deferrals?applicantId='+applicantId);
  await call(c,'talent-review-queue',{action:'mark_bench_ready',applicantId,expectedUpdatedAt:requirements.updatedAt});assert.equal(s.store.stage,'bench_ready');
  const gate=(await call(c,'talent-verification?applicantId='+applicantId)).gate;assert.equal(gate.benchReadyEligible,true);assert.equal(gate.interviewAddressed,false);assert.equal(gate.referencesAddressed,false);

@@ -684,11 +684,24 @@
     }
     const groups = new Map();
     all.filter(d => classifyDocument(d) !== 'profile_photo').forEach(d => { const type = screeningDocumentType(d); if (!groups.has(type)) groups.set(type, []); groups.get(type).push(d); });
-    target.innerHTML = groups.size ? [...groups.entries()].map(([type, items]) => `<section class="document-group"><h3>${escapeHtml(type === 'assessment' ? 'Legacy assessments · needs classification' : documentLabels[type] || titleCase(type))}<span>${items.length}</span></h3>${items.map(d => `<article class="document-item"><span class="document-icon">${type === 'resume' ? '▤' : type === 'english_proof' ? 'A' : type === 'internet_proof' ? '⌁' : type === 'equipment_proof' ? '▣' : type === 'introduction_video' ? '▶' : '◫'}</span><span><strong>${escapeHtml(d.file_name)}</strong><small>${escapeHtml(titleCase(d.status || 'uploaded'))} · ${d.created_at ? escapeHtml(new Date(d.created_at).toLocaleDateString()) : 'Date not recorded'}</small></span>${d.storage_path ? `<button class="text-button file-view-button open-private-document" data-storage-path="${escapeHtml(d.storage_path)}">${type === 'introduction_video' ? 'Play video' : 'View file'}</button>` : '<span class="file-pending">File pending</span>'}</article>`).join('')}</section>`).join('') : '<div class="documents-empty"><strong>No documents attached yet</strong><p>Imported application files and new uploads will appear here.</p></div>';
+    const assessmentEditor = window.soroAssessmentFileEditor;
+    const fileActions = (d, type) => `<div class="assessment-file-actions">${d.storage_path ? `<button class="text-button file-view-button open-private-document" data-storage-path="${escapeHtml(d.storage_path)}">${type === 'introduction_video' ? 'Play video' : 'View file'}</button>` : '<span class="file-pending">File pending</span>'}${canManageScreeningResults() && assessmentEditor?.authorized() && assessmentEditor.eligible(d) ? `<button class="text-button" data-assessment-classify="${escapeHtml(d.id)}">Change Assessment Type</button>` : ''}</div>`;
+    target.innerHTML = groups.size ? [...groups.entries()].map(([type, items]) => `<section class="document-group"><h3>${escapeHtml(type === 'assessment' ? 'Legacy assessments · needs classification' : documentLabels[type] || titleCase(type))}<span>${items.length}</span></h3>${items.map(d => `<article class="document-item"><span class="document-icon">${type === 'resume' ? '▤' : type === 'english_proof' ? 'A' : type === 'internet_proof' ? '⌁' : type === 'equipment_proof' ? '▣' : type === 'introduction_video' ? '▶' : '◫'}</span><span><strong>${escapeHtml(d.file_name)}</strong><small>${escapeHtml(titleCase(d.status || 'uploaded'))} · ${d.created_at ? escapeHtml(new Date(d.created_at).toLocaleDateString()) : 'Date not recorded'}</small></span>${fileActions(d, type)}</article>`).join('')}</section>`).join('') : '<div class="documents-empty"><strong>No documents attached yet</strong><p>Imported application files and new uploads will appear here.</p></div>';
     renderProfileResumeLinks(all, applicant);
     renderScreeningSourceLinks(all);
     target.querySelectorAll('.open-private-document').forEach(b => b.addEventListener('click', () => openPrivateDocument(b.dataset.storagePath)));
+    target.querySelectorAll('[data-assessment-classify]').forEach(button => button.addEventListener('click', () => {
+      if (!stillCurrent() || !canManageScreeningResults()) return;
+      assessmentEditor.open(applicant.id, button.dataset.assessmentClassify, { viewFile: openPrivateDocument, afterSave: async () => {
+        if (!stillCurrent()) return;
+        const refreshed = await loadTalentProfileDocuments();
+        if (!stillCurrent()) return;
+        const message = document.createElement('p'); message.className = 'assessment-file-saved'; message.setAttribute('role', 'status');
+        message.textContent = refreshed ? 'Assessment type saved. Scores and privacy are unchanged.' : 'Assessment type saved, but the file list could not be refreshed. Reload this profile to see the latest category.'; target.prepend(message);
+      }});
+    }));
     document.querySelectorAll('.screening-source-button.open-private-document').forEach(button => button.addEventListener('click', () => openPrivateDocument(button.dataset.storagePath)));
+    return true;
   };
 
   function bindScreeningResultsEditor() {
