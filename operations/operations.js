@@ -224,6 +224,10 @@ function syncAuthorizedNavigation(access=window.soroCurrentAccess){
   document.querySelectorAll('#main-nav [data-view]').forEach(button=>{
     button.hidden=!allowed.has(button.dataset.view);
   });
+  const applicationPreview=document.getElementById('application-preview-nav');
+  // Test Mode offers this fixed public link in its parent header; the sample
+  // frame keeps all external navigation blocked.
+  if(applicationPreview)applicationPreview.hidden=Boolean(window.SoroTestSession)||!access||!access.user_id||access.active!==true||access.must_change_password===true||!['admin','talent_management'].includes(accessRole);
   const supportNav=document.getElementById('support-tickets-nav');
   // Auth events carry the access row; the verified session identity lives on soroCurrentAccess.
   if(supportNav)supportNav.hidden=!access||!(access.user_id||window.soroCurrentAccess?.user_id)||access.active===false||access.must_change_password===true||!window.SoroSupportTickets?.canReviewRole?.(accessRole);

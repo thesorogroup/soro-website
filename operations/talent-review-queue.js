@@ -593,6 +593,8 @@
 
   async function requestRequirements(applicantId, body = null) {
     if (!canOpenForRole()) throw new Error('Only Admin and Talent Management can update review requirements.');
+    applicantId = validUuid(applicantId);
+    if (!applicantId) throw new Error('This review is no longer open. Close it and select the checklist item again.');
     const scope = accessFingerprint(), version = requirementsVersion;
     const token = await sessionToken();
     checkRequestScope(scope);
@@ -645,6 +647,8 @@
   }
 
   async function loadRequirements(applicantId, itemKey = '') {
+    applicantId = validUuid(applicantId);
+    if (!applicantId || !findApplicant(applicantId) || !canOpenForRole()) return false;
     const version = ++requirementsVersion;
     requirementsContext = { applicantId, itemKey, phase: 'loading', data: null, message: '', error: false };
     render();
@@ -939,7 +943,7 @@
   }
 
   function reviewDialogOpen() {
-    return Boolean(requirementsContext || root?.soroTalentCoreProfileEditor?.isOpen?.() || root?.document?.querySelector?.('[data-review-dialog][open], [data-verification-dialog][open]'));
+    return Boolean(requirementsContext || root?.soroTalentCoreProfileEditor?.isOpen?.() || root?.soroTalentChecklistEditor?.isOpen?.() || root?.document?.querySelector?.('[data-review-dialog][open], [data-verification-dialog][open]'));
   }
 
   async function refresh(options = {}) {
@@ -1386,11 +1390,14 @@
     const applicant = findApplicant(verificationContext.applicantId);
     const name = verificationContext.data?.applicant?.fullName || applicant?.fullName || 'Talent applicant';
     const interviewMode = verificationContext.mode === 'interview';
+    const focusedMode = verificationContext.mode;
+    const deferKeys = interviewMode ? ['interview'] : focusedMode === 'references' ? ['references'] : focusedMode === 'skills' ? ['skills'] : ['skills','references'];
+    const deferActions = `<div class="talent-verification-defer-actions">${deferKeys.map(key=>`<button type="button" class="button" data-verification-defer="${key}">${REQUIREMENT_LABELS[key]} · Verify Later</button>`).join('')}</div>`;
     let content = '';
     if (verificationContext.phase === 'loading') content = `<div class="talent-verification-loading" role="status">Loading ${interviewMode ? 'interview details' : 'skills and reference verification'}…</div>`;
     else if (verificationContext.phase === 'error') content = `<div class="talent-verification-error" role="alert"><strong>Verification unavailable</strong><p>${escapeHtml(verificationContext.error)}</p><button type="button" class="button" data-verification-retry>Try again</button></div>`;
-    else if (verificationContext.data) content = `${verificationContext.status ? `<div class="talent-verification-feedback ${verificationContext.statusType === 'error' ? 'is-error' : ''}" role="status">${escapeHtml(verificationContext.status)}</div>` : ''}${interviewMode ? interviewMarkup(verificationContext.data) : `<section class="talent-verification-section"><div class="talent-verification-section-heading"><div><p class="eyebrow">Full Skill Library</p><h3>Add, edit &amp; verify skills</h3></div></div><div data-review-skills-panel>${root.soroTalentReviewEvidence?.skillsMarkup(evidence.skills) || '<p>Skill review is unavailable. Refresh the page.</p>'}</div></section>${referencesMarkup(verificationContext.data)}`}`;
-    return `<dialog class="talent-verification-dialog${interviewMode ? '' : ' has-resume'}" data-verification-dialog data-verification-owner="${escapeHtml(verificationContext.applicantId)}" data-verification-mode="${interviewMode ? 'interview' : 'verification'}" aria-labelledby="talent-verification-title"><div class="talent-verification-shell"><header class="talent-verification-header"><div><p class="eyebrow">${interviewMode ? 'Schedule / Record Interview' : 'Skills &amp; reference verification'}</p><h2 id="talent-verification-title">${escapeHtml(name)}</h2><p>${interviewMode ? 'Schedule or manage the appointment and record the interview outcome.' : 'Review the résumé alongside the reported skills and employment references.'}</p></div><button type="button" data-verification-close aria-label="Close verification">×</button></header><div class="talent-verification-workspace">${interviewMode ? '' : `<aside class="review-evidence-resume" data-review-resume-panel>${root.soroTalentReviewEvidence?.resumeMarkup(evidence.resume) || '<p>Résumé preview is unavailable.</p>'}</aside>`}<div class="talent-verification-body">${content}</div></div></div></dialog>`;
+    else if (verificationContext.data) content = `${verificationContext.status ? `<div class="talent-verification-feedback ${verificationContext.statusType === 'error' ? 'is-error' : ''}" role="status">${escapeHtml(verificationContext.status)}</div>` : ''}${deferActions}${interviewMode ? interviewMarkup(verificationContext.data) : `${focusedMode==='references'?'':`<section class="talent-verification-section"><div class="talent-verification-section-heading"><div><p class="eyebrow">Full Skill Library</p><h3>Add, edit &amp; verify skills</h3></div></div><div data-review-skills-panel>${root.soroTalentReviewEvidence?.skillsMarkup(evidence.skills) || '<p>Skill review is unavailable. Refresh the page.</p>'}</div></section>`}${focusedMode==='skills'?'':referencesMarkup(verificationContext.data)}`}`;
+    return `<dialog class="talent-verification-dialog${interviewMode ? '' : ' has-resume'}" data-verification-dialog data-verification-owner="${escapeHtml(verificationContext.applicantId)}" data-verification-mode="${escapeHtml(focusedMode)}" aria-labelledby="talent-verification-title"><div class="talent-verification-shell"><header class="talent-verification-header"><div><p class="eyebrow">${interviewMode ? 'Schedule / Record Interview' : focusedMode==='references'?'Reference Verification':focusedMode==='skills'?'Skill Verification':'Skills &amp; reference verification'}</p><h2 id="talent-verification-title">${escapeHtml(name)}</h2><p>${interviewMode ? 'Schedule or manage the appointment and record the interview outcome.' : 'Review the résumé alongside the reported skills and employment references.'}</p></div><button type="button" data-verification-close aria-label="Close verification">×</button></header><div class="talent-verification-workspace">${interviewMode ? '' : `<aside class="review-evidence-resume" data-review-resume-panel>${root.soroTalentReviewEvidence?.resumeMarkup(evidence.resume) || '<p>Résumé preview is unavailable.</p>'}</aside>`}<div class="talent-verification-body">${content}</div></div></div></dialog>`;
   }
 
   function actionDialogMarkup() {
@@ -1449,12 +1456,11 @@
     const deferral = item.deferral, restore = item.status === 'deferred';
     const title = restore ? 'Restore Requirement' : 'Verify Later';
     const key = escapeHtml(item.key);
-    const nextAction = item.key === 'interview' ? 'Record or Schedule Interview' : item.key === 'references' ? 'Review References' : item.key === 'skills' ? 'Edit & Verify Skills' : item.key === 'core_profile' ? 'Edit Core Profile' : 'Open Talent Profile';
+    const nextAction = item.key === 'interview' ? 'Record or Schedule Interview' : item.key === 'references' ? 'Review References' : item.key === 'skills' ? 'Edit & Verify Skills' : item.key === 'core_profile' ? 'Edit Core Profile' : item.key === 'resume' ? 'Review Résumé' : 'Review File & Record Result';
     return `<li class="talent-requirement-row is-${item.status}"><div class="talent-requirement-heading"><strong>${escapeHtml(item.label)}</strong><span class="talent-requirement-state">${item.status === 'complete' ? 'Requirement met' : restore ? 'Verify Later' : 'Pending'}</span></div>
       <button type="button" class="button talent-requirement-next" data-requirement-next="${key}">${nextAction}</button>
-      ${item.key === 'resume' ? '<p class="talent-requirement-guidance">Use the profile’s Documents tab to review or add the résumé.</p>' : ['english','disc','enneagram','mbti','internet','equipment'].includes(item.key) ? '<p class="talent-requirement-guidance">Record scores under Screening Results. Use Documents to review files or change their assessment type.</p>' : ''}
       ${restore ? `<div class="talent-requirement-deferral"><p>${escapeHtml(deferral.reason)}</p><small>Saved by ${escapeHtml(deferral.createdByName)} · ${escapeHtml(formatDate(deferral.createdAt))}${deferral.taskId ? ` · Follow-up task${deferral.dueDate ? ` due ${escapeHtml(deferral.dueDate)}` : ''}` : ' · No follow-up task'}</small>${deferral.taskId ? `<button type="button" class="talent-requirement-task-link" data-requirement-open-task="${deferral.taskId}">Open Task</button>` : ''}</div>` : ''}
-      ${item.status === 'complete' ? '' : `<details class="talent-requirement-edit" name="talent-requirement-editor"><summary>${title}</summary><form data-requirement-form="${key}" data-requirement-action="${restore ? 'restore' : 'defer'}">
+      ${item.status === 'complete' ? '' : `<details class="talent-requirement-edit" name="talent-requirement-editor"${requirementsContext?.itemKey===item.key?' open':''}><summary>${title}</summary><form data-requirement-form="${key}" data-requirement-action="${restore ? 'restore' : 'defer'}">
         ${restore ? `<p class="talent-requirement-warning">This item will be required again.${applicant?.stage === 'bench_ready' ? ' This Talent will return to In Review because this requirement is still pending.' : ''}${deferral.taskId ? ' The existing follow-up task will be kept with its current status.' : ''}</p>` : ''}
         <label for="requirement-reason-${key}">${restore ? 'Reason for restoring' : 'Reason for verifying later'} <span>Required</span></label><textarea id="requirement-reason-${key}" name="reason" required maxlength="500" rows="3" placeholder="Add the context the team needs to follow up."></textarea>
         ${restore ? '' : `<label class="talent-requirement-task-option"><input type="checkbox" name="createTask" data-requirement-task> Create a follow-up task assigned to me</label><label class="talent-requirement-date" data-requirement-due hidden>Task due date <input type="date" name="dueDate" disabled></label>`}
@@ -1661,7 +1667,7 @@
     evidenceVersion += 1;
     evidence = {skills:null,resume:null};
     loadVerification(applicant.applicantId, {mode});
-    if (mode !== 'interview') { loadEvidence('skills'); loadEvidence('resume'); }
+    if (mode !== 'interview') { if(mode!=='references')loadEvidence('skills'); loadEvidence('resume'); }
     return true;
   }
 
@@ -1856,6 +1862,31 @@
       const caughtUp=saved?.record&&refreshed&&(refreshed.updatedAt===saved.record.updated_at||Date.parse(refreshed.updatedAt)>Date.parse(saved.record.updated_at));
       feedback=Object.freeze(caughtUp?{type:'success',message:refreshed.checklist.find(item=>item.key==='core_profile')?.state==='complete'?'Core Profile saved — all core requirements are filled.':'Core Profile saved. Some required details are still missing.'}:{type:'error',message:'Core Profile saved, but the checklist could not be refreshed. Choose Refresh Queue to load the latest review.'});
       render();
+    }, {onVerifyLater: () => openRequirements(applicantId, 'core_profile')});
+  }
+
+  function openChecklistItem(applicantId, itemKey) {
+    const applicant=findApplicant(applicantId);
+    if(!mountedRoot||!canOpenForRole()||!applicant||!REQUIREMENT_KEYS.includes(itemKey)||applicant.stage==='submitted'||applicant.stage==='declined'||applicant.archived||pendingStageAction||pendingVerificationAction||pendingRequirementAction)return false;
+    holdReview(applicant.applicantId);
+    if(itemKey==='core_profile')return openCoreProfile(applicant.applicantId);
+    if(['skills','references','interview'].includes(itemKey))return openVerification(applicant.applicantId,itemKey);
+    const editor=root.soroTalentChecklistEditor;
+    if(!editor?.open){feedback=Object.freeze({type:'error',message:'The checklist editor is still loading. Refresh the page and try again.'});render();return false;}
+    const mounted=mountedRoot,actor=actualUserId();
+    return editor.open(applicant,itemKey,{
+      onVerifyLater:()=>openRequirements(applicant.applicantId,itemKey),
+      afterSave:async(saved)=>{
+        if(!canOpenForRole()||mountedRoot!==mounted||actualUserId()!==actor)return;
+        feedback=Object.freeze({type:'success',message:`${REQUIREMENT_LABELS[itemKey]} result saved. Refreshing the checklist…`});
+        await refresh({silent:true});
+        if(!canOpenForRole()||mountedRoot!==mounted||actualUserId()!==actor)return;
+        const refreshed=findApplicant(applicant.applicantId),item=refreshed?.checklist.find(i=>i.key===itemKey);
+        const confirmed=refreshed&&saved&&(refreshed.updatedAt===saved.updated_at||Date.parse(refreshed.updatedAt)>Date.parse(saved.updated_at))&&item?.resultRecorded;
+        feedback=Object.freeze({type:confirmed?'success':'error',message:confirmed?`${REQUIREMENT_LABELS[itemKey]} result recorded — checklist updated.`:'The result was saved, but the latest checklist could not be confirmed. Choose Refresh Queue.'});
+        render();
+        mountedRoot.querySelector(`[data-review-requirements="${applicant.applicantId}"][data-review-item="${itemKey}"]`)?.focus?.({preventScroll:true});
+      }
     });
   }
 
@@ -1864,18 +1895,17 @@
     const coreProfileButton = event.target.closest?.('[data-review-core-profile]');
     if (coreProfileButton) { event.preventDefault(); openCoreProfile(coreProfileButton.dataset.reviewCoreProfile); return; }
     const requirementsButton = event.target.closest?.('[data-review-requirements]');
-    if (requirementsButton) { event.preventDefault(); openRequirements(requirementsButton.dataset.reviewRequirements, requirementsButton.dataset.reviewItem); return; }
+    if (requirementsButton) { event.preventDefault(); openChecklistItem(requirementsButton.dataset.reviewRequirements, requirementsButton.dataset.reviewItem); return; }
+    const deferVerification = event.target.closest?.('[data-verification-defer]');
+    if(deferVerification){event.preventDefault();const id=verificationContext?.applicantId,key=deferVerification.dataset.verificationDefer;if(id&&closeVerification())openRequirements(id,key);return;}
     if (event.target.closest?.('[data-requirements-close]')) { event.preventDefault(); closeRequirements(); return; }
-    if (event.target.closest?.('[data-requirements-retry]')) { event.preventDefault(); loadRequirements(requirementsContext?.applicantId, requirementsContext?.itemKey); return; }
+    if (event.target.closest?.('[data-requirements-retry]')) { event.preventDefault(); if(requirementsContext?.applicantId)loadRequirements(requirementsContext.applicantId, requirementsContext.itemKey); return; }
     const requirementNext = event.target.closest?.('[data-requirement-next]');
     if (requirementNext) {
       event.preventDefault();
       const applicantId = requirementsContext?.applicantId, key = requirementNext.dataset.requirementNext;
       if (!applicantId || !REQUIREMENT_KEYS.includes(key) || !closeRequirements()) return;
-      if (key === 'core_profile') openCoreProfile(applicantId);
-      else if (key === 'interview') openVerification(applicantId, 'interview');
-      else if (['skills', 'references'].includes(key)) openVerification(applicantId);
-      else openProfile(applicantId);
+      openChecklistItem(applicantId,key);
       return;
     }
     const requirementTask = event.target.closest?.('[data-requirement-open-task]');
@@ -2183,6 +2213,7 @@
 
   function unmount({ clear = true, reset = false } = {}) {
     root?.soroTalentCoreProfileEditor?.close?.(true);
+    root?.soroTalentChecklistEditor?.close?.(true);
     pendingRequirementAction?.finish?.();
     pendingRequirementAction = null;
     pendingVerificationAction?.finish?.();
@@ -2351,6 +2382,7 @@
     setSort,
     openResume,
     openCoreProfile,
+    openChecklistItem,
     openVerification,
     openRequirements,
     closeRequirements,

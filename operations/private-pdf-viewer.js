@@ -54,6 +54,7 @@
   function markup() {
     return '<div class="private-pdf-viewer" data-private-pdf-viewer><div class="private-pdf-toolbar" aria-label="Résumé page controls"><button type="button" class="button" data-pdf-prev disabled aria-label="Previous résumé page">Previous</button><span data-pdf-page aria-live="polite">Loading…</span><button type="button" class="button" data-pdf-next disabled aria-label="Next résumé page">Next</button><label>Zoom <select data-pdf-zoom disabled><option value="1">Fit width</option><option value="1.25">125%</option><option value="1.5">150%</option><option value="2">200%</option></select></label></div><p data-pdf-status role="status">Loading the private PDF…</p><div class="private-pdf-pages" data-pdf-pages tabindex="0" aria-label="Résumé PDF page"></div><details class="private-pdf-text" data-pdf-text-details hidden><summary>Readable page text</summary><div data-pdf-text></div></details></div>';
   }
+  function documentMarkup() { return markup().replaceAll('Résumé','Document').replaceAll('résumé','document'); }
   function mount(host, options, dependencies = {}) {
     const controller = new AbortController();
     const status = host.querySelector('[data-pdf-status]'), pages = host.querySelector('[data-pdf-pages]');
@@ -82,7 +83,7 @@
       renderVersion += 1; controller.abort(); clearTimeout(loadTimer); clearTimeout(renderTimer);
       disposeDocument(); clearPages();
       status.hidden = false;
-      status.textContent = 'This PDF could not be previewed here. Try Reload résumé, or Open résumé separately. Password-protected or very large files may need to be opened separately.';
+      status.textContent = options.label ? 'This PDF could not be previewed here. Try Reload File, or Open Separately. Password-protected or very large files may need to be opened separately.' : 'This PDF could not be previewed here. Try Reload résumé, or Open résumé separately. Password-protected or very large files may need to be opened separately.';
       label.textContent = 'Preview unavailable'; prev.disabled = next.disabled = zoomControl.disabled = true;
     }
     function controls(busy) {
@@ -96,7 +97,7 @@
       clearTimeout(renderTimer); renderTimer = setTimeout(() => { if (current()) fail(); }, 20000);
       const previous = rendering;
       previous?.cancel(); rendering = null;
-      controls(true); status.hidden = false; status.textContent = 'Rendering résumé page…';
+      controls(true); status.hidden = false; status.textContent = options.label ? 'Rendering document page…' : 'Rendering résumé page…';
       try {
         if (previous) await previous.promise.catch(() => {});
         if (!current()) return;
@@ -112,7 +113,7 @@
         canvas.width = Math.max(1, Math.floor(viewport.width * density));
         canvas.height = Math.max(1, Math.floor(viewport.height * density));
         canvas.style.width = Math.floor(viewport.width) + 'px'; canvas.style.height = Math.floor(viewport.height) + 'px';
-        canvas.setAttribute('role','img'); canvas.setAttribute('aria-label', `Résumé page ${pageNumber}. Readable text is available below.`);
+        canvas.setAttribute('role','img'); canvas.setAttribute('aria-label', `${options.label ? 'Document' : 'Résumé'} page ${pageNumber}. Readable text is available below.`);
         pages.append(canvas);
         rendering = page.render({canvas, canvasContext:canvas.getContext('2d'), viewport, transform: density === 1 ? null : [density,0,0,density,0,0], annotationMode:0});
         await rendering.promise;
@@ -174,5 +175,5 @@
     })();
     return Object.freeze({destroy, ready});
   }
-  return Object.freeze({markup, mount, validateUrl, readPdf, dimensions, MAX_BYTES});
+  return Object.freeze({markup, documentMarkup, mount, validateUrl, readPdf, dimensions, MAX_BYTES});
 }));

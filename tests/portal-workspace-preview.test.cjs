@@ -375,7 +375,7 @@ test('every portal uses the same accessible Soro navy sidebar treatment', () => 
 
   assert.match(html, /operations\.css\?v=20260829-profile-center/);
   assert.match(html, /roles\.css\?v=20260831-fox-command/);
-  assert.match(html, /sidebar-theme\.css\?v=20260913-live-workspaces/);
+  assert.match(html, /sidebar-theme\.css\?v=20260914-application-preview/);
   assert.equal((html.match(/src="\.\.\/assets\/soro-ops-fox-command\.svg" alt="Soro Ops"/g) || []).length, 5);
   assert.match(html, /rel="icon"[^>]+soro-ops-fox-command-icon\.png/);
   assert.match(html, /rel="apple-touch-icon"[^>]+soro-ops-fox-command-icon\.png/);

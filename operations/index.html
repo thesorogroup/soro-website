@@ -9,9 +9,9 @@
     <link rel="stylesheet" href="operations.css?v=20260829-profile-center" />
     <link rel="stylesheet" href="action-progress.css?v=20260910-branded-progress" />
     <link rel="stylesheet" href="roles.css?v=20260831-fox-command" />
-    <link rel="stylesheet" href="sidebar-theme.css?v=20260913-live-workspaces" />
+    <link rel="stylesheet" href="sidebar-theme.css?v=20260914-application-preview" />
     <link rel="stylesheet" href="feedback.css?v=20260909-feedback" />
-    <link rel="stylesheet" href="founder-test-mode.css?v=20260912-test-mode" />
+    <link rel="stylesheet" href="founder-test-mode.css?v=20260914-application-preview" />
     <link rel="stylesheet" href="founder-live-portal.css?v=20260913" />
     <link rel="stylesheet" href="reports.css?v=20260909-real-reports" />
     <link rel="stylesheet" href="activity-history.css?v=20260909-activity" />
@@ -50,6 +50,7 @@
     <link rel="stylesheet" href="talent-review-queue.css?v=20260914-references" />
     <link rel="stylesheet" href="talent-core-profile-editor.css?v=20260914-core-profile" />
     <link rel="stylesheet" href="assessment-file-editor.css?v=20260914-classification" />
+    <link rel="stylesheet" href="talent-checklist-editor.css?v=20260914-checklist-editor" />
     <link rel="stylesheet" href="staff-account.css?v=20260909-ownership-spacing" />
     <link rel="stylesheet" href="available-talent-bench.css?v=20260901-available-talent-bench" />
     <link rel="stylesheet" href="client-shortlist-workflow.css?v=20260908-shortlist-emails" />
@@ -126,6 +127,7 @@
           <button class="nav-link" data-view="vas">Talent</button>
           <button class="nav-link" id="available-talent-nav" data-view="available-talent" hidden>Available Talent</button>
           <button class="nav-link" id="talent-review-nav" data-view="talent-review" hidden><span>Talent Review Queue</span><b id="talent-review-count" hidden>0</b></button>
+          <a class="nav-link" id="application-preview-nav" href="https://thesorogroup.com/application/?preview=1" target="_blank" rel="noopener noreferrer" aria-label="Application Preview (opens in a new tab)" hidden><span>Application Preview</span><span aria-hidden="true">↗</span></a>
           <button class="nav-link" id="work-log-nav" data-view="work-log" hidden>Work Log</button>
           <button class="nav-link" data-view="documents">Documents</button>
           <button class="nav-link" data-view="reports">Reports</button>
@@ -165,12 +167,13 @@
     <script src="work-log.js?v=20260909-work-log"></script>
     <script src="active-talent-today.js?v=20260829-active-talent-today"></script>
     <script src="talent-time-off.js?v=20260829-talent-time-off"></script>
-    <script src="private-pdf-viewer.js?v=20260909-private-pdf"></script>
+    <script src="private-pdf-viewer.js?v=20260914-checklist-editor"></script>
     <script src="talent-review-evidence.js?v=20260914-inline-verification"></script>
     <script src="talent-core-profile-data.js?v=20260914-core-profile"></script>
-    <script src="talent-core-profile-editor.js?v=20260914-core-profile"></script>
+    <script src="talent-core-profile-editor.js?v=20260914-checklist-editor"></script>
+    <script src="talent-checklist-editor.js?v=20260914-checklist-editor"></script>
     <script src="assessment-file-editor.js?v=20260914-classification"></script>
-    <script src="talent-review-queue.js?v=20260914-references"></script>
+    <script src="talent-review-queue.js?v=20260914-checklist-editor"></script>
     <script src="placement-checkins.js?v=20260912-performance"></script>
     <script src="task-detail.js?v=20260913-dream-pathway"></script>
     <script src="task-center.js?v=20260913-status-spacing"></script>
@@ -184,11 +187,11 @@
     <script src="sales-lifecycle-tracker.js?v=20260907-sales-tracker"></script>
     <script src="client-dashboard.js?v=20260909-work-log"></script>
     <script src="document-center.js?v=20260908-document-center"></script>
-    <script src="sidebar-navigation.js?v=20260910-menu-groups"></script>
+    <script src="sidebar-navigation.js?v=20260914-application-preview"></script>
     <script src="feedback.js?v=20260909-usability-label"></script>
     <script src="report-definitions.js?v=20260909-real-reports"></script>
     <script src="reports.js?v=20260909-activity"></script>
-    <script src="operations.js?v=20260913-founder-live-workspaces"></script>
+    <script src="operations.js?v=20260914-application-preview"></script>
     <script src="page-task-action.js?v=20260910-task-collaboration"></script>
     <script src="talent-directory-filters.js?v=20260909-full-catalog"></script>
     <script src="talent-skill-editor.js?v=20260914-inline-verification"></script>
@@ -215,7 +218,7 @@
     <script src="admin-record-management.js?v=20260901-role-view-access"></script>
     <script src="talent-portal-access.js?v=20260901-role-view-access"></script>
     <script src="admin-permanent-deletion.js?v=20260901-role-view-access"></script>
-    <script src="founder-test-mode.js?v=20260914-classification"></script>
+    <script src="founder-test-mode.js?v=20260914-checklist-editor"></script>
     <script src="founder-live-portal.js?v=20260913"></script>
   </body>
 </html>

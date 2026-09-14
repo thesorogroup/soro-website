@@ -39,17 +39,17 @@
   function close(force=false){
     const context=active;
     if(!context||context.saving&&!force)return false;
-    active=null;context.dialog.close();context.dialog.remove();return true;
+    active=null;context.dialog.close();context.dialog.remove();context.trigger?.focus?.({preventScroll:true});return true;
   }
   function isOpen(){return Boolean(active?.dialog.open);}
-  async function open(applicant,afterSave){
+  async function open(applicant,afterSave,{onVerifyLater}={}){
     const service=data();
     if(!service?.authorized()||!applicant?.applicantId)return false;
     if(active?.saving)return false;
     close();
     const dialog=root.document.createElement('dialog');
     dialog.className='core-profile-dialog';dialog.dataset.coreProfileDialog='';dialog.setAttribute('aria-labelledby','core-profile-title');
-    const context={dialog,scope:service.scope(),saving:false};active=context;
+    const context={dialog,scope:service.scope(),saving:false,trigger:root.document.activeElement};active=context;
     const current=()=>active===context&&dialog.open&&service.authorized()&&service.scope()===context.scope;
     dialog.innerHTML='<div class="core-profile-loading"><h2 id="core-profile-title">Edit Core Profile</h2><p data-core-status role="status">Loading profile details…</p><button type="button" class="button" data-core-close>Cancel</button></div>';
     root.document.body.append(dialog);
@@ -61,6 +61,7 @@
       const snapshot=await service.load(applicant.applicantId);
       if(!current())return false;
       dialog.innerHTML=markup(snapshot);
+      if(onVerifyLater){const defer=root.document.createElement('button');defer.type='button';defer.className='button';defer.textContent='Verify Later';defer.addEventListener('click',()=>{if(!context.saving){close();onVerifyLater();}});dialog.querySelector('footer>div').prepend(defer);}
       const form=dialog.querySelector('form');paintProgress(form,snapshot);
       form.addEventListener('input',()=>paintProgress(form,snapshot));form.addEventListener('change',()=>paintProgress(form,snapshot));
       form.addEventListener('submit',async event=>{

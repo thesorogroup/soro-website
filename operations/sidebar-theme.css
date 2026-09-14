@@ -33,6 +33,8 @@
   color: #fff;
 }
 
+a.nav-link { text-decoration: none; }
+
 .nav-link.active {
   background: var(--sidebar-active);
   color: #fff;

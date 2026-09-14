@@ -26,6 +26,7 @@ class Element {
   removeEventListener() {}
   async fire(type, extra = {}) { const event = { target: this, preventDefault() {}, ...extra }; return Promise.all((this.listeners.get(type) || []).map(callback => callback(event))); }
   append(child) { this.children.push(child); }
+  prepend(child) { this.children.unshift(child); }
   setAttribute(key, value) { this[key] = value; }
   remove() { this.removed = true; }
   focus() { this.focused = true; }
@@ -58,11 +59,11 @@ class Form extends Element {
   querySelectorAll(selector) { return selector === 'input,select,button' ? this.controls : selector === '[data-core-close]' ? this.closeControls : []; }
 }
 class Dialog extends Element {
-  set innerHTML(html) { this.html = html; this.form = html.includes('<form ') ? new Form(html) : null; this.loading = new Element(); this.loadingStatus = new Element(); }
+  set innerHTML(html) { this.html = html; this.form = html.includes('<form ') ? new Form(html) : null; this.loading = new Element(); this.loadingStatus = new Element(); this.footerActions = new Element(); }
   get innerHTML() { return this.html; }
   showModal() { this.open = true; }
   close() { this.open = false; this.fire('close'); }
-  querySelector(selector) { return selector === 'form' ? this.form : selector === '[data-core-status]' ? this.form?.status || this.loadingStatus : selector === '.core-profile-loading' ? this.loading : null; }
+  querySelector(selector) { return selector === 'footer>div' ? this.footerActions : selector === 'form' ? this.form : selector === '[data-core-status]' ? this.form?.status || this.loadingStatus : selector === '.core-profile-loading' ? this.loading : null; }
 }
 
 function setup() {

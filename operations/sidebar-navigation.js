@@ -25,12 +25,16 @@
     footer=root.document.createElement('div');footer.className='sidebar-nav-footer';footer.id='sidebar-nav-footer';
     const buttons=[...nav.querySelectorAll('.nav-link')];
     const grouped=new Set(GROUPS.flatMap(g=>g.views));
-    buttons.filter(b=>!grouped.has(b.dataset.view)&&!['my-profile','feedback','help'].includes(b.dataset.view)&&b.id!=='founder-account-nav').forEach(b=>primary.append(b));
+    buttons.filter(b=>!grouped.has(b.dataset.view)&&!['my-profile','feedback','help'].includes(b.dataset.view)&&!['founder-account-nav','application-preview-nav'].includes(b.id)).forEach(b=>primary.append(b));
     scroll.append(primary);
     GROUPS.forEach(config=>{
       const section=root.document.createElement('details');section.className='sidebar-nav-group';section.dataset.navGroup=config.id;
       section.innerHTML=`<summary><span>${config.label}</span><b data-group-count hidden>0</b><span class="nav-group-chevron" aria-hidden="true">›</span></summary><div class="sidebar-nav-group-items"></div>`;
       const items=section.querySelector('.sidebar-nav-group-items');config.views.forEach(view=>{const b=buttons.find(b=>b.dataset.view===view);if(b)items.append(b);});
+      if(config.id==='talent'){
+        const preview=buttons.find(b=>b.id==='application-preview-nav');
+        if(preview)items.insertBefore(preview,items.querySelector('[data-view="work-log"]'));
+      }
       section.addEventListener('toggle',()=>{refreshBadges();if(lastScope)try{root.localStorage.setItem(`soro-nav:${lastScope}:${config.id}`,String(section.open));}catch{}});
       scroll.append(section);
     });

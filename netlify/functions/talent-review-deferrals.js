@@ -16,20 +16,23 @@ function exactKeys(value, keys) {
 function queryApplicant(event) {
   const query = event.queryStringParameters || {};
   const multi = event.multiValueQueryStringParameters || {};
-  if (!exactKeys(query, ['applicantId']) || !uuid(query.applicantId)
-    || String(event.body || '').trim() || event.isBase64Encoded
-    || (Object.keys(multi).length && (!exactKeys(multi, ['applicantId'])
-      || !Array.isArray(multi.applicantId) || multi.applicantId.length !== 1
-      || multi.applicantId[0] !== query.applicantId))) {
-    throw fail(400, 'Choose one valid Talent application.');
+  const invalid=()=>{throw fail(400, 'Choose one valid Talent application.');};
+  if(String(event.body || '').trim()||Object.keys(query).some(k=>k!=='applicantId')||Object.keys(multi).some(k=>k!=='applicantId'))invalid();
+  const ids=[];
+  if(Object.hasOwn(query,'applicantId'))ids.push(query.applicantId);
+  if(Object.hasOwn(multi,'applicantId')){
+    if(!Array.isArray(multi.applicantId)||multi.applicantId.length!==1)invalid();
+    ids.push(multi.applicantId[0]);
   }
   if (event.rawQueryString) {
     const raw = [...new URLSearchParams(event.rawQueryString)];
-    if (raw.length !== 1 || raw[0][0] !== 'applicantId' || raw[0][1] !== query.applicantId) {
-      throw fail(400, 'Choose one valid Talent application.');
-    }
+    if(raw.length!==1||raw[0][0]!=='applicantId')invalid();
+    ids.push(raw[0][1]);
   }
-  return query.applicantId.toLowerCase();
+  // Netlify can represent an empty GET body as base64; the flag alone is not a body.
+  // Accept consistent single-value representations, never duplicates or conflicting scope.
+  if(!ids.length||ids.some(id=>typeof id!=='string'||!uuid(id)||id!==ids[0]))invalid();
+  return ids[0].toLowerCase();
 }
 
 function postInput(event) {

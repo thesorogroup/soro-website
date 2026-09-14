@@ -222,6 +222,8 @@
       if(previous?previous!==fingerprint||d.document_type!==body.documentType:d.document_type!==body.expectedType||d.updated_at!==body.expectedUpdatedAt)return new Response(JSON.stringify({message:'This file changed. Reopen Change Assessment Type.'}),{status:409});
       if(!previous){
         const before=d.document_type;d.document_type=body.documentType;d.updated_at=new Date(Math.max(Date.now(),Date.parse(d.updated_at)+1)).toISOString();
+        const key={english_proof:'english',disc_assessment:'disc',enneagram_assessment:'enneagram',mbti_assessment:'mbti'}[d.document_type];
+        if(key&&store.reviewDeferrals[key]){delete store.reviewDeferrals[key];const applicant=store.applicants.find(a=>a.id===d.applicant_id);applicant.updated_at=new Date(Math.max(Date.now(),Date.parse(applicant.updated_at)+1)).toISOString();}
         store.classificationRequests[body.requestId]=fingerprint;store.classificationAudit.push({documentId:d.id,actorId:personas[selected].id,before,after:d.document_type});
         notice('Sample assessment type saved. No live files were changed.');
       }
@@ -369,5 +371,5 @@
   document.addEventListener('click',event=>{const a=event.target.closest('a');if(a&&a.getAttribute('href')&&!a.getAttribute('href').startsWith('#')){event.preventDefault();event.stopImmediatePropagation();notice('External links are disabled in Test Mode.');}},true);
   // Opaque sandbox origins intentionally cannot use browser storage. Supply only disposable preferences.
   for(const key of ['localStorage','sessionStorage']){const memory=new Map();try{Object.defineProperty(w,key,{value:{getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,String(v)),removeItem:k=>memory.delete(k),clear:()=>memory.clear()}});}catch{}}
-  w.SoroTestSession={id,personas,access,queue,dashboard,get store(){return store;},get selected(){return selected;},select(value){if(personas[value])selected=value;},reset,notice};
+  w.SoroTestSession={id,personas,access,queue,dashboard,previewFile(applicantId,documentId){const d=tableRows('documents').find(d=>d.id===documentId&&d.applicant_id===applicantId);return selected==='talent'&&d?localFiles.get(d.storage_path)?.url:null;},get store(){return store;},get selected(){return selected;},select(value){if(personas[value])selected=value;},reset,notice};
 }(window));

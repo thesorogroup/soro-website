@@ -75,7 +75,7 @@ test('GET verifies the session and forwards only the actor and requested applica
 test('GET rejects selected actor, organization, duplicate query scope and request bodies before authentication', async t => {
   const calls = mock(t);
   const invalid = [
-    event({ queryStringParameters: {} }), event({ queryStringParameters: { applicantId: 'invalid' } }),
+    event({ queryStringParameters: {}, multiValueQueryStringParameters: {}, rawQueryString: '' }), event({ queryStringParameters: { applicantId: 'invalid' } }),
     event({ queryStringParameters: { applicantId, actorId } }),
     event({ queryStringParameters: { applicantId, organizationId: requestId } }),
     event({ queryStringParameters: { applicantId, role: 'admin' } }),
@@ -83,10 +83,20 @@ test('GET rejects selected actor, organization, duplicate query scope and reques
     event({ multiValueQueryStringParameters: { applicantId: [requestId] } }),
     event({ rawQueryString: `applicantId=${applicantId}&applicantId=${applicantId}` }),
     event({ rawQueryString: `applicantId=${applicantId}&organizationId=${requestId}` }),
-    event({ body: '{}' }), event({ isBase64Encoded: true })
+    event({ body: '{}' }), event({ isBase64Encoded: true, body:'e30=' })
   ];
   for (const request of invalid) assert.equal((await api.handler(request)).statusCode, 400);
   assert.equal(calls.length, 0);
+});
+
+test('GET accepts consistent Netlify query representations and an empty encoded body', () => {
+  for(const request of [
+    event({isBase64Encoded:true}),
+    event({queryStringParameters:{},multiValueQueryStringParameters:{}}),
+    event({queryStringParameters:{},rawQueryString:''}),
+    event({multiValueQueryStringParameters:{},rawQueryString:''})
+  ])assert.equal(api.queryApplicant(request),applicantId);
+  for(const request of [event({queryStringParameters:{applicantId:[applicantId]}}),event({rawQueryString:`applicantId=${requestId}`})])assert.throws(()=>api.queryApplicant(request),/Choose one valid/);
 });
 
 test('missing or invalid sessions cannot call either deferral RPC', async t => {

@@ -15,7 +15,7 @@
     const policy=doc.createElement('meta');policy.httpEquiv='Content-Security-Policy';
     policy.content=`default-src 'none'; script-src ${location.origin}; style-src ${location.origin} 'unsafe-inline'; img-src ${location.origin} data: blob:; media-src blob:; font-src ${location.origin}; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; form-action 'none'; base-uri ${location.origin}`;
     doc.head.prepend(policy);
-    const boot=doc.createElement('script');boot.src=new URL('test-mode/runtime.js?v=20260914-references',base.href).href;doc.head.append(boot);
+    const boot=doc.createElement('script');boot.src=new URL('test-mode/runtime.js?v=20260914-checklist-editor',base.href).href;doc.head.append(boot);
     const ready=doc.createElement('script');ready.src=new URL('test-mode/start.js?v=20260913-render-parity',base.href).href;doc.body.append(ready);
     doc.title='Soro Ops — Test Mode';
     return '<!doctype html>'+doc.documentElement.outerHTML;
@@ -25,6 +25,8 @@
     const attempt=++launch,actor=root.soroCurrentAccess.user_id;
     dialog=document.createElement('dialog');dialog.className='founder-test-dialog';dialog.setAttribute('aria-label','Founder Test Mode');
     dialog.innerHTML='<header class="founder-test-bar"><div><strong>Test Mode</strong><small>Fictional accounts · No live records, emails, meetings, or payments</small></div><label>View As<select aria-label="Test portal">'+Object.entries(ROLES).map(([value,label])=>`<option value="${value}">${label}</option>`).join('')+'</select></label><button type="button" class="button" data-reset>Reset Samples</button><button type="button" class="button" data-exit>Exit Test Mode</button></header><p class="founder-test-status" role="status">Opening your private test session…</p>';
+    const previewLink=document.createElement('a');previewLink.className='button';previewLink.textContent='Application Preview ↗';previewLink.href='https://thesorogroup.com/application/?preview=1';previewLink.target='_blank';previewLink.rel='noopener noreferrer';previewLink.setAttribute('aria-label','Application Preview (opens in a new tab)');
+    dialog.querySelector('.founder-test-bar').insertBefore(previewLink,dialog.querySelector('[data-reset]'));
     document.body.append(dialog);dialog.showModal();
     dialog.querySelector('[data-exit]').onclick=close;dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
     dialog.querySelector('select').onchange=e=>message('role',e.target.value);
