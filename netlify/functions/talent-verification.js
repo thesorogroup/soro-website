@@ -225,7 +225,16 @@ function rpcError(status, payload) {
   if (code === 'P0001' || code === '23505' || code === '23514') {
     return httpError(409, 'verification_state_conflict', 'This action is not available in the current verification state.');
   }
-  if (code === '22023') return httpError(400, 'invalid_request', 'Check the verification details and try again.');
+  if (code === '22023') {
+    // Only expose known, actionable validation messages, never raw database errors.
+    const previousInterviewMessages = {
+      'Complete the previous interview details.': 'The previous interview could not be saved. Your entries have been kept. Please try again, or contact support if this continues.',
+      'Use a valid past interview date or leave it unknown.': 'Choose today or an earlier interview date, or leave the date blank if it is unknown.',
+      'Scores must be whole numbers from 1 to 5 or blank.': 'Enter whole-number interview scores from 1 to 5, or leave unknown scores blank.'
+    };
+    return httpError(400, 'invalid_request', Object.hasOwn(previousInterviewMessages, message)
+      ? previousInterviewMessages[message] : 'Check the verification details and try again.');
+  }
   if (code === 'PGRST202' || status === 404) {
     return httpError(503, 'service_unavailable', 'Talent verification is not configured yet.');
   }

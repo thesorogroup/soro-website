@@ -57,3 +57,20 @@ test('manual recording only calls authentication and mutation; even a stray comm
  }
  assert.equal(calls.length,before,'invalid scope is rejected before any authenticated or database request');
 });
+
+test('previous-interview validation errors are actionable without exposing raw database details',async t=>{
+ const original=global.fetch;let databaseMessage='';
+ global.fetch=async url=>String(url).endsWith('/auth/v1/user')?new Response(JSON.stringify({id:id(10)})):
+  new Response(JSON.stringify({code:'22023',message:databaseMessage,details:'PRIVATE DATABASE DETAIL'}),{status:400});
+ t.after(()=>global.fetch=original);
+ for(const [message,expected] of [
+  ['Complete the previous interview details.',/Your entries have been kept/],
+  ['Use a valid past interview date or leave it unknown.',/leave the date blank/],
+  ['Scores must be whole numbers from 1 to 5 or blank.',/whole-number interview scores from 1 to 5/],
+  ['PRIVATE UNRECOGNIZED ERROR',/^Check the verification details and try again\.$/]
+ ]){
+  databaseMessage=message;const response=await backend.handler(event(base()));
+  assert.equal(response.statusCode,400);assert.match(JSON.parse(response.body).message,expected);
+  assert.doesNotMatch(response.body,/PRIVATE/);
+ }
+});
