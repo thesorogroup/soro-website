@@ -4,6 +4,7 @@ function sandbox(){const c={parent:{postMessage(){}},document:{addEventListener(
 async function call(c,path,body,status=200){const r=await c.fetch('/.netlify/functions/'+path,body?{method:'POST',body:JSON.stringify(body)}:{});assert.equal(r.status,status);return r.json();}
 test('sample deferrals stay pending, create one private task, and do not automatically mark Bench Ready',async()=>{
  const c=sandbox(),s=c.SoroTestSession,id=s.id,applicantId=id(11);
+ s.store.applicants[1].phone='+63 917 555 0100';
  await call(c,'talent-review-queue',{action:'begin_review'});
  let requirements=await call(c,'talent-review-deferrals?applicantId='+applicantId);
  assert.equal(requirements.items.length,11);

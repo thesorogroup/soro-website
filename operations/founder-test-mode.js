@@ -15,7 +15,7 @@
     const policy=doc.createElement('meta');policy.httpEquiv='Content-Security-Policy';
     policy.content=`default-src 'none'; script-src ${location.origin}; style-src ${location.origin} 'unsafe-inline'; img-src ${location.origin} data: blob:; media-src blob:; font-src ${location.origin}; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; form-action 'none'; base-uri ${location.origin}`;
     doc.head.prepend(policy);
-    const boot=doc.createElement('script');boot.src=new URL('test-mode/runtime.js?v=20260914-verify-later',base.href).href;doc.head.append(boot);
+    const boot=doc.createElement('script');boot.src=new URL('test-mode/runtime.js?v=20260914-core-profile',base.href).href;doc.head.append(boot);
     const ready=doc.createElement('script');ready.src=new URL('test-mode/start.js?v=20260913-render-parity',base.href).href;doc.body.append(ready);
     doc.title='Soro Ops — Test Mode';
     return '<!doctype html>'+doc.documentElement.outerHTML;

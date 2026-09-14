@@ -45,18 +45,76 @@ test('missing identity, missing organization, and organization mismatches fail c
   assert.equal(dream.render(), '');
 });
 test('empty state contains no invented goal, progress, allocation, or funding promise', () => {
-  const html = dream.render(options('virtual_assistant', { applicant: { ...applicant, greatest_dream: '   ' } }));
+  const html = dream.render(options('virtual_assistant', { applicant: { ...applicant, greatest_dream: '   ', first_name: 'Gabriel', last_name: 'Garin' } }));
   assert.match(html, /Every dream starts somewhere/);
-  assert.doesNotMatch(html, /Finish my education|\$|\d+%|Next check-in/);
+  assert.doesNotMatch(html, /Finish my education|\$|\d+%|Next check-in|<blockquote|<figcaption|Gabriel Garin/);
+});
+test('short dreams quote the exact original text with one italic first-and-last attribution', () => {
+  const content = '  My dream is to finish school.\nI want to support my family.  ';
+  const record = { ...applicant, greatest_dream: content, first_name: ' Gabriel ', last_name: ' Garin ', full_name: 'Legacy, Different Middle' };
+  const before = JSON.stringify(record);
+  const html = dream.render(options('admin', { applicant: record }));
+  assert.ok(html.includes(`<blockquote class="talent-dream-quote"><p class="talent-dream-copy">${content}</p></blockquote>`));
+  assert.match(html, /<figure class="talent-dream-quotation">/);
+  assert.match(html, /<figcaption class="talent-dream-attribution"><em>— Gabriel Garin<\/em><\/figcaption>/);
+  assert.equal((html.match(/talent-dream-attribution/g) || []).length, 1);
+  assert.doesNotMatch(html, /Legacy|Different Middle|<details/);
+  assert.equal(JSON.stringify(record), before, 'Rendering does not rewrite any applicant data.');
+});
+test('legacy attribution reorders an unambiguous Last, First Middle name without discarding given names', () => {
+  for (const [full_name, expected] of [
+    ['Garin, Gabriel Antonio', 'Gabriel Antonio Garin'],
+    ['de la Cruz, Maria Clara', 'Maria Clara de la Cruz'],
+    ['Gabriel Garin', 'Gabriel Garin'],
+    ['Santos, Gabriel, Jr.', 'Santos, Gabriel, Jr.'],
+    ['Cher', 'Cher']
+  ]) {
+    const html = dream.render(options('admin', { applicant: { ...applicant, full_name } }));
+    assert.ok(html.includes(`<em>— ${expected}</em>`), full_name);
+  }
+});
+test('attribution never invents a name and uses only the supplied identity fields', () => {
+  for (const replacement of [{}, { first_name: '', last_name: '', full_name: ' ' }, { preferred_name: 'Gabe' }]) {
+    const html = dream.render(options('admin', { applicant: { ...applicant, ...replacement } }));
+    assert.doesNotMatch(html, /<figcaption|— Talent|— Unknown|— Gabe/);
+  }
+  assert.match(dream.render(options('admin', { applicant: { ...applicant, first_name: 'Gabriel' } })), /<em>— Gabriel<\/em>/);
+  assert.match(dream.render(options('admin', { applicant: { ...applicant, last_name: 'Garin' } })), /<em>— Garin<\/em>/);
+});
+test('quotation and attribution escape markup and punctuation without rewriting the words', () => {
+  const html = dream.render(options('admin', { applicant: { ...applicant, greatest_dream: '<script>"My dream" & family\'s future</script>', first_name: '<img src=x>', last_name: 'O\'Brien & "Co"' } }));
+  assert.match(html, /&lt;script&gt;&quot;My dream&quot; &amp; family&#39;s future&lt;\/script&gt;/);
+  assert.match(html, /<em>— &lt;img src=x&gt; O&#39;Brien &amp; &quot;Co&quot;<\/em>/);
+  assert.doesNotMatch(html, /<script|<img/);
 });
 test('Dream text is escaped and long dreams have a native, keyboard-accessible disclosure', () => {
   const content = '<img src=x onerror="alert(1)"> & my family\n' + 'A meaningful personal goal. '.repeat(30);
-  const html = dream.render(options('admin', { applicant: { ...applicant, greatest_dream: content } }));
+  const html = dream.render(options('admin', { applicant: { ...applicant, greatest_dream: content, first_name: 'Gabriel', last_name: 'Garin' } }));
   assert.match(html, /&lt;img src=x onerror=&quot;alert\(1\)&quot;&gt; &amp;/);
   assert.doesNotMatch(html, /<img|<script/);
   assert.match(html, /<details class="talent-dream-story"><summary>/);
+  assert.match(html, /<q class="talent-dream-copy talent-dream-excerpt">/);
+  assert.match(html, /<blockquote class="talent-dream-quote">/);
+  assert.match(html, /<\/blockquote><\/details><figcaption class="talent-dream-attribution"><em>— Gabriel Garin<\/em>/);
+  assert.equal((html.match(/talent-dream-attribution/g) || []).length, 1, 'The attribution is shared by collapsed and expanded states.');
+  assert.ok(html.includes(content.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character])), 'The full quotation retains every original word and whitespace.');
   assert.match(html, /Read Full Dream/);
   assert.match(html, /Show Less/);
+});
+test('the companion keeps one concise heading and the existing Benefits action without repeated prose', () => {
+  const html = dream.render(options('admin', { benefitsAvailable: true }));
+  const companion = html.slice(html.indexOf('<aside class="talent-dream-companion">'));
+  assert.match(companion, /<h3>Your Dream, In Motion<\/h3>/);
+  assert.doesNotMatch(companion, /<p>|A Future Worth Building|Meaningful work is part of the journey/);
+  assert.match(companion, /class="button talent-dream-benefits" data-talent-dream-benefits>Benefits & Support/);
+  assert.match(html, /Full Pathway Private · Shared with Talent Management and Administrators/);
+});
+test('the statement groups its heading, quotation and privacy within the existing inspiration host', () => {
+  const html = dream.render(options('admin'));
+  assert.match(html, /<div class="talent-dream-main"><div class="talent-dream-statement"><p class="talent-dream-eyebrow">/);
+  assert.match(html, /<h2 id="talent-dream-title">Dream & Aspirations<\/h2><figure class="talent-dream-quotation">/);
+  assert.match(html, /<p class="talent-dream-privacy">[^<]+<\/p><\/div><\/div><aside class="talent-dream-companion">/);
+  assert.equal((html.match(/class="talent-dream-statement"/g) || []).length, 1);
 });
 test('Benefits action appears only when the existing Benefits tab is authorized', () => {
   assert.doesNotMatch(dream.render(options('admin')), /data-talent-dream-benefits/);

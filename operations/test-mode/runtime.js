@@ -18,9 +18,10 @@
     store.applicants[0].self_reported_skills=store.applicants[0].skills.slice();
     Object.assign(store.applicants[0],{status:'submitted',work_status:'Available',timezone:'Asia/Manila',english_proficiency_score:'',personality_profile_score:'',computer_specs:'',legacy_application_data:{}});
     store.applicants[0].verified_skills=['Calendar management','Email management'];
-    store.applicants.push({...clone(store.applicants[0]),id:id(11),auth_user_id:null,full_name:'Santos, Riley',first_name:'Riley',last_name:'Santos',preferred_name:'Riley',email:'riley@example.test',verified_skills:[]});
+    store.applicants.push({...clone(store.applicants[0]),id:id(11),auth_user_id:null,full_name:'Santos, Riley',first_name:'Riley',last_name:'Santos',preferred_name:'Riley',email:'riley@example.test',phone:'',verified_skills:[]});
     for(const a of store.applicants)Object.assign(a,{relevant_experience_years:a.experience_years,relevant_experience_summary:a.experience_summary,education_training_summary:'Business administration coursework and virtual assistance training.',self_reported_experience_areas:a.work_areas.slice(),availability_note:'Full time · Monday–Friday',address_line_1:'100 Sample Street',city:'Cebu City',province_state:'Cebu',postal_code:'6000',portal_access_status:a.auth_user_id?'active':'not_activated'});
     store.documents=[];store.uploads=[];store.reviewDeferrals={};store.reviewDeferralRequests={};store.reviewDeferralTaskIds={};store.taskNotifications=[];
+    store.interview=null;store.interviewHistory=[];store.interviewRequests={};store.interviewAudit=[];
     store.clients=[{id:id(50),company:{name:store.companyName,industry:'Professional services',website:'example.test',country:'United States'},primaryContact:{name:store.contactName,title:'Owner',email:'alex@example.test',phone:''},owner:{id:id(3),name:'Jordan Lee',current:true},lifecycleStage:'active',portal:{requested:true,status:'active',email:'alex@example.test'},hiringRequests:[{id:id(20),roleTitle:'General Virtual Assistant',vaType:'General',seats:1,skills:['Calendar management','Email management'],schedule:'Monday–Friday · Philippine Time',timeZone:'Asia/Manila',targetStartDate:day(),status:'filled',progressStep:'active',candidateCount:0}],activity:[{label:'Sample account',detail:'Fictional data for Test Mode.',timestamp:now()}]}];
     store.tasks=[{id:id(30),title:'Review your sample profile',details:'Check your details and let your Soro team know if anything needs updating. This is a fictional task.',kind:'manual',version:1,progress:'not_started',status:'open',priority:'normal',dueDate:day(),createdAt:now(),updatedAt:now(),relatedLabel:'Sample Talent Profile',isUnread:true,assignees:[{id:id(4),userId:id(4),name:'Jamie Cruz'}],assignedTo:{id:id(4),name:'Jamie Cruz'},createdBy:{id:id(2),name:'Taylor Morgan'},history:[]}];
     store.tasks.push({...clone(store.tasks[0]),id:id(31),title:'Review client requirements',details:'Check the sample Client account and its role requirements.',relatedLabel:'Sample Company',assignees:[{id:id(3),userId:id(3),name:'Jordan Lee'}],assignedTo:{id:id(3),name:'Jordan Lee'},createdBy:{id:id(3),name:'Jordan Lee'}});
@@ -43,7 +44,7 @@
   function query(table){
     const filters=[],orders=[];let single=false,mutation=null,maximum=Infinity,offset=0;
     const captured=store,actor=selected;
-    const api={select(){return api;},eq(k,v){filters.push(r=>r[k]===v);return api;},neq(k,v){filters.push(r=>r[k]!==v);return api;},not(k,op,v){if(op==='is')filters.push(r=>(r[k]??null)!==v);return api;},is(k,v){filters.push(r=>(r[k]??null)===v);return api;},in(k,v){filters.push(r=>v.includes(r[k]));return api;},order(k,o={}){orders.push([k,o.ascending!==false]);return api;},limit(n){maximum=n;return api;},range(start,end){offset=start;maximum=end-start+1;return api;},maybeSingle(){single=true;return api;},single(){single=true;return api;},update(v){mutation=v;return api;},insert(){mutation=false;return api;},delete(){mutation=false;return api;},then(resolve,reject){try{if(captured!==store||actor!==selected)return Promise.resolve(unavailable()).then(resolve,reject);let rows=tableRows(table).filter(row=>filters.every(f=>f(row)));if(mutation!==null){if(table!=='applicants'||selected!=='talent'||!mutation)return Promise.resolve(unavailable()).then(resolve,reject);rows.forEach(row=>Object.assign(row,mutation,{updated_at:now()}));notice('Sample profile updated in this test session only.');}rows=rows.slice().sort((a,b)=>{for(const[k,asc]of orders){if(a[k]!==b[k])return(a[k]<b[k]?-1:1)*(asc?1:-1);}return 0;}).slice(offset,offset+maximum);return Promise.resolve({data:clone(single?(rows[0]||null):rows),error:null}).then(resolve,reject);}catch(e){return Promise.reject(e).then(resolve,reject);}}};return api;
+    const api={select(){return api;},eq(k,v){filters.push(r=>r[k]===v);return api;},neq(k,v){filters.push(r=>r[k]!==v);return api;},not(k,op,v){if(op==='is')filters.push(r=>(r[k]??null)!==v);return api;},is(k,v){filters.push(r=>(r[k]??null)===v);return api;},in(k,v){filters.push(r=>v.includes(r[k]));return api;},order(k,o={}){orders.push([k,o.ascending!==false]);return api;},limit(n){maximum=n;return api;},range(start,end){offset=start;maximum=end-start+1;return api;},maybeSingle(){single=true;return api;},single(){single=true;return api;},update(v){mutation=v;return api;},insert(){mutation=false;return api;},delete(){mutation=false;return api;},then(resolve,reject){try{if(captured!==store||actor!==selected)return Promise.resolve(unavailable()).then(resolve,reject);let rows=tableRows(table).filter(row=>filters.every(f=>f(row)));if(mutation!==null){if(table!=='applicants'||selected!=='talent'||!mutation)return Promise.resolve(unavailable()).then(resolve,reject);rows.forEach(row=>Object.assign(row,mutation,{updated_at:new Date(Math.max(Date.now(),Date.parse(row.updated_at)+1)).toISOString()}));if(rows.length)notice('Sample profile updated in this test session only.');}rows=rows.slice().sort((a,b)=>{for(const[k,asc]of orders){if(a[k]!==b[k])return(a[k]<b[k]?-1:1)*(asc?1:-1);}return 0;}).slice(offset,offset+maximum);return Promise.resolve({data:clone(single?(rows[0]||null):rows),error:null}).then(resolve,reject);}catch(e){return Promise.reject(e).then(resolve,reject);}}};return api;
   }
   w.SORO_SUPABASE_CONFIG=Object.freeze({url:'https://test.invalid'});
   w.soroSupabase={auth:{getSession:async()=>({data:{session:{access_token:'fictional-test-session',user:{id:personas[selected].id,email:personaEmail()}}}}),getUser:async()=>({data:{user:{id:personas[selected].id,email:personaEmail()}}}),onAuthStateChange:()=>({data:{subscription:{unsubscribe(){}}}})},from:query,rpc:async()=>unavailable(),storage:{from:bucket=>({createSignedUrl:async path=>{const d=tableRows('documents').find(d=>d.storage_path===path),file=localFiles.get(path);return bucket==='soro-private-documents'&&d&&file?.url?{data:{signedUrl:file.url},error:null}:unavailable();},upload:async()=>unavailable(),download:async()=>unavailable()})}};
@@ -58,8 +59,10 @@
     const a=store.applicants[1],keys=['core_profile','resume','english','disc','enneagram','mbti','internet','equipment','skills'],labels=['Core profile','Resume','English assessment','DISC assessment','Enneagram assessment','Four-letter personality assessment','Internet speed proof','Computer specifications','Skills'];
     const personality=w.soroScreeningPresentation?.parsePersonalityResults(a.personality_profile_score)||{};
     const values={english:a.english_test_result,disc:personality.disc,enneagram:personality.enneagram,mbti:personality.mbti,internet:a.internet_speed,equipment:a.computer_specs};
+    const nonblank=value=>typeof value==='string'&&!!value.trim();
+    const coreComplete=['full_name','email','phone','timezone'].every(field=>nonblank(a[field]))&&(nonblank(a.location)||nonblank(a.country)&&nonblank(a.city));
     const checklist=keys.map((key,i)=>{
-      const state=key==='resume'?'missing':key==='skills'&&![...(a.self_reported_skills||[]),...(a.self_reported_experience_areas||[]),...(a.verified_skills||[])].some(x=>String(x).trim())?'missing':'complete';
+      const state=key==='resume'||key==='core_profile'&&!coreComplete?'missing':key==='skills'&&![...(a.self_reported_skills||[]),...(a.self_reported_experience_areas||[]),...(a.verified_skills||[])].some(x=>String(x).trim())?'missing':'complete';
       const deferral=state!=='complete'?store.reviewDeferrals[key]:null;
       if(state==='complete')delete store.reviewDeferrals[key];
       return{key,label:labels[i],state,...(i>=2&&i<=7?{resultRecorded:Boolean(values[key]),evidenceState:'available'}:{}),...(key==='skills'?{verifiedSkillsCount:a.verified_skills.length}:{}),...(deferral?{deferral:clone(deferral)}:{})};
@@ -68,11 +71,39 @@
   }
   function reviewRequirements(){
     const a=queue().applicants[0];
-    return{applicantId:a.applicantId,updatedAt:a.updatedAt,items:[...a.checklist.map(item=>({key:item.key,label:item.label,status:item.deferral?'deferred':item.state==='complete'?'complete':'pending',deferral:item.deferral||null})),...['interview','references'].map(key=>({key,label:key==='interview'?'Interview':'Employment references',status:store.reviewDeferrals[key]?'deferred':'pending',deferral:store.reviewDeferrals[key]||null}))]};
+    if(interviewAddressed())delete store.reviewDeferrals.interview;
+    return{applicantId:a.applicantId,updatedAt:a.updatedAt,items:[...a.checklist.map(item=>({key:item.key,label:item.label,status:item.deferral?'deferred':item.state==='complete'?'complete':'pending',deferral:item.deferral||null})),...['interview','references'].map(key=>({key,label:key==='interview'?'Interview':'Employment references',status:key==='interview'&&interviewAddressed()?'complete':store.reviewDeferrals[key]?'deferred':'pending',deferral:store.reviewDeferrals[key]||null}))]};
   }
+  const interviewAddressed=()=>!!store.interview&&(store.interview.status==='completed'&&!!store.interview.outcome||['no_show','waived'].includes(store.interview.status)&&!!store.interview.notes?.trim());
   function reviewGate(){
     const items=reviewRequirements().items.filter(i=>['interview','references'].includes(i.key));
-    return{interviewAddressed:false,referencesAddressed:false,benchReadyEligible:items.every(i=>i.status!=='pending'),blockers:items.filter(i=>i.status==='pending').map(i=>i.label+' must be addressed'),deferrals:{interview:store.reviewDeferrals.interview||null,references:store.reviewDeferrals.references||null}};
+    return{interviewAddressed:interviewAddressed(),referencesAddressed:false,benchReadyEligible:items.every(i=>i.status!=='pending'),blockers:items.filter(i=>i.status==='pending').map(i=>i.label+' must be addressed'),deferrals:{interview:store.reviewDeferrals.interview||null,references:store.reviewDeferrals.references||null}};
+  }
+  function verification(){return{generatedAt:now(),viewerRole:personas[selected].role,applicant:queue().applicants[0],gate:reviewGate(),interview:clone(store.interview),interviewHistory:clone(store.interviewHistory),references:[],interviewers:[{id:id(2),name:'Taylor Morgan'}],availableAttendees:[{id:id(3),name:'Jordan Lee'}],calendarIntegration:{configured:false,organizerLabel:'Disabled in Test Mode'}};}
+  function recordPreviousInterview(body){
+    const keys=['action','requestId','applicantId','expectedUpdatedAt','interviewId','occurredOn','interviewerName','outcome','communicationScore','preparednessScore','roleFitScore','overallScore','note'];
+    const uuid=value=>typeof value==='string'&&/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+    const validText=(value,max)=>typeof value==='string'&&!!value.trim()&&value.trim().length<=max&&!value.includes('\u0000');
+    if(Object.keys(body).length!==keys.length||keys.some(k=>!Object.hasOwn(body,k))||body.action!=='record_previous_interview'||!uuid(body.requestId)||body.applicantId!==id(11)||!['admin','talent_management'].includes(personas[selected].role))return null;
+    const fingerprint=JSON.stringify(body),prior=store.interviewRequests[body.requestId];
+    if(prior)return prior===fingerprint?verification():null;
+    if(!['in_review','needs_more_info','bench_ready'].includes(store.stage)||store.applicants[1].archived_at)return null;
+    if(!validText(body.interviewerName,180)||!validText(body.note,4000)||!['recommended','follow_up','not_recommended'].includes(body.outcome))return null;
+    if(body.occurredOn!==null&&(!validCalendarDate(body.occurredOn)||body.occurredOn>new Date().toISOString().slice(0,10)))return null;
+    const scores=['communicationScore','preparednessScore','roleFitScore','overallScore'];
+    if(scores.some(k=>body[k]!==null&&(!Number.isInteger(body[k])||body[k]<1||body[k]>5)))return null;
+    const current=store.interview;
+    if(current){
+      if(body.interviewId!==current.interviewId||body.expectedUpdatedAt!==current.updatedAt)return null;
+      if(current.recordSource!=='historical'&&!(current.status==='cancelled'&&current.calendar.status==='not_applicable'))return null;
+    }else if(body.interviewId!==null||body.expectedUpdatedAt!==null)return null;
+    const stamp=new Date(Math.max(Date.now(),Date.parse(current?.updatedAt||0)+1)).toISOString();
+    if(current&&current.recordSource!=='historical')store.interviewHistory.push(clone(current));
+    const next={interviewId:current?.interviewId||crypto.randomUUID(),roundNumber:(current?.roundNumber||1)+(current&&current.recordSource!=='historical'?1:0),recordSource:'historical',occurredOn:body.occurredOn,status:'completed',startsAt:null,endsAt:null,timezone:null,updatedAt:stamp,interviewer:{id:null,name:body.interviewerName.trim()},additionalAttendees:[],outcome:body.outcome,scorecard:{communication:body.communicationScore,preparedness:body.preparednessScore,roleFit:body.roleFitScore,overall:body.overallScore},notes:body.note.trim(),calendar:{status:'not_applicable',joinUrl:null}};
+    store.interviewAudit.push({actorId:personas[selected].id,at:stamp,action:'record_previous_interview',before:clone(current),after:clone(next)});
+    store.interview=next;store.applicants[1].updated_at=stamp;store.interviewRequests[body.requestId]=fingerprint;
+    notice('Previous interview saved in this test session only. No invitation, email, or task was created.');
+    return verification();
   }
   function changeReviewDeferral(body){
     const a=store.applicants[1],item=reviewRequirements().items.find(i=>i.key===body.itemKey);
@@ -237,7 +268,11 @@
       result=method==='GET'?reviewRequirements():changeReviewDeferral(body);
       if(!result)return new Response(JSON.stringify({message:'The sample review changed or required information is missing. Refresh and try again.'}),{status:409});
     }
-    else if(name==='talent-verification'&&method==='GET'&&selected==='talent'){const a=queue().applicants[0];result={generatedAt:now(),viewerRole:personas[selected].role,applicant:a,gate:reviewGate(),interview:null,interviewHistory:[],references:[],interviewers:[{id:id(2),name:'Taylor Morgan'}],availableAttendees:[{id:id(3),name:'Jordan Lee'}],calendarIntegration:{configured:false,organizerLabel:'Disabled in Test Mode'}};}
+    else if(name==='talent-verification'){
+      if(selected!=='talent'||!['admin','talent_management'].includes(personas[selected].role)||(method==='GET'?u.searchParams.get('applicantId'):body.applicantId)!==id(11))return new Response(JSON.stringify({message:'This sample interview is unavailable.'}),{status:403});
+      result=method==='GET'?verification():method==='POST'?recordPreviousInterview(body):null;
+      if(!result)return new Response(JSON.stringify({message:'This interview changed or required details are missing. Existing scheduled interviews cannot be overwritten. Refresh and check the fields.'}),{status:409});
+    }
     else if(name==='talent-review-queue'&&method==='POST'&&body.action==='begin_review'&&selected==='talent'){store.stage='in_review';store.applicants[1].updated_at=now();result=queue();}
     else if(name==='talent-review-queue'&&method==='POST'&&['mark_bench_ready','return_to_review'].includes(body.action)&&selected==='talent'){
       if(body.applicantId!==id(11)||body.expectedUpdatedAt!==store.applicants[1].updated_at||(body.action==='mark_bench_ready'&&(store.stage!=='in_review'||reviewRequirements().items.some(i=>i.status==='pending'))))return new Response(JSON.stringify({message:'Resolve or explicitly defer each remaining requirement before Bench Ready.'}),{status:409});

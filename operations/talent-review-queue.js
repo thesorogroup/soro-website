@@ -405,7 +405,9 @@
     const timezone = text(source.timezone, 80);
     const interviewerSource = source.interviewer;
     const interviewerId = validUuid(interviewerSource?.id, { optional: true });
-    const interviewerName = text(interviewerSource?.name, 120);
+    const interviewerName = text(interviewerSource?.name, 180);
+    const recordSource = source.recordSource == null ? 'scheduled' : text(source.recordSource, 30);
+    const occurredOn = source.occurredOn == null ? null : validDate(source.occurredOn);
     const calendarStatus = text(source.calendar?.status, 40).toLowerCase();
     const joinUrl = safeHttpsUrl(source.calendar?.joinUrl);
     const scorecard = normalizeScorecard(source.scorecard);
@@ -418,10 +420,14 @@
     if (outcome && !INTERVIEW_OUTCOMES.has(outcome)) return null;
     if (source.scorecard && !scorecard) return null;
     if (source.calendar?.joinUrl && !joinUrl) return null;
+    if (!['scheduled', 'historical'].includes(recordSource) || (source.occurredOn != null && !occurredOn)) return null;
+    if (recordSource === 'historical' && (status !== 'completed' || calendarStatus !== 'not_applicable' || startsAt || endsAt || timezone || joinUrl || interviewerId || additionalAttendees.length || !outcome)) return null;
+    if (recordSource !== 'historical' && occurredOn) return null;
     return Object.freeze({
-      interviewId, status, startsAt, endsAt, timezone, updatedAt,
+      interviewId, status, startsAt: recordSource === 'historical' ? null : startsAt,
+      endsAt: recordSource === 'historical' ? null : endsAt, timezone, updatedAt, recordSource, occurredOn,
       roundNumber: Math.max(1, Number(source.roundNumber) || 1),
-      interviewer: Object.freeze({ id: interviewerId, name: interviewerName }),
+      interviewer: Object.freeze({ id: recordSource === 'historical' ? null : interviewerId, name: interviewerName }),
       additionalAttendees,
       outcome: outcome || '', scorecard, notes: text(source.notes, 4000),
       calendar: Object.freeze({ status: calendarStatus, joinUrl })
@@ -760,6 +766,27 @@
   function buildVerificationAction(action, values = {}) {
     const normalizedAction = text(action, 50).toLowerCase();
     const applicantId = values.applicantId;
+    if (normalizedAction === 'record_previous_interview') {
+      const base = verificationRequestBase(normalizedAction, applicantId, values.expectedUpdatedAt ?? null);
+      const interviewId = values.interviewId == null ? null : validUuid(values.interviewId);
+      const occurredOn = values.occurredOn == null || values.occurredOn === '' ? null : validDate(values.occurredOn);
+      const outcome = text(values.outcome, 40).toLowerCase();
+      if (values.interviewId != null && !interviewId) throw new Error('The interview record changed. Refresh and try again.');
+      if ((interviewId && !base.expectedUpdatedAt) || (!interviewId && base.expectedUpdatedAt)) throw new Error('The interview record changed. Refresh and try again.');
+      if (values.occurredOn && (!occurredOn || occurredOn > new Date().toISOString().slice(0, 10))) throw new Error('Enter a past interview date, or leave the date blank if it is unknown.');
+      if (!INTERVIEW_OUTCOMES.has(outcome)) throw new Error('Choose an interview recommendation.');
+      if (String(values.interviewerName || '').trim().length > 180) throw new Error('Keep the interviewer name to 180 characters or fewer.');
+      if (String(values.note || '').trim().length > 4000) throw new Error('Keep the interview summary to 4,000 characters or fewer.');
+      return Object.freeze({
+        ...base, interviewId, occurredOn,
+        interviewerName: requiredText(values.interviewerName, 'Interviewer name', 180), outcome,
+        communicationScore: nullableFormScore(values.communicationScore),
+        preparednessScore: nullableFormScore(values.preparednessScore),
+        roleFitScore: nullableFormScore(values.roleFitScore),
+        overallScore: nullableFormScore(values.overallScore),
+        note: requiredText(values.note, 'Internal interview summary', 4000)
+      });
+    }
     if (normalizedAction === 'schedule_interview') {
       const base = verificationRequestBase(normalizedAction, applicantId, null);
       const startsAt = validTimestamp(values.startsAt);
@@ -861,7 +888,7 @@
   }
 
   function reviewDialogOpen() {
-    return Boolean(requirementsContext || root?.document?.querySelector?.('[data-review-dialog][open], [data-verification-dialog][open]'));
+    return Boolean(requirementsContext || root?.soroTalentCoreProfileEditor?.isOpen?.() || root?.document?.querySelector?.('[data-review-dialog][open], [data-verification-dialog][open]'));
   }
 
   async function refresh(options = {}) {
@@ -986,17 +1013,17 @@
         const isSkills = item.key === 'skills';
         const done = isSkills ? skillsCount > 0 : item.resultRecorded === true;
         const status = isSkills ? (skillsCount === 0 ? 'No Skills Verified' : skillsSummary)
-          : done ? 'Result Recorded' : item.resultRecorded === false ? 'Awaiting Result' : 'Recording Status Not Loaded';
+          : done ? 'Verified · Result Recorded' : item.resultRecorded === false ? 'Awaiting Result' : 'Recording Status Not Loaded';
         const receipt = isSkills ? (item.state === 'complete' ? 'Skills Reported' : 'No Skills Reported') : sourceLabel(item);
         const label = isSkills ? 'Skills Verification' : item.label;
-        return `<li class="talent-review-progress-item ${item.deferral ? 'is-deferred' : done ? 'is-recorded' : 'is-pending'}">
+        return `<li class="talent-review-progress-item ${done ? 'is-recorded' : item.deferral ? 'is-deferred' : 'is-pending'}" data-review-progress="${escapeHtml(item.key)}">
           <strong>${escapeHtml(label)}</strong>
-          <span class="talent-review-receipt ${item.state === 'complete' ? 'is-received' : 'is-source-missing'}">${escapeHtml(receipt)}</span>
           <span class="talent-review-progress-status"><b aria-hidden="true">${done ? '✓' : '○'}</b>${escapeHtml(status)}</span>
-          ${item.deferral ? '<span class="talent-review-deferral-badge">Verify Later</span>' : ''}
+          <span class="talent-review-receipt ${item.state === 'complete' ? 'is-received' : 'is-source-missing'}">${escapeHtml(receipt)}</span>
+          ${item.deferral ? `<span class="talent-review-deferral-badge">${done && !isSkills ? 'Source File Deferred' : 'Verify Later'}</span>` : ''}
         </li>`;
       }).join('')}</ul>
-      <p class="talent-review-checklist-note">Received files are not reviewed results. Green means a result is recorded or skills are verified; interview and reference checks are separate.</p>
+      <p class="talent-review-checklist-note">Green means the assessment result is recorded or the skill is verified. File receipt and categorization are separate checks; they do not undo a recorded result.</p>
       <details class="talent-review-submission" data-review-submission="${applicant.applicantId}"${submissionOpen ? ' open' : ''}><summary><strong>Applicant Submission</strong><span>${received} of ${applicant.checklist.length} Items Received</span></summary>
         <ul>${applicant.checklist.map(item => `<li class="${item.state === 'complete' ? 'is-received' : 'is-source-missing'}"><strong>${escapeHtml(item.label)}</strong><span>${item.state === 'complete' ? 'Received' : item.evidenceState === 'unclassified_available' ? 'Check File Category' : 'Missing'}</span>${item.deferral ? '<span class="talent-review-deferral-badge">Verify Later</span>' : ''}</li>`).join('')}</ul>
       </details>
@@ -1030,7 +1057,8 @@
   }
 
   function interviewButtonMarkup(applicant) {
-    return `<button type="button" class="button talent-review-verification" data-review-interview="${escapeHtml(applicant.applicantId)}" aria-label="Schedule interview for ${escapeHtml(applicant.fullName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM8 2v6m8-6v6M4 10h16"/></svg><span><strong>Schedule Interview</strong><small>Appointment &amp; outcome</small></span></button>`;
+    const complete = verificationGateCache.get(applicant.applicantId)?.interviewAddressed === true;
+    return `<button type="button" class="button talent-review-verification" data-review-interview="${escapeHtml(applicant.applicantId)}" aria-label="Schedule interview for ${escapeHtml(applicant.fullName)}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v16H4zM8 2v6m8-6v6M4 10h16"/></svg><span><strong>Schedule Interview</strong>${complete ? '<small class="talent-review-interview-complete">✓ Interview Complete</small>' : '<small>Appointment &amp; outcome</small>'}</span></button>`;
   }
 
   function requirementsButtonMarkup(applicant) {
@@ -1048,7 +1076,7 @@
       <header class="talent-review-card-heading">
         <span class="talent-review-avatar" aria-hidden="true">${escapeHtml(initials(applicant.fullName))}</span>
         <div class="talent-review-person">
-          <button type="button" class="talent-review-profile-link" data-review-profile="${escapeHtml(applicant.applicantId)}">${escapeHtml(applicant.fullName)}</button>
+          <div class="talent-review-name-row"><button type="button" class="talent-review-profile-link" data-review-profile="${escapeHtml(applicant.applicantId)}">${escapeHtml(applicant.fullName)}</button>${!applicant.archived ? `<button type="button" class="talent-review-core-edit" data-review-core-profile="${escapeHtml(applicant.applicantId)}" aria-label="Edit core profile for ${escapeHtml(applicant.fullName)}">Edit Core Profile</button>` : ''}</div>
           ${applicant.preferredName ? `<span>Goes by ${escapeHtml(applicant.preferredName)}</span>` : ''}
           ${applicant.email ? `<small>${escapeHtml(applicant.email)}</small>` : ''}
         </div>
@@ -1171,7 +1199,7 @@
 
   function scorecardMarkup(scorecard) {
     if (!scorecard) return '';
-    const values = [['Communication', scorecard.communication], ['Preparedness', scorecard.preparedness], ['Role fit', scorecard.roleFit], ['Overall', scorecard.overall]];
+    const values = [['Communication / English comprehension', scorecard.communication], ['Preparedness', scorecard.preparedness], ['Role fit', scorecard.roleFit], ['Overall', scorecard.overall]];
     return `<dl class="talent-verification-scorecard">${values.map(([label, value]) => `<div><dt>${label}</dt><dd>${value === null ? '—' : `${escapeHtml(value)} / 5`}</dd></div>`).join('')}</dl>`;
   }
 
@@ -1181,27 +1209,56 @@
       <div class="talent-verification-form-grid">
         <label><span>Interview status</span><select name="status" required><option value="completed">Completed</option><option value="no_show">Applicant did not attend</option><option value="waived">Interview waived</option></select></label>
         <label><span>Recommendation</span><select name="outcome"><option value="recommended">Recommended</option><option value="follow_up">Follow-up needed</option><option value="not_recommended">Not recommended</option></select></label>
-        ${[['communicationScore', 'Communication'], ['preparednessScore', 'Preparedness'], ['roleFitScore', 'Role fit'], ['overallScore', 'Overall']].map(([name, label]) => `<label><span>${label} score</span><input type="number" name="${name}" min="1" max="5" step="1" inputmode="numeric" placeholder="1–5"></label>`).join('')}
+        ${[['communicationScore', 'Communication / English comprehension'], ['preparednessScore', 'Preparedness'], ['roleFitScore', 'Role fit'], ['overallScore', 'Overall']].map(([name, label]) => `<label><span>${label} score</span><input type="number" name="${name}" min="1" max="5" step="1" inputmode="numeric" placeholder="1–5"></label>`).join('')}
         <label class="talent-verification-field-wide"><span>Internal summary</span><textarea name="note" maxlength="4000" required placeholder="Record the interview result and follow-up. This is not added to calendar invitations."></textarea></label>
       </div>
       <button type="submit" class="button primary">Save interview result</button>
     </form>`;
   }
 
+  function previousInterviewFormMarkup(interview = null) {
+    const previous = interview?.recordSource === 'historical' ? interview : null;
+    return `<form class="talent-verification-form talent-interview-previous-form" data-verification-form="record_previous_interview">
+      <div class="talent-interview-manual-note"><strong>Already interviewed outside this system?</strong><p>Record what happened here. Saving counts toward the interview requirement without creating a calendar invitation, email, or follow-up task.</p></div>
+      <div class="talent-verification-form-grid">
+        <label><span>Interview date <small>(optional)</small></span><input type="date" name="occurredOn" max="${new Date().toISOString().slice(0, 10)}" value="${escapeHtml(previous?.occurredOn || '')}" aria-describedby="previous-interview-date-help"><small id="previous-interview-date-help">Leave blank if the original date is unknown. No date or time will be invented.</small></label>
+        <label><span>Interviewer name</span><input name="interviewerName" maxlength="180" value="${escapeHtml(previous?.interviewer.name || '')}" required autocomplete="off" placeholder="Who conducted the interview?"></label>
+        <fieldset class="talent-interview-previous-scores talent-verification-field-wide"><legend>Interview scores <span>(optional · 1–5)</span></legend><p>Use the original scores if available. Leave a score blank if it was not recorded. These are interview ratings, separate from uploaded assessment test results.</p><div class="talent-verification-form-grid">${[['communicationScore', 'communication', 'Communication / English comprehension'], ['preparednessScore', 'preparedness', 'Preparedness'], ['roleFitScore', 'roleFit', 'Role fit'], ['overallScore', 'overall', 'Overall']].map(([name, key, label]) => `<label><span>${label} score</span><input type="number" name="${name}" min="1" max="5" step="1" inputmode="numeric" value="${escapeHtml(previous?.scorecard?.[key] ?? '')}" placeholder="1–5"></label>`).join('')}</div></fieldset>
+        <label class="talent-verification-field-wide"><span>Recommendation</span><select name="outcome" required><option value=""${previous?.outcome ? '' : ' selected'} disabled>Select the interview recommendation</option>${[['recommended', 'Recommended'], ['follow_up', 'Follow-up needed'], ['not_recommended', 'Not recommended']].map(([value, label]) => `<option value="${value}"${previous?.outcome === value ? ' selected' : ''}>${label}</option>`).join('')}</select><small>Saving satisfies the interview requirement. Other review requirements still apply before Bench Ready.</small></label>
+        <label class="talent-verification-field-wide"><span>Internal interview summary</span><textarea name="note" maxlength="4000" required placeholder="Summarize the previous interview, strengths, concerns, and any next steps.">${escapeHtml(previous?.notes || '')}</textarea><small>Private to authorized Soro staff. The original applicant answers are not changed.</small></label>
+      </div>
+      <button type="submit" class="button primary">${previous ? 'Save Previous Interview Changes' : 'Save Previous Interview'}</button>
+    </form>`;
+  }
+
+  function interviewEntryChoicesMarkup(data, interview = null) {
+    return `<div class="talent-interview-entry-choices" aria-label="Choose how to record this interview">
+      <details data-interview-choice="schedule"><summary><strong>Schedule New Interview</strong><span>Arrange an upcoming appointment with a calendar invitation.</span></summary>${scheduleFormMarkup(data, interview)}</details>
+      <details data-interview-choice="previous"><summary><strong>Record Previous Interview</strong><span>Add the scores and outcome from an interview that already happened.</span></summary>${previousInterviewFormMarkup()}</details>
+    </div>`;
+  }
+
+  function previousInterviewDateLabel(interview) {
+    if (!interview.occurredOn) return 'Original date unknown';
+    return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${interview.occurredOn}T12:00:00Z`));
+  }
+
   function interviewMarkup(data) {
     const interview = data.interview;
-    if (!interview) return `<section class="talent-verification-section"><div class="talent-verification-section-heading"><div><p class="eyebrow">Internal interview</p><h3>No interview scheduled</h3></div><span class="talent-verification-state is-open">Action needed</span></div>${scheduleFormMarkup(data)}</section>`;
+    if (!interview) return `<section class="talent-verification-section"><div class="talent-verification-section-heading"><div><p class="eyebrow">Internal interview</p><h3>Interview record</h3></div><span class="talent-verification-state is-open">Action needed</span></div><p class="talent-interview-entry-intro">Choose an upcoming appointment or record an interview that took place before this system.</p>${interviewEntryChoicesMarkup(data)}</section>`;
+    const historical = interview.recordSource === 'historical';
     const terminal = ['completed', 'no_show', 'waived'].includes(interview.status);
     const followUp = interview.status === 'no_show' || (interview.status === 'completed' && interview.outcome === 'follow_up');
     return `<section class="talent-verification-section">
-      <div class="talent-verification-section-heading"><div><p class="eyebrow">Internal interview</p><h3>${escapeHtml(humanLabel(interview.status))}</h3></div><span class="talent-verification-state is-${escapeHtml(interview.status)}">${escapeHtml(humanLabel(interview.status))}</span></div>
-      <div class="talent-verification-interview-summary"><div><small>Appointment</small><strong>${escapeHtml(formatDateTime(interview.startsAt, interview.timezone))}</strong></div><div><small>Interviewer</small><strong>${escapeHtml(interview.interviewer.name)}</strong></div>${interview.outcome ? `<div><small>Recommendation</small><strong>${escapeHtml(humanLabel(interview.outcome))}</strong></div>` : ''}</div>
-      ${calendarMarkup(interview)}
+      <div class="talent-verification-section-heading"><div><p class="eyebrow">${historical ? 'Recorded manually' : 'Internal interview'}</p><h3>${historical ? 'Previous Interview Completed' : escapeHtml(humanLabel(interview.status))}</h3></div><span class="talent-verification-state is-${escapeHtml(interview.status)}">${escapeHtml(humanLabel(interview.status))}</span></div>
+      <div class="talent-verification-interview-summary"><div><small>${historical ? 'Original interview date' : 'Appointment'}</small><strong>${escapeHtml(historical ? previousInterviewDateLabel(interview) : formatDateTime(interview.startsAt, interview.timezone))}</strong></div><div><small>Interviewer</small><strong>${escapeHtml(interview.interviewer.name)}</strong></div>${interview.outcome ? `<div><small>Recommendation</small><strong>${escapeHtml(humanLabel(interview.outcome))}</strong></div>` : ''}</div>
+      ${historical ? '<p class="talent-interview-recorded-note">Completed outside this system and recorded for the review checklist. No calendar invitation, email, or follow-up task was created.</p>' : calendarMarkup(interview)}
       ${interview.additionalAttendees?.length ? `<p class="talent-verification-form-note"><strong>Additional attendees:</strong> ${interview.additionalAttendees.map(person => escapeHtml(person.name)).join(', ')}</p>` : ''}
       ${scorecardMarkup(interview.scorecard)}
       ${interview.notes ? `<div class="talent-verification-private-note"><strong>Internal note</strong><p>${escapeHtml(interview.notes)}</p></div>` : ''}
       ${interview.status === 'scheduled' ? `<div class="talent-verification-control-grid"><details><summary>Reschedule</summary>${scheduleFormMarkup(data, interview)}</details><details><summary>Complete or waive</summary>${outcomeFormMarkup(interview)}</details><details><summary>Cancel appointment</summary><form class="talent-verification-form" data-verification-form="cancel_interview"><label><span>Internal cancellation note</span><textarea name="note" maxlength="1000" required placeholder="Why is this appointment being cancelled?"></textarea></label><p class="talent-verification-form-note">This internal note is not sent in the calendar cancellation.</p><button type="submit" class="button talent-review-confirm-guarded">Cancel interview</button></form></details></div>` : ''}
-      ${interview.status === 'cancelled' ? (interview.calendar.status === 'not_applicable' ? scheduleFormMarkup(data, interview) : '<p class="talent-verification-inline-error">Finish the Microsoft 365 cancellation above before rebooking this interview.</p>') : ''}
+      ${historical ? `<details class="talent-interview-edit-previous" data-interview-choice="edit-previous"><summary>Edit Previous Interview</summary>${previousInterviewFormMarkup(interview)}</details>` : ''}
+      ${interview.status === 'cancelled' ? (interview.calendar.status === 'not_applicable' ? interviewEntryChoicesMarkup(data, interview) : '<p class="talent-verification-inline-error">Finish the Microsoft 365 cancellation above before rebooking or recording a previous interview.</p>') : ''}
       ${followUp ? (['synced', 'not_applicable'].includes(interview.calendar.status) && data.applicant.stage === 'in_review' ? `<details class="talent-interview-follow-up"><summary>Schedule follow-up interview</summary><p>The previous appointment and its result will stay in Interview history. This creates a new invitation.</p>${scheduleFormMarkup(data, interview, true)}</details>` : '<p class="talent-verification-form-note">Complete calendar sync and keep the application in review before scheduling another round.</p>') : terminal ? '<p class="talent-verification-complete-copy">This interview requirement is addressed. Continue with reference verification.</p>' : ''}
       ${interview.status === 'scheduled' && Date.parse(interview.endsAt) <= Date.now() ? '<p class="talent-interview-result-due" role="status"><strong>Interview result due</strong><br>Record the outcome to complete the interviewer’s follow-up task.</p>' : ''}
       ${interviewHistoryMarkup(data.interviewHistory)}
@@ -1210,7 +1267,7 @@
 
   function interviewHistoryMarkup(history = []) {
     if (!history.length) return '';
-    return `<section class="talent-interview-history" aria-label="Interview history"><h4>Interview history</h4><p>Previous rounds are saved for your team. Notes and scores stay private.</p>${[...history].reverse().map(item => `<details><summary><span>Round ${escapeHtml(item.roundNumber)} · ${escapeHtml(humanLabel(item.status))}</span><small>${escapeHtml(formatDateTime(item.startsAt, item.timezone))}</small></summary><div class="talent-interview-history-body"><p><strong>Interviewer:</strong> ${escapeHtml(item.interviewer.name)}</p>${item.additionalAttendees.length ? `<p><strong>Also invited:</strong> ${item.additionalAttendees.map(person => escapeHtml(person.name)).join(', ')}</p>` : ''}${item.outcome ? `<p><strong>Recommendation:</strong> ${escapeHtml(humanLabel(item.outcome))}</p>` : ''}${scorecardMarkup(item.scorecard)}${item.notes ? `<p>${escapeHtml(item.notes)}</p>` : ''}</div></details>`).join('')}</section>`;
+    return `<section class="talent-interview-history" aria-label="Interview history"><h4>Interview history</h4><p>Previous rounds are saved for your team. Notes and scores stay private.</p>${[...history].reverse().map(item => `<details><summary><span>Round ${escapeHtml(item.roundNumber)} · ${item.recordSource === 'historical' ? 'Previous Interview Completed · Recorded Manually' : escapeHtml(humanLabel(item.status))}</span><small>${escapeHtml(item.recordSource === 'historical' ? previousInterviewDateLabel(item) : formatDateTime(item.startsAt, item.timezone))}</small></summary><div class="talent-interview-history-body"><p><strong>Interviewer:</strong> ${escapeHtml(item.interviewer.name)}</p>${item.additionalAttendees.length ? `<p><strong>Also invited:</strong> ${item.additionalAttendees.map(person => escapeHtml(person.name)).join(', ')}</p>` : ''}${item.outcome ? `<p><strong>Recommendation:</strong> ${escapeHtml(humanLabel(item.outcome))}</p>` : ''}${scorecardMarkup(item.scorecard)}${item.notes ? `<p>${escapeHtml(item.notes)}</p>` : ''}</div></details>`).join('')}</section>`;
   }
 
   function referenceOutcomeLabel(reference) {
@@ -1254,7 +1311,7 @@
     let content = '';
     if (verificationContext.phase === 'loading') content = `<div class="talent-verification-loading" role="status">Loading ${interviewMode ? 'interview details' : 'skills and reference verification'}…</div>`;
     else if (verificationContext.phase === 'error') content = `<div class="talent-verification-error" role="alert"><strong>Verification unavailable</strong><p>${escapeHtml(verificationContext.error)}</p><button type="button" class="button" data-verification-retry>Try again</button></div>`;
-    else if (verificationContext.data) content = `${verificationContext.status ? `<div class="talent-verification-feedback ${verificationContext.statusType === 'error' ? 'is-error' : ''}" role="status">${escapeHtml(verificationContext.status)}</div>` : ''}${interviewMode ? interviewMarkup(verificationContext.data) : `<section class="talent-verification-section"><div class="talent-verification-section-heading"><div><p class="eyebrow">Applicant-reported skills</p><h3>Verify skills &amp; experience</h3></div></div><div data-review-skills-panel>${root.soroTalentReviewEvidence?.skillsMarkup(evidence.skills) || '<p>Skill review is unavailable. Refresh the page.</p>'}</div></section>${referencesMarkup(verificationContext.data)}`}`;
+    else if (verificationContext.data) content = `${verificationContext.status ? `<div class="talent-verification-feedback ${verificationContext.statusType === 'error' ? 'is-error' : ''}" role="status">${escapeHtml(verificationContext.status)}</div>` : ''}${interviewMode ? interviewMarkup(verificationContext.data) : `<section class="talent-verification-section"><div class="talent-verification-section-heading"><div><p class="eyebrow">Full Skill Library</p><h3>Add, edit &amp; verify skills</h3></div></div><div data-review-skills-panel>${root.soroTalentReviewEvidence?.skillsMarkup(evidence.skills) || '<p>Skill review is unavailable. Refresh the page.</p>'}</div></section>${referencesMarkup(verificationContext.data)}`}`;
     return `<dialog class="talent-verification-dialog${interviewMode ? '' : ' has-resume'}" data-verification-dialog data-verification-owner="${escapeHtml(verificationContext.applicantId)}" data-verification-mode="${interviewMode ? 'interview' : 'verification'}" aria-labelledby="talent-verification-title"><div class="talent-verification-shell"><header class="talent-verification-header"><div><p class="eyebrow">${interviewMode ? 'Schedule Interview' : 'Skills &amp; reference verification'}</p><h2 id="talent-verification-title">${escapeHtml(name)}</h2><p>${interviewMode ? 'Schedule or manage the appointment and record the interview outcome.' : 'Review the résumé alongside the reported skills and employment references.'}</p></div><button type="button" data-verification-close aria-label="Close verification">×</button></header><div class="talent-verification-workspace">${interviewMode ? '' : `<aside class="review-evidence-resume" data-review-resume-panel>${root.soroTalentReviewEvidence?.resumeMarkup(evidence.resume) || '<p>Résumé preview is unavailable.</p>'}</aside>`}<div class="talent-verification-body">${content}</div></div></div></dialog>`;
   }
 
@@ -1356,12 +1413,21 @@
       const nextBody = template.content.querySelector('.talent-verification-body');
       const body = existing.querySelector('.talent-verification-body');
       const draft = body.querySelector('[data-review-skills-form]');
+      const previousInterviewDraft = verificationContext.statusType === 'error' ? body.querySelector('[data-verification-form="record_previous_interview"]') : null;
+      const openInterviewChoices = [...(body.querySelectorAll?.('[data-interview-choice][open]') || [])].map(details => details.dataset.interviewChoice);
       const scroll = body.scrollTop;
       const workspace = existing.querySelector('.talent-verification-workspace');
       const workspaceScroll = workspace?.scrollTop || 0;
       body.innerHTML = nextBody.innerHTML;
       const nextDraft = body.querySelector('[data-review-skills-form]');
       if (draft && nextDraft) nextDraft.replaceWith(draft);
+      const nextPreviousInterview = body.querySelector('[data-verification-form="record_previous_interview"]');
+      if (previousInterviewDraft && nextPreviousInterview) nextPreviousInterview.replaceWith(previousInterviewDraft);
+      for (const choice of openInterviewChoices) {
+        const details = [...(body.querySelectorAll?.('[data-interview-choice]') || [])].find(item => item.dataset.interviewChoice === choice);
+        if (details) details.open = true;
+      }
+      mountSkillPicker();
       body.scrollTop = scroll;
       if (workspace) workspace.scrollTop = workspaceScroll;
       return true;
@@ -1391,6 +1457,7 @@
       if (typeof dialog.showModal === 'function' && !dialog.open) dialog.showModal();
     }
     mountResumeViewer();
+    mountSkillPicker();
     const after = anchorSelector ? mountedRoot.querySelector?.(anchorSelector)?.getBoundingClientRect?.().top : null;
     if (Number.isFinite(top) && Number.isFinite(after) && typeof root.scrollBy === 'function') root.scrollBy({top: after - top, behavior:'instant'});
     else if (Number.isFinite(pageScroll)) root.scrollTo?.({top:pageScroll, behavior:'instant'});
@@ -1472,6 +1539,13 @@
     });
   }
 
+  function mountSkillPicker() {
+    const form = mountedRoot?.querySelector?.('[data-review-skills-form]');
+    if (form && evidence.skills?.catalog && root.soroTalentReviewEvidence?.authorized()) {
+      root.soroTalentSkillEditor?.bindPicker?.(form, evidence.skills);
+    }
+  }
+
   async function loadEvidence(kind) {
     if (kind === 'skills' && skillsSaving) return;
     const service = root.soroTalentReviewEvidence, id = verificationContext?.applicantId;
@@ -1484,7 +1558,7 @@
     const panel = () => mountedRoot?.querySelector?.(`[data-review-${kind === 'resume' ? 'resume' : 'skills'}-panel]`);
     if (panel()) panel().innerHTML = kind === 'resume' ? service.resumeMarkup(null) : service.skillsMarkup(null);
     let result;
-    try { result = await (kind === 'resume' ? service.loadResume(id) : service.loadSkills(id)); }
+    try { result = await (kind === 'resume' ? service.loadResume(id) : service.loadSkills(id, {includeCatalog:true})); }
     catch (error) {
       if (request !== evidenceRequests[kind] || version !== evidenceVersion || verificationContext?.applicantId !== id || service.scope() !== accessScope || !service.authorized()) return;
       result = {error: error.message};
@@ -1493,6 +1567,7 @@
     evidence[kind] = result;
     if (panel()) panel().innerHTML = kind === 'resume' ? service.resumeMarkup(evidence[kind]) : service.skillsMarkup(evidence[kind]);
     if (kind === 'resume') mountResumeViewer();
+    else mountSkillPicker();
   }
 
   function openVerification(applicantId, mode = 'verification') {
@@ -1565,6 +1640,15 @@
     if (!verificationContext?.data || !canOpenForRole()) throw new Error('Refresh this verification record and try again.');
     const context = verificationContext, version = verificationRequestVersion;
     const body = buildVerificationAction(action, { applicantId: context.applicantId, ...values });
+    if (body.action === 'record_previous_interview') {
+      const current = context.data.interview;
+      if (current && current.recordSource !== 'historical' && !(current.status === 'cancelled' && current.calendar.status === 'not_applicable')) {
+        throw new Error('Use the current appointment’s result controls. A scheduled or completed system interview cannot be replaced by a previous-interview entry.');
+      }
+      if ((current?.interviewId || null) !== body.interviewId || (current?.updatedAt || null) !== body.expectedUpdatedAt) {
+        throw new Error('The interview record changed. Refresh and try again.');
+      }
+    }
     if (['schedule_interview', 'reschedule_interview', 'schedule_follow_up_interview'].includes(body.action) && !verificationContext.data.interviewers.some(item => item.id === body.interviewerUserId)) {
       throw new Error('Choose an eligible interviewer from the current staff list.');
     }
@@ -1585,7 +1669,7 @@
     verificationGateCache.set(verificationContext.applicantId, data.gate);
     verificationContext = Object.freeze({
       applicantId: context.applicantId, mode: context.mode, phase: 'ready', data, error: '',
-      status: context.mode === 'interview' ? 'Interview saved.' : 'Reference verification saved.', statusType: 'success'
+      status: body.action === 'record_previous_interview' ? 'Previous interview saved. The interview requirement is now complete. Other review requirements remain unchanged.' : context.mode === 'interview' ? 'Interview saved.' : 'Reference verification saved.', statusType: 'success'
     });
     render();
     return data;
@@ -1599,7 +1683,7 @@
   }
 
   function verificationProgressLabel(action) {
-    return ({schedule_interview:'Scheduling interview…',reschedule_interview:'Rescheduling interview…',schedule_follow_up_interview:'Scheduling follow-up interview…',cancel_interview:'Cancelling interview…',retry_calendar_sync:'Updating interview calendar…',record_interview_outcome:'Saving interview outcome…'})[action] || 'Saving reference verification…';
+    return ({schedule_interview:'Scheduling interview…',reschedule_interview:'Rescheduling interview…',schedule_follow_up_interview:'Scheduling follow-up interview…',cancel_interview:'Cancelling interview…',retry_calendar_sync:'Updating interview calendar…',record_interview_outcome:'Saving interview outcome…',record_previous_interview:'Saving previous interview…'})[action] || 'Saving reference verification…';
   }
 
   function findApplicant(applicantId) {
@@ -1676,8 +1760,28 @@
     return '';
   }
 
+  async function openCoreProfile(applicantId) {
+    const applicant=findApplicant(applicantId),editor=root?.soroTalentCoreProfileEditor;
+    if(!canOpenForRole()||!applicant||applicant.archived||pendingStageAction||pendingVerificationAction||pendingRequirementAction)return false;
+    if(!editor?.open){feedback=Object.freeze({type:'error',message:'The Core Profile editor is unavailable. Refresh the page and try again.'});render();return false;}
+    holdReview(applicantId);
+    const mounted=mountedRoot,actor=actualUserId();
+    return editor.open(applicant,async saved=>{
+      if(!canOpenForRole()||mountedRoot!==mounted||actualUserId()!==actor)return;
+      feedback=Object.freeze({type:'success',message:'Core Profile saved. Refreshing the checklist…'});
+      await refresh({silent:true});
+      if(!canOpenForRole()||mountedRoot!==mounted||actualUserId()!==actor)return;
+      const refreshed=findApplicant(applicantId);
+      const caughtUp=saved?.record&&refreshed&&(refreshed.updatedAt===saved.record.updated_at||Date.parse(refreshed.updatedAt)>Date.parse(saved.record.updated_at));
+      feedback=Object.freeze(caughtUp?{type:'success',message:refreshed.checklist.find(item=>item.key==='core_profile')?.state==='complete'?'Core Profile saved — all core requirements are filled.':'Core Profile saved. Some required details are still missing.'}:{type:'error',message:'Core Profile saved, but the checklist could not be refreshed. Choose Refresh Queue to load the latest review.'});
+      render();
+    });
+  }
+
   async function handleClick(event) {
     if (pendingRequirementAction) { event.preventDefault(); return; }
+    const coreProfileButton = event.target.closest?.('[data-review-core-profile]');
+    if (coreProfileButton) { event.preventDefault(); openCoreProfile(coreProfileButton.dataset.reviewCoreProfile); return; }
     const requirementsButton = event.target.closest?.('[data-review-requirements]');
     if (requirementsButton) { event.preventDefault(); openRequirements(requirementsButton.dataset.reviewRequirements); return; }
     if (event.target.closest?.('[data-requirements-close]')) { event.preventDefault(); closeRequirements(); return; }
@@ -1825,20 +1929,44 @@
     if (skillsSaving || !service || context?.mode === 'interview' || !snapshot?.record) return;
     skillsSaving = true;
     evidenceRequests.skills += 1;
-    const names = service.skillNames(snapshot.record);
-    const selected = [...form.querySelectorAll('[name="verified_skill"]:checked')].map(input => ({name: names[Number(input.value)], years: form.elements[`skill_years_${input.value}`]?.value || ''}));
     const status = form.querySelector('[data-review-skills-status]'), submit = form.querySelector('[type="submit"]');
+    const controls = [...form.querySelectorAll('input, select, button')].map(control => ({control, disabled:control.disabled}));
+    controls.forEach(({control}) => { control.disabled = true; });
+    form.setAttribute?.('aria-busy', 'true');
     if (submit) submit.disabled = true;
     if (status) status.textContent = 'Saving verified skills…';
     try {
+      const names = service.skillNames(snapshot.record);
+      const selected = snapshot.catalog && root.soroTalentSkillEditor?.readSelection
+        ? root.soroTalentSkillEditor.readSelection(form, snapshot)
+        : [...form.querySelectorAll('[name="verified_skill"]:checked')].map(input => ({name: names[Number(input.value)], years: form.elements[`skill_years_${input.value}`]?.value || ''}));
       const saved = await service.saveSkills(context.applicantId, snapshot, selected);
       if (version !== evidenceVersion || verificationContext?.applicantId !== context.applicantId || !service.authorized()) return;
       evidence.skills = saved;
-      if (status) status.textContent = 'Verified skills saved to the Talent profile.';
+      const panel = form.closest?.('[data-review-skills-panel]');
+      if (panel) {
+        const search = form.querySelector('[name="skill_search"]')?.value || '';
+        const area = form.querySelector('[name="skill_area"]')?.value || '';
+        const scroll = form.querySelector('.profile-skill-editor-list')?.scrollTop || 0;
+        panel.innerHTML = service.skillsMarkup(saved);
+        const nextSearch = panel.querySelector('[name="skill_search"]'), nextArea = panel.querySelector('[name="skill_area"]');
+        if (nextSearch) nextSearch.value = search;
+        if (nextArea) nextArea.value = area;
+        mountSkillPicker();
+        const list = panel.querySelector('.profile-skill-editor-list');
+        if (list) list.scrollTop = scroll;
+        const nextStatus = panel.querySelector('[data-review-skills-status]');
+        if (nextStatus) nextStatus.textContent = 'Verified skills saved to the Talent profile.';
+      } else if (status) status.textContent = 'Verified skills saved to the Talent profile.';
     } catch (error) {
       if (version !== evidenceVersion || verificationContext?.applicantId !== context.applicantId) return;
       if (status) status.textContent = error.message || 'Skills could not be saved.';
-    } finally { if (version === evidenceVersion) skillsSaving = false; if (submit?.isConnected) submit.disabled = false; }
+    } finally {
+      if (version === evidenceVersion) skillsSaving = false;
+      controls.forEach(({control, disabled}) => { if (control.isConnected) control.disabled = disabled; });
+      if (submit?.isConnected) submit.disabled = false;
+      form.removeAttribute?.('aria-busy');
+    }
   }
 
   async function handleVerificationSubmit(form) {
@@ -1859,6 +1987,13 @@
       };
     } else if (action === 'cancel_interview') {
       bodyValues = { interviewId: interview?.interviewId, expectedUpdatedAt: interview?.updatedAt, note: values.note };
+    } else if (action === 'record_previous_interview') {
+      bodyValues = {
+        interviewId: interview?.interviewId || null, expectedUpdatedAt: interview?.updatedAt || null,
+        occurredOn: values.occurredOn || null, interviewerName: values.interviewerName, outcome: values.outcome,
+        communicationScore: values.communicationScore, preparednessScore: values.preparednessScore,
+        roleFitScore: values.roleFitScore, overallScore: values.overallScore, note: values.note
+      };
     } else if (action === 'record_interview_outcome') {
       bodyValues = {
         interviewId: interview?.interviewId, expectedUpdatedAt: interview?.updatedAt,
@@ -1940,6 +2075,7 @@
   }
 
   function unmount({ clear = true, reset = false } = {}) {
+    root?.soroTalentCoreProfileEditor?.close?.(true);
     pendingRequirementAction?.finish?.();
     pendingRequirementAction = null;
     pendingVerificationAction?.finish?.();
@@ -2103,6 +2239,7 @@
     setSearch,
     setSort,
     openResume,
+    openCoreProfile,
     openVerification,
     openRequirements,
     closeRequirements,

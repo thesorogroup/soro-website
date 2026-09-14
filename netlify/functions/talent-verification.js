@@ -31,6 +31,7 @@ const ACTIONS = new Set([
   'schedule_follow_up_interview',
   'cancel_interview',
   'record_interview_outcome',
+  'record_previous_interview',
   'retry_calendar_sync',
   'save_reference',
   'record_reference_attempt',
@@ -45,6 +46,10 @@ const ACTION_KEYS = Object.freeze({
   record_interview_outcome: [
     'action', 'requestId', 'applicantId', 'expectedUpdatedAt', 'interviewId', 'status', 'outcome',
     'communicationScore', 'preparednessScore', 'roleFitScore', 'overallScore', 'note'
+  ],
+  record_previous_interview: [
+    'action', 'requestId', 'applicantId', 'expectedUpdatedAt', 'interviewId', 'occurredOn', 'interviewerName',
+    'outcome', 'communicationScore', 'preparednessScore', 'roleFitScore', 'overallScore', 'note'
   ],
   retry_calendar_sync: ['action', 'requestId', 'applicantId', 'expectedUpdatedAt', 'interviewId'],
   save_reference: ['action', 'requestId', 'applicantId', 'expectedUpdatedAt', 'referenceId', 'name', 'company', 'relationship', 'phone', 'email'],
@@ -285,6 +290,19 @@ function inputScore(value, label) {
   return value;
 }
 
+function validDateOnly(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value;
+}
+
+function inputPreviousDate(value) {
+  if (value === null) return null;
+  if (!validDateOnly(value) || value > new Date().toISOString().slice(0, 10)) {
+    throw httpError(400, 'invalid_request', 'Choose a valid past interview date, or leave it blank if unknown.');
+  }
+  return value;
+}
+
 function inputDuration(value) {
   if (!Number.isInteger(value) || value < 15 || value > 240 || value % 5 !== 0) {
     throw httpError(400, 'invalid_request', 'Interview duration must be 15 to 240 minutes in five-minute increments.');
@@ -343,6 +361,19 @@ function actionPayload(body, action) {
     if (payload.status !== 'completed' && payload.outcome !== null) {
       throw httpError(400, 'invalid_request', 'No show and Waived do not use an interview outcome.');
     }
+    payload.scorecard = {
+      communication: inputScore(body.communicationScore, 'Communication score'),
+      preparedness: inputScore(body.preparednessScore, 'Preparedness score'),
+      roleFit: inputScore(body.roleFitScore, 'Role fit score'),
+      overall: inputScore(body.overallScore, 'Overall score')
+    };
+    payload.note = inputText(body.note, 'Interview note', 4000, { required: true });
+  } else if (action === 'record_previous_interview') {
+    payload.interviewId = inputNullableUuid(body.interviewId, 'interview');
+    payload.occurredOn = inputPreviousDate(body.occurredOn);
+    payload.interviewerName = inputText(body.interviewerName, 'Interviewer name', 180, { required: true });
+    payload.outcome = String(body.outcome || '').trim().toLowerCase();
+    if (!INTERVIEW_OUTCOMES.has(payload.outcome)) throw httpError(400, 'invalid_request', 'Choose an interview outcome.');
     payload.scorecard = {
       communication: inputScore(body.communicationScore, 'Communication score'),
       preparedness: inputScore(body.preparednessScore, 'Preparedness score'),
@@ -619,6 +650,15 @@ function publicInterview(value) {
   if (outcome && !INTERVIEW_OUTCOMES.has(outcome)) throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid response.');
   const calendarStatus = requiredText(value.calendar?.status, 30);
   if (!CALENDAR_STATUSES.has(calendarStatus)) throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid response.');
+  const recordSource = value.recordSource === undefined ? 'scheduled' : requiredText(value.recordSource, 30);
+  const occurredOn = value.occurredOn === undefined || value.occurredOn === null ? null : value.occurredOn;
+  if (!['scheduled', 'historical'].includes(recordSource) || (occurredOn !== null && !validDateOnly(occurredOn))
+    || (recordSource === 'scheduled' && occurredOn !== null)
+    || (recordSource === 'historical' && (status !== 'completed' || !outcome || calendarStatus !== 'not_applicable'
+      || value.startsAt || value.endsAt || value.timezone || value.interviewer?.id || value.calendar?.joinUrl
+      || (value.additionalAttendees || []).length))) {
+    throw httpError(502, 'verification_service_error', 'Talent verification returned an invalid previous interview.');
+  }
   const scorecard = value.scorecard === null || value.scorecard === undefined ? null : {
     communication: nullableScore(value.scorecard.communication),
     preparedness: nullableScore(value.scorecard.preparedness),
@@ -627,6 +667,8 @@ function publicInterview(value) {
   };
   return {
     interviewId: requiredUuid(value.interviewId),
+    recordSource,
+    occurredOn,
     roundNumber: Math.max(1, Number(value.roundNumber) || 1),
     status,
     startsAt: nullableTimestamp(value.startsAt),
@@ -752,7 +794,8 @@ async function mutateVerification(event) {
   }
   const requestId = inputUuid(body.requestId, 'request id');
   const applicantId = inputUuid(body.applicantId, 'Talent application');
-  const expectedUpdatedAt = inputTimestamp(body.expectedUpdatedAt, 'last update time', action === 'schedule_interview' || (action === 'save_reference' && body.referenceId === null));
+  const expectedUpdatedAt = inputTimestamp(body.expectedUpdatedAt, 'last update time', action === 'schedule_interview'
+    || (action === 'record_previous_interview' && body.interviewId === null) || (action === 'save_reference' && body.referenceId === null));
   const payloadInput = actionPayload(body, action);
   if (['schedule_interview', 'reschedule_interview', 'schedule_follow_up_interview', 'cancel_interview', 'record_interview_outcome', 'retry_calendar_sync'].includes(action)) {
     payloadInput.calendarOrganizer = graphConfigured() ? GRAPH_ORGANIZER : null;
@@ -766,6 +809,13 @@ async function mutateVerification(event) {
     p_expected_updated_at: expectedUpdatedAt,
     p_payload: payloadInput
   });
+  // Recording an interview which already happened must never dispatch a calendar operation.
+  if (action === 'record_previous_interview') {
+    if (mutation.calendarCommand !== null && mutation.calendarCommand !== undefined) {
+      throw httpError(502, 'verification_service_error', 'Previous interview returned an unexpected calendar operation.');
+    }
+    return json(200, publicPayload(mutation.state));
+  }
   const command = calendarCommand(mutation.calendarCommand, requestId, mutation.state);
   if (!command) return json(200, publicPayload(mutation.state));
 

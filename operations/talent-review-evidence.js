@@ -108,6 +108,9 @@
   function skillsMarkup(state) {
     if (!state) return '<p role="status">Loading applicant skills…</p>';
     if (state.error) return `<p role="alert">${escape(state.error)}</p><button type="button" class="button" data-evidence-retry="skills">Reload skills</button>`;
+    if (state.catalog && root.soroTalentSkillEditor?.pickerMarkup) {
+      return `<form data-review-skills-form><p class="review-skills-instructions">Search all available skills, including ones the applicant did not report. Select <strong>Verify</strong> only after checking a skill, and update experience as needed. Original application answers stay unchanged.</p>${root.soroTalentSkillEditor.pickerMarkup(state)}<p data-review-skills-status role="status" aria-live="polite"></p><button class="button primary" type="submit">Save verified skills</button></form>`;
+    }
     const names = skillNames(state.record), verified = state.record?.verified_skills || [], years = state.record?.legacy_application_data?.verified_skill_experience || {};
     return `<form data-review-skills-form><p>Check the skills you have verified. Experience in years is optional. These updates also appear on the Talent profile.</p><div class="review-evidence-skills">${names.map((name,index) => `<div class="review-evidence-skill"><label><input type="checkbox" name="verified_skill" value="${index}"${verified.includes(name) ? ' checked' : ''}><span>${escape(name)}</span></label><label><span>Years</span><input type="number" name="skill_years_${index}" min="0" max="50" step="0.5" value="${escape(years[name] ?? '')}"></label></div>`).join('') || '<p>No applicant-reported or previously verified skills are recorded yet.</p>'}</div><p data-review-skills-status role="status"></p><button class="button primary" type="submit"${names.length ? '' : ' disabled'}>Save verified skills</button></form>`;
   }

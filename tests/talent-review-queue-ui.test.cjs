@@ -20,7 +20,7 @@ test('review action row shares a flexible height without changing dropdown actio
   assert.match(css,/\.talent-review-action-divider \{ align-self: center/);
   assert.match(css,/\.talent-review-secondary\[open\] > summary::after/);
   assert.match(css,/@media \(max-width: 430px\)[\s\S]*\.talent-review-verification \{ flex: 1 1 100%; \}/);
-  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260914-verify-later/);
+  assert.match(read('operations/index.html'),/talent-review-queue.css\?v=20260914-core-profile/);
 });
 
 const APPLICANT_KEYS = Object.freeze([
@@ -298,11 +298,11 @@ test('verification and interview drawers contain independent controls', async t 
   ui.mount(target);await new Promise(r=>setImmediate(r));
   ui.openVerification(applicantId);await new Promise(r=>setImmediate(r));
   const dialog=()=>target.innerHTML.slice(target.innerHTML.indexOf('<dialog'));
-  assert.match(dialog(),/data-review-resume-panel/);assert.match(dialog(),/Verify skills/);assert.match(dialog(),/Employment references/);
+  assert.match(dialog(),/data-review-resume-panel/);assert.match(dialog(),/Add, edit &amp; verify skills/);assert.match(dialog(),/Employment references/);
   assert.doesNotMatch(dialog(),/data-verification-form="schedule_interview"|Internal interview/);
   ui.openVerification(applicantId,'interview');await new Promise(r=>setImmediate(r));
   assert.match(dialog(),/data-verification-form="schedule_interview"/);
-  assert.doesNotMatch(dialog(),/data-review-resume-panel|Employment references|Verify skills/);
+  assert.doesNotMatch(dialog(),/data-review-resume-panel|Employment references|Add, edit &amp; verify skills/);
 });
 
 function installUi(t, options = {}) {
@@ -360,6 +360,121 @@ function installUi(t, options = {}) {
   });
   return { ui, calls, events, listeners };
 }
+
+function interviewPayload(interview = null, overrides = {}) {
+  return {
+    generatedAt: updatedAt, viewerRole: 'admin',
+    applicant: {applicantId, fullName:'Legacy Applicant', stage:'in_review', updatedAt},
+    gate: {interviewAddressed: interview?.status === 'completed' && ['recommended','follow_up','not_recommended'].includes(interview?.outcome), referencesAddressed:false, benchReadyEligible:false, blockers:['References pending']},
+    interview, interviewHistory:[], references:[], interviewers:[], availableAttendees:[],
+    calendarIntegration:{configured:false, organizerLabel:''}, ...overrides
+  };
+}
+
+function historicalInterview(overrides = {}) {
+  return {
+    interviewId:requestId, status:'completed', recordSource:'historical', occurredOn:'2026-08-15',
+    startsAt:null, endsAt:null, timezone:null, updatedAt, roundNumber:1,
+    interviewer:{id:null, name:'Jordan Reed'}, additionalAttendees:[],
+    outcome:'recommended', scorecard:{communication:4,preparedness:null,roleFit:3,overall:4},
+    notes:'Prior interview notes', calendar:{status:'not_applicable',joinUrl:null}, ...overrides
+  };
+}
+
+test('previous interview action is explicit, validates dates and keeps unknown scores empty', t => {
+  const {ui} = installUi(t);
+  const input={applicantId,interviewId:null,expectedUpdatedAt:null,occurredOn:'2026-08-15',interviewerName:' Jordan Reed ',outcome:'recommended',communicationScore:'4',preparednessScore:'',roleFitScore:null,overallScore:'5',note:' Completed before the portal. '};
+  const body=ui.buildVerificationAction('record_previous_interview',input);
+  assert.deepEqual(body,{action:'record_previous_interview',requestId,applicantId,interviewId:null,expectedUpdatedAt:null,occurredOn:'2026-08-15',interviewerName:'Jordan Reed',outcome:'recommended',communicationScore:4,preparednessScore:null,roleFitScore:null,overallScore:5,note:'Completed before the portal.'});
+  assert.equal(ui.buildVerificationAction('record_previous_interview',{...input,occurredOn:''}).occurredOn,null);
+  assert.equal(ui.buildVerificationAction('record_previous_interview',{...input,interviewId:requestId,expectedUpdatedAt:updatedAt}).interviewId,requestId);
+  for(const change of [{occurredOn:'2026-02-30'},{occurredOn:'2999-01-01'},{outcome:''},{outcome:'passed'},{interviewerName:''},{interviewerName:'x'.repeat(181)},{note:''},{note:'x'.repeat(4001)},{communicationScore:0},{communicationScore:6},{interviewId:'bad'},{interviewId:requestId},{expectedUpdatedAt:updatedAt}]) {
+    assert.throws(()=>ui.buildVerificationAction('record_previous_interview',{...input,...change}),JSON.stringify(change));
+  }
+  assert.doesNotMatch(JSON.stringify(body),/startsAt|endsAt|status|additionalAttendee|interviewerUserId|sendEmail/);
+});
+
+test('historical interview metadata is validated without turning it into a calendar appointment', t => {
+  const {ui}=installUi(t);
+  const entry=historicalInterview({occurredOn:null,privateMeetingUrl:'SECRET'});
+  const saved=ui.normalizeVerificationPayload(interviewPayload(entry),applicantId,'admin').interview;
+  assert.equal(saved.recordSource,'historical');assert.equal(saved.occurredOn,null);
+  assert.equal(saved.interviewer.id,null);assert.equal(saved.startsAt,null);
+  assert.doesNotMatch(JSON.stringify(saved),/SECRET|privateMeetingUrl/);
+  for(const change of [{recordSource:'unknown'},{occurredOn:'not-a-date'},{status:'scheduled'},{timezone:'Asia/Manila'},{startsAt:updatedAt},{endsAt:updatedAt},{interviewer:{id:ownerId,name:'Jordan'}},{calendar:{status:'synced',joinUrl:null}},{outcome:null},{additionalAttendees:[{id:ownerId,name:'Guest'}]}]) {
+    assert.throws(()=>ui.normalizeVerificationPayload(interviewPayload({...entry,...change}),applicantId,'admin'),JSON.stringify(change));
+  }
+  const normal=historicalInterview({recordSource:undefined,occurredOn:undefined,status:'scheduled',outcome:'',startsAt:updatedAt,endsAt:'2026-08-30T23:30:00Z',timezone:'Asia/Manila',interviewer:{id:ownerId,name:'Jordan'},calendar:{status:'synced',joinUrl:null}});
+  assert.equal(ui.normalizeVerificationPayload(interviewPayload(normal),applicantId,'admin').interview.recordSource,'scheduled');
+});
+
+test('interview drawer offers both paths without requiring a staff account for historical recording', async t => {
+  let interview=null;
+  const {ui}=installUi(t,{responsePayload:call=>call.url.includes('talent-verification')?interviewPayload(interview):queuePayload('admin',[applicant({stage:'in_review'})])});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(resolve=>setImmediate(resolve));
+  ui.openVerification(applicantId,'interview');await new Promise(resolve=>setImmediate(resolve));
+  const markup=target.innerHTML.slice(target.innerHTML.indexOf('<dialog'));
+  assert.match(markup,/Schedule New Interview/);assert.match(markup,/Record Previous Interview/);
+  assert.match(markup,/data-verification-form="record_previous_interview"/);
+  assert.match(markup,/Communication \/ English comprehension score/);
+  assert.match(markup,/Leave blank if the original date is unknown/);
+  assert.match(markup,/without creating a calendar invitation, email, or follow-up task/);
+  assert.match(markup,/Saving satisfies the interview requirement\. Other review requirements still apply before Bench Ready/);
+  assert.doesNotMatch(markup,/follow-up recommendation still needs attention before Bench Ready/);
+  assert.match(markup,/<option value="" selected disabled>Select the interview recommendation/);
+  assert.doesNotMatch(markup,/<details data-interview-choice="[^"]+" open/);
+  assert.match(markup,/No eligible interviewer is available/,'scheduling remains independently guarded');
+  assert.match(markup,/>Save Previous Interview<\/button>/,'manual recording is available with a typed interviewer');
+});
+
+test('manually recorded interview displays honest date, editable scores and completion without auto Bench Ready', async t => {
+  let interview=historicalInterview({occurredOn:null});
+  const {ui}=installUi(t,{responsePayload:call=>call.url.includes('talent-verification')?interviewPayload(interview):queuePayload('admin',[applicant({stage:'in_review',allowedActions:['mark_bench_ready']})])});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(resolve=>setImmediate(resolve));
+  ui.openVerification(applicantId,'interview');await new Promise(resolve=>setImmediate(resolve));
+  const markup=target.innerHTML.slice(target.innerHTML.indexOf('<dialog'));
+  assert.match(markup,/Previous Interview Completed/);assert.match(markup,/Recorded manually/);
+  assert.match(markup,/Original date unknown/);assert.match(markup,/Edit Previous Interview/);
+  assert.match(markup,/name="interviewerName" maxlength="180" value="Jordan Reed"/);
+  assert.match(markup,/name="communicationScore"[^>]*value="4"/);
+  assert.match(markup,/name="preparednessScore"[^>]*value=""/);
+  assert.match(markup,/<option value="recommended" selected>/);
+  assert.match(target.innerHTML,/✓ Interview Complete/);
+  assert.match(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
+  assert.doesNotMatch(markup,/Join Teams|Retry sync|Check sync|data-verification-form="record_interview_outcome"/);
+});
+
+test('active scheduled interviews cannot be replaced by the previous-interview form', async t => {
+  const interview=historicalInterview({recordSource:'scheduled',occurredOn:null,status:'scheduled',outcome:'',startsAt:updatedAt,endsAt:'2026-08-30T23:30:00Z',timezone:'Asia/Manila',interviewer:{id:ownerId,name:'Jordan'},calendar:{status:'synced',joinUrl:null}});
+  const {ui}=installUi(t,{responsePayload:call=>call.url.includes('talent-verification')?interviewPayload(interview):queuePayload('admin',[applicant({stage:'in_review'})])});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(resolve=>setImmediate(resolve));
+  ui.openVerification(applicantId,'interview');await new Promise(resolve=>setImmediate(resolve));
+  const markup=target.innerHTML.slice(target.innerHTML.indexOf('<dialog'));
+  assert.doesNotMatch(markup,/data-verification-form="record_previous_interview"|Edit Previous Interview/);
+  assert.match(markup,/data-verification-form="record_interview_outcome"/);
+});
+
+test('historical follow-up retains source and date in history while offering a real new appointment', async t => {
+  const interview=historicalInterview({outcome:'follow_up'});
+  const {ui}=installUi(t,{responsePayload:call=>call.url.includes('talent-verification')?interviewPayload(interview,{interviewHistory:[historicalInterview({interviewId:'55555555-5555-4555-8555-555555555555'})]}):queuePayload('admin',[applicant({stage:'in_review'})])});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(resolve=>setImmediate(resolve));
+  ui.openVerification(applicantId,'interview');await new Promise(resolve=>setImmediate(resolve));
+  assert.match(target.innerHTML,/data-verification-form="schedule_follow_up_interview"/);
+  assert.match(target.innerHTML,/Previous Interview Completed · Recorded Manually/);
+  assert.match(target.innerHTML,/Aug 15, 2026/);
+  assert.match(target.innerHTML,/✓ Interview Complete/,'a completed historical follow-up recommendation still addresses the interview requirement');
+});
+
+test('historical date and interviewer controls remain top aligned with equal input heights',()=>{
+  const css=read('operations/talent-review-queue.css');
+  assert.match(css,/\.talent-interview-previous-form \.talent-verification-form-grid \{[^}]*align-items: start/);
+  assert.match(css,/\.talent-interview-previous-form label \{[^}]*align-content: start/);
+  assert.match(css,/\.talent-interview-previous-form input,\s*\.talent-interview-previous-form select \{ height: 44px; min-height: 44px; \}/);
+});
 
 test('only the actual Admin and Talent Management roles can open or load the queue', async t => {
   const { ui, calls } = installUi(t, { role: 'sales' });
@@ -682,6 +797,32 @@ test('leaving the queue during its first load leaves retryable state rather than
 
 const requirementKeys = ['core_profile','resume','english','disc','enneagram','mbti','internet','equipment','skills','interview','references'];
 const deferralRecord = {id:requestId,reason:'Confirm during onboarding.',createdAt:updatedAt,createdByName:'Jordan Reed',dueDate:null,taskId:null};
+test('recorded assessment stays green while missing-file follow-up remains separate', async t => {
+  const checklist=[
+    {key:'english',label:'English assessment',state:'needs_review',resultRecorded:true,evidenceState:'missing',deferral:deferralRecord},
+    {key:'disc',label:'DISC assessment',state:'needs_review',resultRecorded:true,evidenceState:'unclassified_available'},
+    {key:'mbti',label:'Personality assessment',state:'missing',resultRecorded:false,evidenceState:'missing',deferral:deferralRecord}
+  ];
+  const {ui}=installUi(t,{responsePayload:queuePayload('admin',[applicant({stage:'in_review',checklist,allowedActions:['mark_bench_ready']})])});
+  const target={innerHTML:'',addEventListener(){},removeEventListener(){},querySelector(){return null;}};
+  ui.mount(target);await new Promise(setImmediate);
+  const english=target.innerHTML.match(/<li class="talent-review-progress-item is-recorded" data-review-progress="english">([\s\S]*?)<\/li>/)?.[1];
+  assert.ok(english);assert.match(english,/Verified · Result Recorded/);assert.match(english,/File Missing/);assert.match(english,/Source File Deferred/);
+  assert.ok(english.indexOf('Verified · Result Recorded')<english.indexOf('File Missing'));
+  assert.match(target.innerHTML,/is-recorded" data-review-progress="disc"/);
+  assert.match(target.innerHTML,/is-deferred" data-review-progress="mbti"/);
+  assert.match(target.innerHTML,/0 of 3 Items Received/);
+  assert.match(target.innerHTML,/2 of 3 Results Recorded/);
+  assert.match(target.innerHTML,/data-review-action="mark_bench_ready" disabled/);
+});
+test('queue embeds the shared full-catalog picker without changing applicant reports',()=>{
+  const source=read('operations/talent-review-queue.js');
+  assert.match(source,/service.loadSkills\(id, \{includeCatalog:true\}\)/);
+  assert.match(source,/soroTalentSkillEditor\?\.bindPicker\?\.\(form, evidence.skills\)/);
+  assert.match(source,/soroTalentSkillEditor.readSelection\(form, snapshot\)/);
+  assert.match(source,/Add, edit &amp; verify skills/);
+  assert.doesNotMatch(source,/update\(\{\s*self_reported_skills/);
+});
 function requirementsPayload(overrides = {}) {
   return {applicantId,updatedAt,items:requirementKeys.map(key=>({key,label:key,status:'pending',deferral:null})),...overrides};
 }
